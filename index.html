@@ -220,6 +220,7 @@
       <button class="tab-btn active" data-tab="cal">Calendário</button>
       <button class="tab-btn" data-tab="tpl">Horário Base</button>
       <button class="tab-btn" data-tab="tec">Técnicos</button>
+      <button class="tab-btn" data-tab="feriados">Feriados</button>
     </div>
   </div>
 
@@ -340,6 +341,22 @@
     <div class="panel tec-summary" id="tecSummary"></div>
   </div>
 
+  <!-- FERIADOS TAB -->
+  <div id="tab-feriados" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Em cada feriado há sempre, no máximo, um único turno das 09:30 às 12:30. Atribui aqui quem o faz —
+      fica automaticamente refletido no calendário e conta para as horas/orçamento do técnico escolhido.
+    </p>
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <table class="tec-table" id="feriadosTable">
+        <thead>
+          <tr><th>Data</th><th>Feriado</th><th>Tipo</th><th>Turno</th><th>Técnico atribuído</th></tr>
+        </thead>
+        <tbody id="feriadosTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
 <!-- DAY MODAL -->
@@ -348,15 +365,27 @@
     <h2 id="modalTitle"></h2>
     <div class="sub" id="modalSub"></div>
     <div id="modalHolidayBanner"></div>
-    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">
-      Por omissão, uma alteração fica <strong>permanente a partir deste dia</strong> (todas as próximas ocorrências desta hora/dia da semana passam a ter este valor). Marca "Substituição pontual" se for só para este dia — nas semanas seguintes volta ao normal.
-    </p>
-    <div id="modalRows"></div>
-    <button class="add-row" id="addSlotBtn">+ Adicionar turno</button>
-    <div class="note-field">
-      <label>Nota (motivo da troca, férias, substituição...)</label>
-      <textarea id="noteInput" placeholder="Ex.: Marcos S. está de férias; Pedro S. cobre o turno"></textarea>
+
+    <div id="normalModeBlock">
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">
+        Por omissão, uma alteração fica <strong>permanente a partir deste dia</strong> (todas as próximas ocorrências desta hora/dia da semana passam a ter este valor). Marca "Substituição pontual" se for só para este dia — nas semanas seguintes volta ao normal.
+      </p>
+      <div id="modalRows"></div>
+      <button class="add-row" id="addSlotBtn">+ Adicionar turno</button>
+      <div class="note-field">
+        <label>Nota (motivo da troca, férias, substituição...)</label>
+        <textarea id="noteInput" placeholder="Ex.: Marcos S. está de férias; Pedro S. cobre o turno"></textarea>
+      </div>
     </div>
+
+    <div id="holidayModeBlock" style="display:none;">
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">
+        Em feriados há sempre, no máximo, um único turno das <strong id="holidayShiftLabel"></strong>. Escolhe quem o faz.
+      </p>
+      <label style="font:600 12px 'Inter';color:var(--ink-soft);display:block;margin-bottom:6px;">Técnico atribuído</label>
+      <select id="holidayTecSelect" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;"></select>
+    </div>
+
     <div class="modal-actions">
       <button class="btn ghost" id="btnCancel">Cancelar</button>
       <button class="btn danger" id="btnResetDay">Repor substituições deste dia</button>
@@ -459,6 +488,16 @@ const HOLIDAYS = [
 const HOLIDAY_MAP = {};
 HOLIDAYS.forEach(h => HOLIDAY_MAP[h.date] = h);
 
+// Atribuição de técnico ao turno único de feriado (09:30–12:30)
+const STORE_HOLIDAY_ASSIGN = 'tef_turnos_feriados_v1'; // {iso: nomeTecnico}
+function loadHolidayAssignments(){
+  try{ const raw = localStorage.getItem(STORE_HOLIDAY_ASSIGN); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveHolidayAssignments(a){ localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(a)); touchMeta(); }
+let HOLIDAY_ASSIGNMENTS = loadHolidayAssignments();
+const HOLIDAY_SHIFT = {start:'09:30', end:'12:30'};
+
 const COLOR_PALETTE = [
   '#dfeee4','#dfe9f7','#fbe3df','#fde9c8','#e8dff5','#fde0ec',
   '#dff5ee','#f3e6d3','#e3e8fb','#f0e3fb','#fbe6e6','#e0f0f5'
@@ -538,7 +577,16 @@ function templateSlotsForDate(dayKey, iso){
 
 // Full resolution for a given date: permanent template (as of that date)
 // with any single-day substitutions/removals/ad-hoc slots layered on top.
+// Feriados são um caso especial: ignoram o horário normal e têm sempre,
+// no máximo, um único turno (09:30–12:30) com o técnico atribuído.
 function shiftsForDate(iso, dayKey){
+  if(HOLIDAY_MAP[iso]){
+    const assigned = HOLIDAY_ASSIGNMENTS[iso];
+    if(assigned && assigned.trim()){
+      return [{id:'holiday_'+iso, start:HOLIDAY_SHIFT.start, end:HOLIDAY_SHIFT.end, name:assigned.trim(), _holiday:true}];
+    }
+    return [];
+  }
   const base = templateSlotsForDate(dayKey, iso);
   const exc = exceptions[iso];
   let result = base.map(slot=>{
@@ -646,7 +694,9 @@ function renderCalendar(){
     if(holiday) html += '<div class="holiday-name">'+holiday.name+'</div>';
 
     if(shifts.length === 0){
-      html += '<div class="empty-note">Sem turnos'+ (pontual ? ' (alterado)' : '') +'</div>';
+      html += '<div class="empty-note" style="'+(holiday?'color:var(--rust);font-style:normal;font-weight:600;':'')+'">'+
+        (holiday ? 'Sem técnico atribuído' : ('Sem turnos'+(pontual?' (alterado)':''))) +
+      '</div>';
     } else {
       html += '<div class="shift-list">';
       shifts.forEach(s=>{
@@ -674,13 +724,48 @@ const modalRows = document.getElementById('modalRows');
 const noteInput = document.getElementById('noteInput');
 let editingIso = null;
 let editingDayKey = null;
+let editingIsHoliday = false;
 let editingRows = []; // {slotId, start, end, name, substituteName, pontual, removed, isNew}
 
 function openDayModal(iso, dayKey, dateObj){
   editingIso = iso;
   editingDayKey = dayKey;
-  const exc = exceptions[iso];
+  const holiday = HOLIDAY_MAP[iso];
+  editingIsHoliday = !!holiday;
 
+  modalTitle.textContent = LONG_WEEKDAY[dateObj.getDay()];
+  modalSub.textContent = dateObj.getDate()+' de '+MONTH_NAMES[dateObj.getMonth()].toLowerCase()+' de '+dateObj.getFullYear();
+
+  if(holiday){
+    const bg = holiday.type==='municipal' ? 'var(--muni-bg)' : holiday.type==='facultativo' ? 'var(--fac-bg)' : 'var(--gold-bg)';
+    const fg = holiday.type==='municipal' ? 'var(--muni-ink)' : holiday.type==='facultativo' ? 'var(--fac-ink)' : 'var(--gold-ink)';
+    modalHolidayBanner.innerHTML = '<div class="holiday-banner" style="background:'+bg+';color:'+fg+'">🎌 '+holiday.name+' — '+(holiday.type==='municipal'?'feriado municipal':holiday.type==='facultativo'?'feriado facultativo':'feriado nacional')+'</div>';
+  } else {
+    modalHolidayBanner.innerHTML = '';
+  }
+
+  if(editingIsHoliday){
+    document.getElementById('normalModeBlock').style.display = 'none';
+    document.getElementById('holidayModeBlock').style.display = '';
+    document.getElementById('btnResetDay').textContent = 'Remover técnico atribuído';
+    document.getElementById('holidayShiftLabel').textContent = HOLIDAY_SHIFT.start+' às '+HOLIDAY_SHIFT.end;
+
+    const assigned = HOLIDAY_ASSIGNMENTS[iso] || '';
+    const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+    const sel = document.getElementById('holidayTecSelect');
+    let options = '<option value="">— nenhum —</option>';
+    names.forEach(n=>{ options += '<option value="'+n+'" '+(assigned===n?'selected':'')+'>'+n+'</option>'; });
+    sel.innerHTML = options;
+
+    overlay.classList.add('show');
+    return;
+  }
+
+  document.getElementById('normalModeBlock').style.display = '';
+  document.getElementById('holidayModeBlock').style.display = 'none';
+  document.getElementById('btnResetDay').textContent = 'Repor substituições deste dia';
+
+  const exc = exceptions[iso];
   editingRows = [];
   (TEMPLATE_LINES[dayKey]||[]).forEach(line=>{
     const v = resolveVersion(line, iso);
@@ -704,18 +789,6 @@ function openDayModal(iso, dayKey, dateObj){
     });
   }
   noteInput.value = exc && exc.note ? exc.note : '';
-
-  modalTitle.textContent = LONG_WEEKDAY[dateObj.getDay()];
-  modalSub.textContent = dateObj.getDate()+' de '+MONTH_NAMES[dateObj.getMonth()].toLowerCase()+' de '+dateObj.getFullYear();
-
-  const holiday = HOLIDAY_MAP[iso];
-  if(holiday){
-    const bg = holiday.type==='municipal' ? 'var(--muni-bg)' : holiday.type==='facultativo' ? 'var(--fac-bg)' : 'var(--gold-bg)';
-    const fg = holiday.type==='municipal' ? 'var(--muni-ink)' : holiday.type==='facultativo' ? 'var(--fac-ink)' : 'var(--gold-ink)';
-    modalHolidayBanner.innerHTML = '<div class="holiday-banner" style="background:'+bg+';color:'+fg+'">🎌 '+holiday.name+' — '+(holiday.type==='municipal'?'feriado municipal':holiday.type==='facultativo'?'feriado facultativo':'feriado nacional')+'</div>';
-  } else {
-    modalHolidayBanner.innerHTML = '';
-  }
 
   renderModalRows();
   overlay.classList.add('show');
@@ -799,6 +872,17 @@ document.getElementById('btnCancel').addEventListener('click', ()=> overlay.clas
 overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.classList.remove('show'); });
 
 document.getElementById('btnSaveDay').addEventListener('click', ()=>{
+  if(editingIsHoliday){
+    const val = document.getElementById('holidayTecSelect').value;
+    if(val){ HOLIDAY_ASSIGNMENTS[editingIso] = val; } else { delete HOLIDAY_ASSIGNMENTS[editingIso]; }
+    saveHolidayAssignments(HOLIDAY_ASSIGNMENTS);
+    overlay.classList.remove('show');
+    renderCalendar();
+    const ferTab = document.getElementById('tab-feriados');
+    if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
+    return;
+  }
+
   const newSlotOverrides = {};
   const newRemovedSlotIds = [];
   const newAdHocSlots = [];
@@ -865,6 +949,15 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
 });
 
 document.getElementById('btnResetDay').addEventListener('click', ()=>{
+  if(editingIsHoliday){
+    delete HOLIDAY_ASSIGNMENTS[editingIso];
+    saveHolidayAssignments(HOLIDAY_ASSIGNMENTS);
+    overlay.classList.remove('show');
+    renderCalendar();
+    const ferTab = document.getElementById('tab-feriados');
+    if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
+    return;
+  }
   delete exceptions[editingIso];
   saveExceptions(exceptions);
   overlay.classList.remove('show');
@@ -886,6 +979,39 @@ function renderHolidayList(){
     row.className = 'hol-item';
     row.innerHTML = '<span>'+h.name+' <span class="badge '+h.type+'" style="margin-left:6px;">'+typeLabel+'</span></span><span class="hol-date">'+label+'</span>';
     el.appendChild(row);
+  });
+}
+
+function renderFeriadosTab(){
+  const tbody = document.getElementById('feriadosTableBody');
+  tbody.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  HOLIDAYS.forEach(h=>{
+    const [y,m,d] = h.date.split('-').map(Number);
+    const label = pad(d)+'/'+pad(m)+'/'+y;
+    const typeLabel = h.type==='municipal' ? 'Municipal' : h.type==='facultativo' ? 'Facultativo' : 'Nacional';
+    const assigned = HOLIDAY_ASSIGNMENTS[h.date] || '';
+    const tr = document.createElement('tr');
+    if(!assigned) tr.className = 'unclassified';
+    let options = '<option value="">— nenhum —</option>';
+    names.forEach(n=>{ options += '<option value="'+n+'" '+(assigned===n?'selected':'')+'>'+n+'</option>'; });
+    tr.innerHTML =
+      '<td>'+label+'</td>'+
+      '<td>'+h.name+'</td>'+
+      '<td><span class="badge '+h.type+'">'+typeLabel+'</span></td>'+
+      '<td class="hrs">'+HOLIDAY_SHIFT.start+' – '+HOLIDAY_SHIFT.end+'</td>'+
+      '<td><select data-date="'+h.date+'">'+options+'</select></td>';
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const date = e.target.dataset.date;
+      const val = e.target.value;
+      if(val){ HOLIDAY_ASSIGNMENTS[date] = val; } else { delete HOLIDAY_ASSIGNMENTS[date]; }
+      saveHolidayAssignments(HOLIDAY_ASSIGNMENTS);
+      renderCalendar();
+      renderFeriadosTab();
+    });
   });
 }
 
@@ -1024,6 +1150,7 @@ function collectAllWorkerNames(){
       exc.adHocSlots.forEach(s=>{ if(s.name && s.name.trim()) names.add(s.name.trim()); });
     }
   });
+  Object.values(HOLIDAY_ASSIGNMENTS).forEach(n=>{ if(n && n.trim()) names.add(n.trim()); });
   return names;
 }
 
@@ -1113,7 +1240,7 @@ function renderTecTab(){
   const tbody = document.getElementById('tecTableBody');
   tbody.innerHTML = '';
 
-  let totalDepHours=0, totalIndHours=0, totalDepVal=0, totalIndVal=0, totalUnclassifiedHours=0;
+  let totalDepHours=0, totalIndHours=0, totalEstHours=0, totalDepVal=0, totalIndVal=0, totalUnclassifiedHours=0;
 
   names.forEach(name=>{
     const entry = TECH_REGISTRY[name];
@@ -1121,6 +1248,7 @@ function renderTecTab(){
     const status = entry.status;
     if(status==='dependente'){ totalDepHours += b.hours; totalDepVal += b.value; }
     else if(status==='independente'){ totalIndHours += b.hours; totalIndVal += b.value; }
+    else if(status==='estagiario'){ totalEstHours += b.hours; }
     else { totalUnclassifiedHours += b.hours; }
 
     const tr = document.createElement('tr');
@@ -1131,9 +1259,10 @@ function renderTecTab(){
         '<option value="" '+(!status?'selected':'')+'>— escolher —</option>'+
         '<option value="dependente" '+(status==='dependente'?'selected':'')+'>Dependente</option>'+
         '<option value="independente" '+(status==='independente'?'selected':'')+'>Independente</option>'+
+        '<option value="estagiario" '+(status==='estagiario'?'selected':'')+'>Estagiário</option>'+
       '</select></td>'+
       '<td class="hrs">'+fmtHours(b.hours)+' h</td>'+
-      '<td class="val">'+(status ? fmtEUR(b.value) : '—')+'</td>'+
+      '<td class="val">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>'+
       '<td><button class="rm-tec" title="Remover técnico" data-name="'+encodeURIComponent(name)+'">×</button></td>';
     tbody.appendChild(tr);
   });
@@ -1162,6 +1291,7 @@ function renderTecTab(){
   summary.innerHTML =
     '<div><div class="stat-label">Horas · Dependentes</div><div class="stat-value">'+fmtHours(totalDepHours)+' h</div></div>'+
     '<div><div class="stat-label">Horas · Independentes</div><div class="stat-value">'+fmtHours(totalIndHours)+' h</div></div>'+
+    (totalEstHours>0.05 ? '<div><div class="stat-label">Horas · Estagiários (não remunerado)</div><div class="stat-value">'+fmtHours(totalEstHours)+' h</div></div>' : '') +
     (totalUnclassifiedHours>0.05 ? '<div><div class="stat-label">Horas por classificar</div><div class="stat-value" style="color:var(--rust)">'+fmtHours(totalUnclassifiedHours)+' h</div></div>' : '') +
     '<div><div class="stat-label">Valor · Dependentes</div><div class="stat-value">'+fmtEUR(totalDepVal)+'</div></div>'+
     '<div><div class="stat-label">Valor · Independentes</div><div class="stat-value">'+fmtEUR(totalIndVal)+'</div></div>'+
@@ -1209,8 +1339,10 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-cal').style.display = tab==='cal' ? '' : 'none';
     document.getElementById('tab-tpl').style.display = tab==='tpl' ? '' : 'none';
     document.getElementById('tab-tec').style.display = tab==='tec' ? '' : 'none';
+    document.getElementById('tab-feriados').style.display = tab==='feriados' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
+    if(tab==='feriados') renderFeriadosTab();
   });
 });
 
@@ -1464,6 +1596,7 @@ function buildExportPayload(){
     exceptions: exceptions,
     tecnicos: TECH_REGISTRY,
     rates: RATES,
+    feriados: HOLIDAY_ASSIGNMENTS,
     exportedAt: nowISO()
   };
 }
@@ -1473,6 +1606,7 @@ function applyImportedData(data){
   if(data.exceptions){ exceptions = data.exceptions; localStorage.setItem(STORE_EXC, JSON.stringify(exceptions)); }
   if(data.tecnicos){ TECH_REGISTRY = data.tecnicos; localStorage.setItem(STORE_TECH, JSON.stringify(TECH_REGISTRY)); }
   if(data.rates){ RATES = data.rates; localStorage.setItem(STORE_RATES, JSON.stringify(RATES)); }
+  if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderHolidayList();
@@ -1480,6 +1614,8 @@ function applyImportedData(data){
   if(tecTab && tecTab.style.display !== 'none') renderTecTab();
   const tplTab = document.getElementById('tab-tpl');
   if(tplTab && tplTab.style.display !== 'none') renderTplGrid();
+  const ferTab = document.getElementById('tab-feriados');
+  if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
   updateSyncStatusLabel();
 }
 
