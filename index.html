@@ -140,6 +140,13 @@
   .row-edit-meta .hint.perm{color:var(--accent);}
   .row-edit-meta .hint.subst{color:var(--rust);}
   .row-restore{font:600 11px 'Inter';color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;}
+
+  .tec-suggest-box{
+    display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--line);border-radius:8px;
+    box-shadow:var(--shadow);max-height:190px;overflow-y:auto;
+  }
+  .tec-suggest-box div{padding:8px 12px;font:500 13.5px 'Inter';color:var(--ink);cursor:pointer;}
+  .tec-suggest-box div:hover, .tec-suggest-box div.active{background:var(--accent-soft);}
   .add-row{font:600 12.5px 'Inter';color:var(--accent);background:none;border:1px dashed var(--accent);border-radius:7px;padding:7px 10px;cursor:pointer;width:100%;margin-top:2px;}
   .note-field{margin-top:14px;}
   .note-field label{font:600 12px 'Inter';color:var(--ink-soft);display:block;margin-bottom:5px;}
@@ -408,6 +415,7 @@
 </div>
 
 <datalist id="tecnicosDatalist"></datalist>
+<div id="tecSuggestBox" class="tec-suggest-box"></div>
 
 <!-- DAY MODAL -->
 <div class="overlay" id="overlay">
@@ -885,14 +893,23 @@ function renderModalRows(){
       const idx = parseInt(e.target.dataset.idx,10);
       const field = e.target.dataset.field;
       editingRows[idx][field] = e.target.value;
-      if(field !== 'substituteName') renderModalRows(); // keep hint text (dates) in sync; cheap since list is short
     });
+    if(inp.dataset.field === 'name' || inp.dataset.field === 'substituteName'){
+      inp.addEventListener('focus', ()=> showTecSuggestions(inp));
+      inp.addEventListener('input', ()=> showTecSuggestions(inp));
+      inp.addEventListener('blur', hideTecSuggestionsSoon);
+    }
   });
   modalRows.querySelectorAll('input[type=checkbox][data-field=pontual]').forEach(chk=>{
     chk.addEventListener('change', (e)=>{
       const idx = parseInt(e.target.dataset.idx,10);
-      editingRows[idx].pontual = e.target.checked;
+      const checked = e.target.checked;
+      editingRows[idx].pontual = checked;
       renderModalRows();
+      if(checked){
+        const subInput = modalRows.querySelector('input[data-idx="'+idx+'"][data-field="substituteName"]');
+        if(subInput){ subInput.focus(); showTecSuggestions(subInput); }
+      }
     });
   });
   modalRows.querySelectorAll('button[data-action=remove]').forEach(btn=>{
@@ -1349,10 +1366,36 @@ function collectAllWorkerNames(){
 
 function populateTecnicosDatalist(){
   const dl = document.getElementById('tecnicosDatalist');
-  if(!dl) return;
-  const names = new Set([...collectAllWorkerNames(), ...Object.keys(TECH_REGISTRY)]);
-  const sorted = Array.from(names).sort((a,b)=>a.localeCompare(b,'pt'));
-  dl.innerHTML = sorted.map(n=>'<option value="'+n+'">').join('');
+  const names = Array.from(new Set([...collectAllWorkerNames(), ...Object.keys(TECH_REGISTRY)])).sort((a,b)=>a.localeCompare(b,'pt'));
+  if(dl) dl.innerHTML = names.map(n=>'<option value="'+n+'">').join('');
+  TEC_NAMES_CACHE = names;
+}
+
+let TEC_NAMES_CACHE = [];
+
+function showTecSuggestions(inputEl){
+  const query = inputEl.value.trim().toLowerCase();
+  const matches = TEC_NAMES_CACHE.filter(n => !query || n.toLowerCase().includes(query)).slice(0, 8);
+  const box = document.getElementById('tecSuggestBox');
+  if(matches.length === 0){ box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(n => '<div data-name="'+n+'">'+n+'</div>').join('');
+  const rect = inputEl.getBoundingClientRect();
+  box.style.left = (rect.left + window.scrollX) + 'px';
+  box.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  box.style.width = Math.max(rect.width, 160) + 'px';
+  box.style.display = 'block';
+  box.querySelectorAll('div').forEach(item=>{
+    // mousedown fires before the input's blur, so the click registers before the list hides
+    item.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      inputEl.value = item.dataset.name;
+      inputEl.dispatchEvent(new Event('input', {bubbles:true}));
+      box.style.display = 'none';
+    });
+  });
+}
+function hideTecSuggestionsSoon(){
+  setTimeout(()=>{ document.getElementById('tecSuggestBox').style.display = 'none'; }, 150);
 }
 
 function hoursBetween(start, end){
