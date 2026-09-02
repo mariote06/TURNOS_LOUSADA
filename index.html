@@ -142,7 +142,7 @@
   .row-restore{font:600 11px 'Inter';color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;}
 
   .tec-suggest-box{
-    display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--line);border-radius:8px;
+    display:none;position:fixed;z-index:200;background:#fff;border:1px solid var(--line);border-radius:8px;
     box-shadow:var(--shadow);max-height:190px;overflow-y:auto;
   }
   .tec-suggest-box div{padding:8px 12px;font:500 13.5px 'Inter';color:var(--ink);cursor:pointer;}
@@ -775,6 +775,25 @@ function renderCalendar(){
    DAY MODAL
 --------------------------------------------------------------- */
 const overlay = document.getElementById('overlay');
+let bodyScrollYBeforeModal = 0;
+function openModalOverlay(){
+  bodyScrollYBeforeModal = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = '-'+bodyScrollYBeforeModal+'px';
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  overlay.classList.add('show');
+}
+function closeModalOverlay(){
+  overlay.classList.remove('show');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  window.scrollTo(0, bodyScrollYBeforeModal);
+  document.getElementById('tecSuggestBox').style.display = 'none';
+  currentSuggestInput = null;
+}
 const modalTitle = document.getElementById('modalTitle');
 const modalSub = document.getElementById('modalSub');
 const modalHolidayBanner = document.getElementById('modalHolidayBanner');
@@ -817,7 +836,7 @@ function openDayModal(iso, dayKey, dateObj){
     names.forEach(n=>{ options += '<option value="'+n+'" '+(assigned===n?'selected':'')+'>'+n+'</option>'; });
     sel.innerHTML = options;
 
-    overlay.classList.add('show');
+    openModalOverlay();
     return;
   }
 
@@ -851,7 +870,7 @@ function openDayModal(iso, dayKey, dateObj){
   noteInput.value = exc && exc.note ? exc.note : '';
 
   renderModalRows();
-  overlay.classList.add('show');
+  openModalOverlay();
 }
 
 function renderModalRows(){
@@ -937,15 +956,15 @@ document.getElementById('addSlotBtn').addEventListener('click', ()=>{
   renderModalRows();
 });
 
-document.getElementById('btnCancel').addEventListener('click', ()=> overlay.classList.remove('show'));
-overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.classList.remove('show'); });
+document.getElementById('btnCancel').addEventListener('click', ()=> closeModalOverlay());
+overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModalOverlay(); });
 
 document.getElementById('btnSaveDay').addEventListener('click', ()=>{
   if(editingIsHoliday){
     const val = document.getElementById('holidayTecSelect').value;
     if(val){ HOLIDAY_ASSIGNMENTS[editingIso] = val; } else { delete HOLIDAY_ASSIGNMENTS[editingIso]; }
     saveHolidayAssignments(HOLIDAY_ASSIGNMENTS);
-    overlay.classList.remove('show');
+    closeModalOverlay();
     renderCalendar();
     const ferTab = document.getElementById('tab-feriados');
     if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
@@ -1013,7 +1032,7 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
 
   saveTemplateLines(TEMPLATE_LINES);
   saveExceptions(exceptions);
-  overlay.classList.remove('show');
+  closeModalOverlay();
   renderCalendar();
 });
 
@@ -1021,7 +1040,7 @@ document.getElementById('btnResetDay').addEventListener('click', ()=>{
   if(editingIsHoliday){
     delete HOLIDAY_ASSIGNMENTS[editingIso];
     saveHolidayAssignments(HOLIDAY_ASSIGNMENTS);
-    overlay.classList.remove('show');
+    closeModalOverlay();
     renderCalendar();
     const ferTab = document.getElementById('tab-feriados');
     if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
@@ -1029,7 +1048,7 @@ document.getElementById('btnResetDay').addEventListener('click', ()=>{
   }
   delete exceptions[editingIso];
   saveExceptions(exceptions);
-  overlay.classList.remove('show');
+  closeModalOverlay();
   renderCalendar();
 });
 
@@ -1372,17 +1391,16 @@ function populateTecnicosDatalist(){
 }
 
 let TEC_NAMES_CACHE = [];
+let currentSuggestInput = null;
 
 function showTecSuggestions(inputEl){
   const query = inputEl.value.trim().toLowerCase();
-  const matches = TEC_NAMES_CACHE.filter(n => !query || n.toLowerCase().includes(query)).slice(0, 8);
+  const matches = TEC_NAMES_CACHE.filter(n => !query || n.toLowerCase().includes(query));
   const box = document.getElementById('tecSuggestBox');
-  if(matches.length === 0){ box.style.display = 'none'; return; }
+  if(matches.length === 0){ box.style.display = 'none'; currentSuggestInput = null; return; }
   box.innerHTML = matches.map(n => '<div data-name="'+n+'">'+n+'</div>').join('');
-  const rect = inputEl.getBoundingClientRect();
-  box.style.left = (rect.left + window.scrollX) + 'px';
-  box.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-  box.style.width = Math.max(rect.width, 160) + 'px';
+  currentSuggestInput = inputEl;
+  positionSuggestBox();
   box.style.display = 'block';
   box.querySelectorAll('div').forEach(item=>{
     // mousedown fires before the input's blur, so the click registers before the list hides
@@ -1391,12 +1409,24 @@ function showTecSuggestions(inputEl){
       inputEl.value = item.dataset.name;
       inputEl.dispatchEvent(new Event('input', {bubbles:true}));
       box.style.display = 'none';
+      currentSuggestInput = null;
     });
   });
 }
-function hideTecSuggestionsSoon(){
-  setTimeout(()=>{ document.getElementById('tecSuggestBox').style.display = 'none'; }, 150);
+function positionSuggestBox(){
+  if(!currentSuggestInput) return;
+  const box = document.getElementById('tecSuggestBox');
+  const rect = currentSuggestInput.getBoundingClientRect();
+  box.style.left = rect.left + 'px';
+  box.style.top = (rect.bottom + 4) + 'px';
+  box.style.width = Math.max(rect.width, 160) + 'px';
 }
+function hideTecSuggestionsSoon(){
+  setTimeout(()=>{ document.getElementById('tecSuggestBox').style.display = 'none'; currentSuggestInput = null; }, 150);
+}
+// Mantém a caixa "presa" ao campo mesmo que o conteúdo do modal seja scrollado.
+document.querySelector('.modal').addEventListener('scroll', positionSuggestBox);
+window.addEventListener('resize', positionSuggestBox);
 
 function hoursBetween(start, end){
   const [h1,m1] = start.split(':').map(Number);
