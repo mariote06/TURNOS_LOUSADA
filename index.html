@@ -198,6 +198,10 @@
   .tec-summary .stat-value{font:700 20px 'Space Grotesk';}
   .tec-summary .stat-value.total{color:var(--accent);}
 
+  .fin-scope-bar{display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;flex-wrap:wrap;gap:10px;}
+  .fin-period-nav{display:flex;align-items:center;gap:8px;font:600 14px 'Space Grotesk';}
+  .fin-period-nav .nav-btn{width:30px;height:30px;font-size:14px;}
+
   @media print{
     .tabs,.actions,.nav-btn,.legend .hint,body .btn,.panel{display:none !important;}
     .cell{break-inside:avoid;}
@@ -221,6 +225,7 @@
       <button class="tab-btn" data-tab="tpl">Horário Base</button>
       <button class="tab-btn" data-tab="tec">Técnicos</button>
       <button class="tab-btn" data-tab="feriados">Feriados</button>
+      <button class="tab-btn" data-tab="fin">Finanças</button>
     </div>
   </div>
 
@@ -355,6 +360,46 @@
         <tbody id="feriadosTableBody"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- FINANÇAS TAB -->
+  <div id="tab-fin" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Ganhos de cada técnico (conforme o valor/hora do vínculo, em Técnicos) e o orçamento (budget) de sala,
+      calculado à parte com um valor/hora próprio — vê por semana, mês, ou toda a época.
+    </p>
+
+    <div class="rate-col" style="max-width:440px;margin-bottom:18px;">
+      <h4>Budget — valor/hora de sala</h4>
+      <div class="rate-history" id="historyBudget"></div>
+      <div class="rate-add-row">
+        <input type="date" id="newRateDateBudget">
+        <div class="tec-rate-input"><span>€</span><input type="number" step="0.01" min="0" id="newRateValBudget" placeholder="0,00"></div>
+        <button class="btn" id="btnAddRateBudget">Definir a partir desta data</button>
+      </div>
+    </div>
+
+    <div class="fin-scope-bar">
+      <div class="tabs">
+        <button class="tab-btn fin-scope-btn active" data-scope="week">Semana</button>
+        <button class="tab-btn fin-scope-btn" data-scope="month">Mês</button>
+        <button class="tab-btn fin-scope-btn" data-scope="year">Ano</button>
+      </div>
+      <div class="fin-period-nav" id="finPeriodNav">
+        <button class="nav-btn" id="finPrev">‹</button>
+        <span id="finPeriodLabel"></span>
+        <button class="nav-btn" id="finNext">›</button>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <table class="tec-table" id="finTable">
+        <thead><tr><th>Técnico</th><th>Vínculo</th><th>Horas</th><th>Ganhos</th></tr></thead>
+        <tbody id="finTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel tec-summary" id="finSummary"></div>
   </div>
 
 </div>
@@ -1016,6 +1061,145 @@ function renderFeriadosTab(){
 }
 
 /* ---------------------------------------------------------------
+   FINANÇAS TAB (ganhos por técnico + budget de sala, por período)
+--------------------------------------------------------------- */
+function getWeekRange(ref){
+  const dow = (ref.getDay()+6)%7; // 0=Seg..6=Dom
+  const monday = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate()-dow);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+6);
+  return {start:monday, end:sunday};
+}
+function getMonthRange(ref){
+  const start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const end = new Date(ref.getFullYear(), ref.getMonth()+1, 0);
+  return {start, end};
+}
+
+let finScope = 'week';
+let finRefDate = new Date();
+if(finRefDate < RANGE_START) finRefDate = new Date(RANGE_START);
+if(finRefDate > RANGE_END) finRefDate = new Date(RANGE_END);
+
+function currentFinRange(){
+  if(finScope==='week') return getWeekRange(finRefDate);
+  if(finScope==='month') return getMonthRange(finRefDate);
+  return {start: new Date(RANGE_START), end: new Date(RANGE_END)};
+}
+
+function finPeriodLabelText(range){
+  if(finScope==='year') return 'Set 2026 – Ago 2027 (época completa)';
+  if(finScope==='month') return MONTH_NAMES[finRefDate.getMonth()]+' '+finRefDate.getFullYear();
+  const s=range.start, e=range.end;
+  return pad(s.getDate())+'/'+pad(s.getMonth()+1)+' – '+pad(e.getDate())+'/'+pad(e.getMonth()+1)+'/'+e.getFullYear();
+}
+
+// Ganhos por técnico (vínculo Dependente/Independente/Estagiário) e o budget
+// total de sala (valor/hora próprio, independente de quem trabalhou), somados
+// dia a dia dentro do período pedido — para respeitar alterações de valor/hora
+// que tenham entrado em vigor a meio do período.
+function computeFinancePeriod(start, end){
+  const clippedStart = start < RANGE_START ? new Date(RANGE_START) : start;
+  const clippedEnd = end > RANGE_END ? new Date(RANGE_END) : end;
+  const perWorker = {};
+  let totalHours = 0, totalBudget = 0;
+  if(clippedStart > clippedEnd) return {perWorker, totalHours, totalBudget};
+  const d = new Date(clippedStart);
+  while(d <= clippedEnd){
+    const iso = isoDate(d);
+    const dKey = dayKeyOf(d);
+    const shifts = shiftsForDate(iso, dKey);
+    shifts.forEach(s=>{
+      const worker = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : (s.name||'').trim();
+      if(!worker) return;
+      const hrs = hoursBetween(s.start, s.end);
+      totalHours += hrs;
+      if(!perWorker[worker]) perWorker[worker] = {hours:0, value:0};
+      perWorker[worker].hours += hrs;
+      const entry = TECH_REGISTRY[worker];
+      const status = entry && entry.status;
+      if((status==='dependente' || status==='independente') && RATES[status]){
+        const rate = resolveRate(RATES[status], iso);
+        perWorker[worker].value += hrs * (rate ? rate.value : 0);
+      }
+      const brate = resolveRate(RATES.budget, iso);
+      totalBudget += hrs * (brate ? brate.value : 0);
+    });
+    d.setDate(d.getDate()+1);
+  }
+  return {perWorker, totalHours, totalBudget};
+}
+
+function renderFinTab(){
+  const range = currentFinRange();
+  document.getElementById('finPeriodLabel').textContent = finPeriodLabelText(range);
+  document.getElementById('finPeriodNav').style.display = finScope==='year' ? 'none' : '';
+
+  renderRateHistory('budget', 'historyBudget');
+  document.getElementById('newRateDateBudget').value = isoDate(new Date());
+
+  const {perWorker, totalHours, totalBudget} = computeFinancePeriod(range.start, range.end);
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+
+  const tbody = document.getElementById('finTableBody');
+  tbody.innerHTML = '';
+  let totalPaid = 0;
+  names.forEach(name=>{
+    const entry = TECH_REGISTRY[name];
+    const b = perWorker[name] || {hours:0, value:0};
+    if(b.hours < 0.01) return; // sem turnos neste período: não polui a tabela
+    const status = entry.status;
+    const statusLabel = status==='dependente' ? 'Dependente' : status==='independente' ? 'Independente' : status==='estagiario' ? 'Estagiário' : '— por classificar —';
+    if(status==='dependente' || status==='independente') totalPaid += b.value;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>'+name+'</td>'+
+      '<td>'+statusLabel+'</td>'+
+      '<td class="hrs">'+fmtHours(b.hours)+' h</td>'+
+      '<td class="val">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>';
+    tbody.appendChild(tr);
+  });
+  if(tbody.children.length===0){
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Sem turnos neste período.</td></tr>';
+  }
+
+  const summary = document.getElementById('finSummary');
+  summary.innerHTML =
+    '<div><div class="stat-label">Horas totais de sala</div><div class="stat-value">'+fmtHours(totalHours)+' h</div></div>'+
+    '<div><div class="stat-label">Budget de sala</div><div class="stat-value">'+fmtEUR(totalBudget)+'</div></div>'+
+    '<div><div class="stat-label">Total pago aos técnicos</div><div class="stat-value">'+fmtEUR(totalPaid)+'</div></div>'+
+    '<div><div class="stat-label">Diferença (budget − pago)</div><div class="stat-value total">'+fmtEUR(totalBudget-totalPaid)+'</div></div>';
+}
+
+document.querySelectorAll('.fin-scope-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.fin-scope-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    finScope = btn.dataset.scope;
+    renderFinTab();
+  });
+});
+document.getElementById('finPrev').addEventListener('click', ()=>{
+  if(finScope==='week') finRefDate.setDate(finRefDate.getDate()-7);
+  else if(finScope==='month') finRefDate.setMonth(finRefDate.getMonth()-1);
+  renderFinTab();
+});
+document.getElementById('finNext').addEventListener('click', ()=>{
+  if(finScope==='week') finRefDate.setDate(finRefDate.getDate()+7);
+  else if(finScope==='month') finRefDate.setMonth(finRefDate.getMonth()+1);
+  renderFinTab();
+});
+document.getElementById('btnAddRateBudget').addEventListener('click', ()=>{
+  const from = document.getElementById('newRateDateBudget').value;
+  const val = parseFloat(document.getElementById('newRateValBudget').value);
+  if(!from || isNaN(val)){ alert('Indica uma data e um valor válido.'); return; }
+  RATES.budget = RATES.budget.filter(v=>v.from!==from);
+  RATES.budget.push({from, value: val});
+  saveRates(RATES);
+  document.getElementById('newRateValBudget').value = '';
+  renderFinTab();
+});
+
+/* ---------------------------------------------------------------
    TEMPLATE TAB (edits the baseline version of each slot line)
 --------------------------------------------------------------- */
 const tplGrid = document.getElementById('tplGrid');
@@ -1116,8 +1300,9 @@ function loadRates(){
     if(raw) return JSON.parse(raw);
   }catch(e){}
   return {
-    dependente: [{from: RANGE_START_ISO, value: 0}],
-    independente: [{from: RANGE_START_ISO, value: 0}]
+    dependente: [{from: RANGE_START_ISO, value: 10}],
+    independente: [{from: RANGE_START_ISO, value: 9.5}],
+    budget: [{from: RANGE_START_ISO, value: 10}]
   };
 }
 function saveRates(r){ localStorage.setItem(STORE_RATES, JSON.stringify(r)); touchMeta(); }
@@ -1134,6 +1319,7 @@ function resolveRate(rateArr, iso){
 
 let TECH_REGISTRY = loadTechRegistry();
 let RATES = loadRates();
+if(!RATES.budget){ RATES.budget = [{from: RANGE_START_ISO, value: 10}]; saveRates(RATES); }
 
 function collectAllWorkerNames(){
   const names = new Set();
@@ -1340,9 +1526,11 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-tpl').style.display = tab==='tpl' ? '' : 'none';
     document.getElementById('tab-tec').style.display = tab==='tec' ? '' : 'none';
     document.getElementById('tab-feriados').style.display = tab==='feriados' ? '' : 'none';
+    document.getElementById('tab-fin').style.display = tab==='fin' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
+    if(tab==='fin') renderFinTab();
   });
 });
 
