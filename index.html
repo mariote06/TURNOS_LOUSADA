@@ -199,6 +199,9 @@
   .tec-summary .stat-value.total{color:var(--accent);}
 
   .fin-scope-bar{display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;flex-wrap:wrap;gap:10px;}
+  .fin-scope-bar .tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;}
+  .fin-scope-btn{border:none;background:transparent;padding:8px 18px;border-radius:999px;font:600 14px 'Inter';color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;}
+  .fin-scope-btn.active{background:var(--accent);color:#fff;}
   .fin-period-nav{display:flex;align-items:center;gap:8px;font:600 14px 'Space Grotesk';}
   .fin-period-nav .nav-btn{width:30px;height:30px;font-size:14px;}
 
@@ -381,9 +384,9 @@
 
     <div class="fin-scope-bar">
       <div class="tabs">
-        <button class="tab-btn fin-scope-btn active" data-scope="week">Semana</button>
-        <button class="tab-btn fin-scope-btn" data-scope="month">Mês</button>
-        <button class="tab-btn fin-scope-btn" data-scope="year">Ano</button>
+        <button class="fin-scope-btn active" data-scope="week">Semana</button>
+        <button class="fin-scope-btn" data-scope="month">Mês</button>
+        <button class="fin-scope-btn" data-scope="year">Ano</button>
       </div>
       <div class="fin-period-nav" id="finPeriodNav">
         <button class="nav-btn" id="finPrev">‹</button>
