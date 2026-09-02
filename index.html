@@ -407,6 +407,8 @@
 
 </div>
 
+<datalist id="tecnicosDatalist"></datalist>
+
 <!-- DAY MODAL -->
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -781,6 +783,8 @@ function openDayModal(iso, dayKey, dateObj){
   const holiday = HOLIDAY_MAP[iso];
   editingIsHoliday = !!holiday;
 
+  populateTecnicosDatalist();
+
   modalTitle.textContent = LONG_WEEKDAY[dateObj.getDay()];
   modalSub.textContent = dateObj.getDate()+' de '+MONTH_NAMES[dateObj.getMonth()].toLowerCase()+' de '+dateObj.getFullYear();
 
@@ -858,13 +862,13 @@ function renderModalRows(){
       '<div class="row-edit-top">'+
         '<input type="time" value="'+row.start+'" data-idx="'+idx+'" data-field="start" '+(row.removed?'disabled':'')+'>'+
         '<input type="time" value="'+row.end+'" data-idx="'+idx+'" data-field="end" '+(row.removed?'disabled':'')+'>'+
-        '<input type="text" value="'+(row.name||'')+'" placeholder="Nome" data-idx="'+idx+'" data-field="name" '+(row.removed||nameLocked?'disabled':'')+'>'+
+        '<input type="text" value="'+(row.name||'')+'" placeholder="Nome" list="tecnicosDatalist" data-idx="'+idx+'" data-field="name" '+(row.removed||nameLocked?'disabled':'')+'>'+
         (row.removed
           ? '<button class="rm" title="Anular remoção" data-idx="'+idx+'" data-action="restore">↺</button>'
           : '<button class="rm" title="Remover turno" data-idx="'+idx+'" data-action="remove">×</button>') +
       '</div>'+
       (nameLocked
-        ? '<div style="margin-top:6px;"><input type="text" value="'+(row.substituteName||'')+'" placeholder="Nome de quem substitui '+row.name+'" data-idx="'+idx+'" data-field="substituteName" style="width:100%;border:1px solid var(--rust);border-radius:7px;padding:7px 8px;font:500 13px \'Inter\';background:var(--rust-soft);"></div>'
+        ? '<div style="margin-top:6px;"><input type="text" value="'+(row.substituteName||'')+'" placeholder="Nome de quem substitui '+row.name+'" list="tecnicosDatalist" data-idx="'+idx+'" data-field="substituteName" style="width:100%;border:1px solid var(--rust);border-radius:7px;padding:7px 8px;font:500 13px \'Inter\';background:var(--rust-soft);"></div>'
         : '') +
       '<div class="row-edit-meta">'+
         (row.removed
@@ -1341,6 +1345,14 @@ function collectAllWorkerNames(){
   });
   Object.values(HOLIDAY_ASSIGNMENTS).forEach(n=>{ if(n && n.trim()) names.add(n.trim()); });
   return names;
+}
+
+function populateTecnicosDatalist(){
+  const dl = document.getElementById('tecnicosDatalist');
+  if(!dl) return;
+  const names = new Set([...collectAllWorkerNames(), ...Object.keys(TECH_REGISTRY)]);
+  const sorted = Array.from(names).sort((a,b)=>a.localeCompare(b,'pt'));
+  dl.innerHTML = sorted.map(n=>'<option value="'+n+'">').join('');
 }
 
 function hoursBetween(start, end){
