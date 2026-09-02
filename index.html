@@ -54,6 +54,17 @@
   .tab-btn{border:none;background:transparent;padding:8px 18px;border-radius:999px;font:600 14px 'Inter';color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;}
   .tab-btn.active{background:var(--accent);color:#fff;}
 
+  .sync-bar{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--paper);border:1px solid var(--line);border-radius:8px;font-size:12.5px;color:var(--ink-soft);}
+  .sync-row-title{font:700 12px 'Space Grotesk';color:var(--ink);text-transform:uppercase;letter-spacing:.03em;}
+  .sync-buttons{display:flex;gap:8px;flex-wrap:wrap;}
+  .sync-bar .btn{padding:6px 12px;font-size:12.5px;}
+  .sync-hint{font-size:11.5px;color:var(--ink-soft);opacity:.85;}
+  .link-status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);}
+  .dot-ok, .dot-warn, .dot-off{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .dot-ok{background:var(--accent);}
+  .dot-warn{background:var(--rust);}
+  .dot-off{background:var(--ink-soft);opacity:.5;}
+
   /* month nav */
   .monthbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
   .monthbar-left{display:flex;align-items:center;gap:10px;}
@@ -210,6 +221,28 @@
       <button class="tab-btn" data-tab="tpl">Horário Base</button>
       <button class="tab-btn" data-tab="tec">Técnicos</button>
     </div>
+  </div>
+
+  <div class="sync-bar" id="linkSyncSection">
+    <div class="sync-row-title">Sincronização entre dispositivos</div>
+    <div class="link-status" id="linkStatus"><span class="dot-off"></span> A verificar…</div>
+    <div class="sync-buttons">
+      <button class="btn primary" id="btnLinkFile">Ligar ficheiro (OneDrive)</button>
+      <button class="btn" id="btnReactivateLink" style="display:none;">Reativar ligação</button>
+      <button class="btn ghost" id="btnUnlinkFile" style="display:none;">Desligar ficheiro</button>
+    </div>
+    <div class="sync-hint">Se este ficheiro estiver dentro da pasta do OneDrive, os dados sincronizam automaticamente com os outros dispositivos onde ligares a mesma app ao mesmo ficheiro.</div>
+  </div>
+
+  <div class="sync-bar">
+    <div class="sync-row-title">Cópia de segurança manual</div>
+    <span id="syncStatus">Dados guardados só neste dispositivo</span>
+    <div class="sync-buttons">
+      <button class="btn" id="btnExportData">Exportar dados (.json)</button>
+      <button class="btn" id="btnImportData">Importar dados (.json)</button>
+      <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+    </div>
+    <div class="sync-hint">Útil como reserva, ou para dispositivos que não suportam a ligação direta acima (ex.: iPhone).</div>
   </div>
 
   <!-- CALENDAR TAB -->
@@ -458,7 +491,7 @@ function loadTemplateLines(){
   }catch(e){}
   return buildDefaultLines();
 }
-function saveTemplateLines(t){ localStorage.setItem(STORE_TPL, JSON.stringify(t)); }
+function saveTemplateLines(t){ localStorage.setItem(STORE_TPL, JSON.stringify(t)); touchMeta(); }
 
 // exceptions[iso] = { slotOverrides: {slotId: {start,end,substituteName}}, removedSlotIds: [id,...], adHocSlots: [{start,end,name}], note: '' }
 function loadExceptions(){
@@ -468,7 +501,7 @@ function loadExceptions(){
   }catch(e){}
   return {};
 }
-function saveExceptions(e){ localStorage.setItem(STORE_EXC, JSON.stringify(e)); }
+function saveExceptions(e){ localStorage.setItem(STORE_EXC, JSON.stringify(e)); touchMeta(); }
 
 let TEMPLATE_LINES = loadTemplateLines();
 let exceptions = loadExceptions();
@@ -949,7 +982,7 @@ function loadTechRegistry(){
   }catch(e){}
   return {};
 }
-function saveTechRegistry(r){ localStorage.setItem(STORE_TECH, JSON.stringify(r)); }
+function saveTechRegistry(r){ localStorage.setItem(STORE_TECH, JSON.stringify(r)); touchMeta(); }
 
 function loadRates(){
   try{
@@ -961,7 +994,7 @@ function loadRates(){
     independente: [{from: RANGE_START_ISO, value: 0}]
   };
 }
-function saveRates(r){ localStorage.setItem(STORE_RATES, JSON.stringify(r)); }
+function saveRates(r){ localStorage.setItem(STORE_RATES, JSON.stringify(r)); touchMeta(); }
 
 // Same resolution logic as the schedule template: the value with the latest
 // "from" that is still <= iso is the one in effect on that date.
@@ -1217,6 +1250,275 @@ document.getElementById('btnExport').addEventListener('click', ()=>{
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 });
+
+/* ---------------------------------------------------------------
+   LIGAÇÃO AUTOMÁTICA A FICHEIRO (File System Access API)
+   ----------------------------------------------------------------
+   Onde o browser suporta (Chrome/Edge no PC, e em versões recentes
+   também no Android), a app pode "ligar-se" diretamente a um
+   ficheiro .json escolhido pelo utilizador — normalmente dentro da
+   pasta do OneDrive — e passa a ler/escrever nesse ficheiro sozinha,
+   sem precisar de exportar/importar manualmente. A referência ao
+   ficheiro fica guardada no IndexedDB (só o localStorage não permite
+   guardar "handles" de ficheiros).
+--------------------------------------------------------------- */
+const FS_ACCESS_SUPPORTED = 'showSaveFilePicker' in window;
+let linkedFileHandle = null;
+
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open('tef_turnos_sync_db', 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore('handles'); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, val){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(val, key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('handles', 'readonly');
+    const req = tx.objectStore('handles').get(key);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbDelete(key){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').delete(key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+function updateLinkUI(state){
+  const section = document.getElementById('linkSyncSection');
+  if(!FS_ACCESS_SUPPORTED){ section.style.display = 'none'; return; }
+  const statusEl = document.getElementById('linkStatus');
+  const linkBtn = document.getElementById('btnLinkFile');
+  const unlinkBtn = document.getElementById('btnUnlinkFile');
+  const reactivateBtn = document.getElementById('btnReactivateLink');
+
+  if(linkedFileHandle && state === 'needs-permission'){
+    statusEl.innerHTML = '<span class="dot-warn"></span> Ligado a "'+linkedFileHandle.name+'" — precisa de confirmação';
+    linkBtn.style.display = 'none';
+    unlinkBtn.style.display = '';
+    reactivateBtn.style.display = '';
+  } else if(linkedFileHandle){
+    statusEl.innerHTML = '<span class="dot-ok"></span> Ligado a "'+linkedFileHandle.name+'"';
+    linkBtn.style.display = 'none';
+    unlinkBtn.style.display = '';
+    reactivateBtn.style.display = 'none';
+  } else {
+    statusEl.innerHTML = '<span class="dot-off"></span> Nenhum ficheiro ligado';
+    linkBtn.style.display = '';
+    unlinkBtn.style.display = 'none';
+    reactivateBtn.style.display = 'none';
+  }
+}
+
+async function readLinkedFile(){
+  if(!linkedFileHandle) return null;
+  try{
+    const perm = await linkedFileHandle.queryPermission({mode:'readwrite'});
+    if(perm !== 'granted') return {needsPermission:true};
+    const file = await linkedFileHandle.getFile();
+    const text = await file.text();
+    if(!text || !text.trim()) return null; // ficheiro vazio (recém-criado)
+    return JSON.parse(text);
+  }catch(e){ return null; }
+}
+
+async function writeLinkedFile(payload){
+  if(!linkedFileHandle) return;
+  try{
+    const perm = await linkedFileHandle.queryPermission({mode:'readwrite'});
+    if(perm !== 'granted') return;
+    const writable = await linkedFileHandle.createWritable();
+    await writable.write(JSON.stringify(payload, null, 2));
+    await writable.close();
+  }catch(e){ console.warn('Falha ao escrever no ficheiro ligado', e); }
+}
+
+async function syncFromLinkedFile(reconcile){
+  const remote = await readLinkedFile();
+  if(remote && remote.needsPermission){ updateLinkUI('needs-permission'); return; }
+  if(!remote){
+    if(reconcile) await writeLinkedFile(buildExportPayload()); // ficheiro novo/vazio: inicializa com os dados locais
+    return;
+  }
+  if(reconcile){
+    const localMeta = loadMeta();
+    if(!localMeta.updatedAt || (remote.exportedAt && remote.exportedAt > localMeta.updatedAt)){
+      applyImportedData(remote);
+    } else if(remote.exportedAt && remote.exportedAt < localMeta.updatedAt){
+      await writeLinkedFile(buildExportPayload());
+    }
+  }
+}
+
+document.getElementById('btnLinkFile').addEventListener('click', async ()=>{
+  try{
+    const handle = await window.showSaveFilePicker({
+      suggestedName: 'turnos-tef-dados.json',
+      types: [{description:'Ficheiro JSON', accept:{'application/json':['.json']}}]
+    });
+    linkedFileHandle = handle;
+    await idbSet('linkedFile', handle);
+    updateLinkUI();
+    await syncFromLinkedFile(true);
+  }catch(e){
+    if(e.name !== 'AbortError') alert('Não foi possível ligar o ficheiro: '+e.message);
+  }
+});
+
+document.getElementById('btnReactivateLink').addEventListener('click', async ()=>{
+  if(!linkedFileHandle) return;
+  try{
+    const perm = await linkedFileHandle.requestPermission({mode:'readwrite'});
+    if(perm === 'granted'){ updateLinkUI(); await syncFromLinkedFile(true); }
+  }catch(e){}
+});
+
+document.getElementById('btnUnlinkFile').addEventListener('click', async ()=>{
+  if(confirm('Desligar este ficheiro de sincronização? A app continua a guardar os dados neste dispositivo.')){
+    linkedFileHandle = null;
+    await idbDelete('linkedFile');
+    updateLinkUI();
+  }
+});
+
+async function restoreLinkedHandle(){
+  if(!FS_ACCESS_SUPPORTED){ updateLinkUI(); return; }
+  try{
+    const handle = await idbGet('linkedFile');
+    if(handle){
+      linkedFileHandle = handle;
+      const perm = await handle.queryPermission({mode:'readwrite'});
+      if(perm === 'granted'){ updateLinkUI(); await syncFromLinkedFile(true); }
+      else updateLinkUI('needs-permission');
+    } else {
+      updateLinkUI();
+    }
+  }catch(e){ updateLinkUI(); }
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && linkedFileHandle) syncFromLinkedFile(true);
+});
+
+restoreLinkedHandle();
+
+/* ---------------------------------------------------------------
+   CÓPIA DE SEGURANÇA MANUAL (exportar/importar ficheiro)
+   ----------------------------------------------------------------
+   Não usa nenhuma API da Microsoft nem exige login. Útil como
+   reserva, ou em dispositivos que não suportam a ligação direta
+   acima (ex.: iPhone/Safari).
+--------------------------------------------------------------- */
+const STORE_META = 'tef_turnos_meta_v1'; // {updatedAt: iso}
+
+function nowISO(){ return new Date().toISOString(); }
+function loadMeta(){
+  try{ const raw = localStorage.getItem(STORE_META); if(raw) return JSON.parse(raw); }catch(e){}
+  return {updatedAt: null};
+}
+function saveMeta(m){ localStorage.setItem(STORE_META, JSON.stringify(m)); }
+let linkedWriteTimer = null;
+function touchMeta(){
+  saveMeta({updatedAt: nowISO()});
+  updateSyncStatusLabel();
+  if(typeof linkedFileHandle !== 'undefined' && linkedFileHandle){
+    clearTimeout(linkedWriteTimer);
+    linkedWriteTimer = setTimeout(()=>{ writeLinkedFile(buildExportPayload()); }, 2000);
+  }
+}
+
+function fmtDateTimePT(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-PT') + ' às ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
+}
+
+function updateSyncStatusLabel(){
+  const el = document.getElementById('syncStatus');
+  const meta = loadMeta();
+  el.textContent = meta.updatedAt
+    ? ('Última alteração: ' + fmtDateTimePT(meta.updatedAt) + ' — lembra-te de exportar para o OneDrive')
+    : 'Dados guardados só neste dispositivo';
+}
+
+function buildExportPayload(){
+  return {
+    template: TEMPLATE_LINES,
+    exceptions: exceptions,
+    tecnicos: TECH_REGISTRY,
+    rates: RATES,
+    exportedAt: nowISO()
+  };
+}
+
+function applyImportedData(data){
+  if(data.template) { TEMPLATE_LINES = data.template; localStorage.setItem(STORE_TPL, JSON.stringify(TEMPLATE_LINES)); }
+  if(data.exceptions){ exceptions = data.exceptions; localStorage.setItem(STORE_EXC, JSON.stringify(exceptions)); }
+  if(data.tecnicos){ TECH_REGISTRY = data.tecnicos; localStorage.setItem(STORE_TECH, JSON.stringify(TECH_REGISTRY)); }
+  if(data.rates){ RATES = data.rates; localStorage.setItem(STORE_RATES, JSON.stringify(RATES)); }
+  saveMeta({updatedAt: data.exportedAt || nowISO()});
+  renderCalendar();
+  renderHolidayList();
+  const tecTab = document.getElementById('tab-tec');
+  if(tecTab && tecTab.style.display !== 'none') renderTecTab();
+  const tplTab = document.getElementById('tab-tpl');
+  if(tplTab && tplTab.style.display !== 'none') renderTplGrid();
+  updateSyncStatusLabel();
+}
+
+document.getElementById('btnExportData').addEventListener('click', ()=>{
+  const payload = buildExportPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'turnos-tef-dados.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  alert('Ficheiro descarregado. Move-o (ou guarda-o diretamente) para dentro da tua pasta do OneDrive, para o teres disponível no outro aparelho.');
+});
+
+document.getElementById('btnImportData').addEventListener('click', ()=>{
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    let data;
+    try{ data = JSON.parse(ev.target.result); }
+    catch(err){ alert('Este ficheiro não parece ser um ficheiro de dados válido.'); return; }
+    const when = data.exportedAt ? fmtDateTimePT(data.exportedAt) : 'data desconhecida';
+    if(confirm('Importar dados de '+when+'? Isto substitui os dados atuais neste dispositivo.')){
+      applyImportedData(data);
+      alert('Dados importados com sucesso.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // permite selecionar o mesmo ficheiro outra vez no futuro
+});
+
+updateSyncStatusLabel();
 
 /* ---------------------------------------------------------------
    INIT
