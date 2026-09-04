@@ -1896,17 +1896,21 @@ function computeEquipSummary(){
   const names = Object.keys(TECH_REGISTRY);
   let grandTotal = 0;
   const perType = EQUIP_TYPES.map(type=>{
-    const sizeTotals = {};
-    let typeTotal = 0;
+    const byGender = {
+      H: {label:'Homem', total:0, sizeTotals:{}},
+      F: {label:'Mulher', total:0, sizeTotals:{}}
+    };
     names.forEach(name=>{
       const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
       if(entry && entry.size && entry.qty>0){
-        sizeTotals[entry.size] = (sizeTotals[entry.size]||0) + entry.qty;
-        typeTotal += entry.qty;
+        const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
+        byGender[gender].total += entry.qty;
+        byGender[gender].sizeTotals[entry.size] = (byGender[gender].sizeTotals[entry.size]||0) + entry.qty;
       }
     });
+    const typeTotal = byGender.H.total + byGender.F.total;
     grandTotal += typeTotal;
-    return {type, typeTotal, sizeTotals};
+    return {type, typeTotal, byGender};
   });
   return {perType, grandTotal};
 }
@@ -1915,14 +1919,21 @@ function renderEquipSummaryPanel(){
   const {perType, grandTotal} = computeEquipSummary();
   const summary = document.getElementById('equipSummary');
   let html = '';
-  perType.forEach(({type, typeTotal, sizeTotals})=>{
-    const breakdown = SIZE_LETTERS
-      .filter(sz=>sizeTotals[sz]>0)
-      .map(sz=>sz+': '+sizeTotals[sz])
-      .join(', ') || 'sem registos';
+  let grandH = 0, grandF = 0;
+  perType.forEach(({type, typeTotal, byGender})=>{
+    grandH += byGender.H.total;
+    grandF += byGender.F.total;
+    const genderLines = ['H','F'].map(g=>{
+      const info = byGender[g];
+      if(info.total===0) return info.label+': 0';
+      const breakdown = SIZE_LETTERS.filter(sz=>info.sizeTotals[sz]>0).map(sz=>sz+':'+info.sizeTotals[sz]).join(', ');
+      return info.label+': '+info.total+' ('+breakdown+')';
+    }).join(' · ');
     html += '<div><div class="stat-label">'+type+'</div><div class="stat-value">'+typeTotal+'</div>'+
-      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+breakdown+'</div></div>';
+      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+genderLines+'</div></div>';
   });
+  html += '<div><div class="stat-label">Total Homem</div><div class="stat-value">'+grandH+'</div></div>';
+  html += '<div><div class="stat-label">Total Mulher</div><div class="stat-value">'+grandF+'</div></div>';
   html += '<div><div class="stat-label">Total de peças entregues</div><div class="stat-value total">'+grandTotal+'</div></div>';
   summary.innerHTML = html;
 }
