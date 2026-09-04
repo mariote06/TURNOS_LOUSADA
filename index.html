@@ -221,7 +221,7 @@
   .equip-line input[type=number]{width:52px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 13px 'Inter';}
   .equip-empty{grid-column:1/-1;color:var(--ink-soft);font-style:italic;padding:14px;}
 
-  .disp-cards{display:flex;flex-direction:column;gap:14px;margin-bottom:18px;}
+  .disp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:14px;margin-bottom:18px;align-items:start;}
   .disp-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;}
   .disp-card h4{margin:0 0 10px;font:700 15px 'Space Grotesk';color:var(--ink);}
   .disp-week-table{border-collapse:collapse;font-size:12px;}
@@ -267,6 +267,8 @@
     .tab-btn{flex-shrink:0;padding:9px 14px;}
 
     .fin-scope-bar .tabs{width:auto;}
+
+    .disp-cards{grid-template-columns:1fr;}
 
     /* sync bars: full-width stacked buttons, easier to tap */
     .sync-buttons{flex-direction:column;}
@@ -557,6 +559,16 @@
       <span><span class="dot" style="background:var(--rust-soft);border:1px solid var(--rust);"></span>Indisponível</span>
     </div>
     <div class="disp-cards" id="dispCards"></div>
+
+    <h3 style="font-size:15px;margin:22px 0 10px;">Resumo por turno — quem está disponível</h3>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="dispShiftTable">
+        <thead>
+          <tr><th>Dia</th><th>Horário</th><th>Disponíveis</th><th>Quem</th></tr>
+        </thead>
+        <tbody id="dispShiftTableBody"></tbody>
+      </table>
+    </div>
   </div>
 
 </div>
@@ -2236,6 +2248,7 @@ function renderDispTab(){
 
   if(names.length === 0){
     container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
+    document.getElementById('dispShiftTableBody').innerHTML = '';
     return;
   }
 
@@ -2283,8 +2296,40 @@ function renderDispTab(){
       saveAvailability(AVAILABILITY);
       e.target.className = 'disp-slot-btn ' + (next==='sim' ? 'avail-yes' : (next==='nao' ? 'avail-no' : ''));
       e.target.textContent = next==='sim' ? 'Sim' : (next==='nao' ? 'Não' : '—');
+      renderDispShiftSummary();
     });
   });
+
+  renderDispShiftSummary();
+}
+
+// Vista invertida: para cada turno (dia + horário), quem marcou "disponível" e quantos.
+function renderDispShiftSummary(){
+  const tbody = document.getElementById('dispShiftTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  const slots = collectWeeklyOpenSlots();
+
+  let anyRow = false;
+  WEEK_ORDER.forEach(dayKey=>{
+    slots.forEach(slot=>{
+      if(!dayHasSlot(dayKey, slot.start, slot.end)) return;
+      anyRow = true;
+      const key = dayKey+'|'+slot.start+'-'+slot.end;
+      const availableNames = names.filter(n => (AVAILABILITY[n] && AVAILABILITY[n][key]) === 'sim');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td data-label="Dia">'+dayKey+'</td>'+
+        '<td data-label="Horário" class="hrs">'+slot.start+'–'+slot.end+'</td>'+
+        '<td data-label="Disponíveis" class="val">'+availableNames.length+'</td>'+
+        '<td data-label="Quem">'+(availableNames.length ? availableNames.join(', ') : '<span style="color:var(--ink-soft);font-style:italic;">ninguém marcado</span>')+'</td>';
+      tbody.appendChild(tr);
+    });
+  });
+  if(!anyRow){
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Sem horários definidos no Horário Base.</td></tr>';
+  }
 }
 
 /* ---------------------------------------------------------------
