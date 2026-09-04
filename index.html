@@ -303,6 +303,7 @@
     .rate-add-row .btn{width:100%;}
   }
 </style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -502,6 +503,9 @@
     </p>
     <div class="equip-cards" id="equipCards"></div>
     <div class="panel tec-summary" id="equipSummary"></div>
+    <div style="margin-top:16px;">
+      <button class="btn primary" id="btnExportEquipExcel">Exportar equipamento (Excel)</button>
+    </div>
   </div>
 
 </div>
@@ -1999,6 +2003,50 @@ function renderEquipTab(){
 
   renderEquipSummaryPanel();
 }
+
+document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
+  if(typeof XLSX === 'undefined'){
+    alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online da primeira vez que exportas).');
+    return;
+  }
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+
+  // Folha 1: Encomenda — totais agregados por equipamento, sexo e tamanho, prontos para o fornecedor.
+  const {perType} = computeEquipSummary();
+  const rowsOrder = [['Equipamento','Sexo','Tamanho','Quantidade a encomendar']];
+  perType.forEach(({type, byGender})=>{
+    ['H','F'].forEach(g=>{
+      const info = byGender[g];
+      SIZE_LETTERS.forEach(sz=>{
+        const q = info.sizeTotals[sz] || 0;
+        if(q>0) rowsOrder.push([type, info.label, sz, q]);
+      });
+    });
+  });
+  const totalOrder = rowsOrder.slice(1).reduce((s,r)=>s+r[3], 0);
+  rowsOrder.push(['','','TOTAL', totalOrder]);
+
+  // Folha 2: Por Técnico — detalhe individual, para conferência.
+  const rowsByTec = [['Técnico','Sexo','Equipamento','Tamanho','Quantidade']];
+  names.forEach(name=>{
+    const genderLabel = (TECH_REGISTRY[name].gender==='F') ? 'Mulher' : 'Homem';
+    EQUIP_TYPES.forEach(type=>{
+      const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
+      if(entry && entry.size && entry.qty>0){
+        rowsByTec.push([name, genderLabel, type, entry.size, entry.qty]);
+      }
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  const wsOrder = XLSX.utils.aoa_to_sheet(rowsOrder);
+  wsOrder['!cols'] = [{wch:18},{wch:10},{wch:8},{wch:22}];
+  const wsByTec = XLSX.utils.aoa_to_sheet(rowsByTec);
+  wsByTec['!cols'] = [{wch:20},{wch:10},{wch:18},{wch:8},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, wsOrder, 'Encomenda');
+  XLSX.utils.book_append_sheet(wb, wsByTec, 'Por Técnico');
+  XLSX.writeFile(wb, 'equipamento_encomenda.xlsx');
+});
 
 /* ---------------------------------------------------------------
    TABS
