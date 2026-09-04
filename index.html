@@ -221,6 +221,16 @@
   .equip-line input[type=number]{width:52px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 13px 'Inter';}
   .equip-empty{grid-column:1/-1;color:var(--ink-soft);font-style:italic;padding:14px;}
 
+  .disp-cards{display:flex;flex-direction:column;gap:14px;margin-bottom:18px;}
+  .disp-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
+  .disp-card h4{margin:0 0 10px;font:700 15px 'Space Grotesk';color:var(--ink);}
+  .disp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .disp-day{display:flex;flex-direction:column;gap:4px;align-items:stretch;}
+  .disp-day span{text-align:center;font:600 11px 'Inter';color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .disp-day select{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 2px;font:500 11.5px 'Inter';background:#fff;text-align:center;}
+  .disp-day select.disp-todo{background:var(--accent-soft);}
+  .disp-day select.disp-indisponivel{background:var(--rust-soft);color:var(--rust);}
+
   .fin-scope-bar{display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;flex-wrap:wrap;gap:10px;}
   .fin-scope-bar .tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;}
   .fin-scope-btn{border:none;background:transparent;padding:8px 18px;border-radius:999px;font:600 14px 'Inter';color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;}
@@ -319,6 +329,7 @@
       <button class="tab-btn" data-tab="feriados">Feriados</button>
       <button class="tab-btn" data-tab="fin">Finanças</button>
       <button class="tab-btn" data-tab="equip">Equipamento</button>
+      <button class="tab-btn" data-tab="disp">Disponibilidade</button>
     </div>
   </div>
 
@@ -506,6 +517,14 @@
     <div style="margin-top:16px;">
       <button class="btn primary" id="btnExportEquipExcel">Exportar equipamento (Excel)</button>
     </div>
+  </div>
+
+  <!-- DISPONIBILIDADE TAB -->
+  <div id="tab-disp" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Disponibilidade semanal de cada técnico (referência para montares o horário) — não afeta o calendário nem os turnos, é só informativo.
+    </p>
+    <div class="disp-cards" id="dispCards"></div>
   </div>
 
 </div>
@@ -2011,20 +2030,32 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
   }
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
 
-  // Folha 1: Encomenda — totais agregados por equipamento, sexo e tamanho, prontos para o fornecedor.
+  // Folha 1: Encomenda — matriz Equipamento x (Mulher XS..XL | Homem XS..XL), com totais.
   const {perType} = computeEquipSummary();
-  const rowsOrder = [['Equipamento','Sexo','Tamanho','Quantidade a encomendar']];
+  const rowsOrder = [
+    ['', 'Mulher','','','','', 'Homem','','','',''],
+    ['', 'XS','S','M','L','XL', 'XS','S','M','L','XL']
+  ];
+  const colTotals = new Array(10).fill(0);
   perType.forEach(({type, byGender})=>{
-    ['H','F'].forEach(g=>{
-      const info = byGender[g];
+    const rowVals = [];
+    ['F','H'].forEach(g=>{
       SIZE_LETTERS.forEach(sz=>{
-        const q = info.sizeTotals[sz] || 0;
-        if(q>0) rowsOrder.push([type, info.label, sz, q]);
+        const q = byGender[g].sizeTotals[sz] || 0;
+        rowVals.push(q>0 ? q : '');
       });
     });
+    rowVals.forEach((v,i)=>{ if(v) colTotals[i] += v; });
+    rowsOrder.push([type, ...rowVals]);
   });
-  const totalOrder = rowsOrder.slice(1).reduce((s,r)=>s+r[3], 0);
-  rowsOrder.push(['','','TOTAL', totalOrder]);
+  rowsOrder.push(['Totais', ...colTotals.map(v=> v>0 ? v : '')]);
+
+  const wsOrder = XLSX.utils.aoa_to_sheet(rowsOrder);
+  wsOrder['!merges'] = [
+    {s:{r:0,c:1}, e:{r:0,c:5}}, // Mulher
+    {s:{r:0,c:6}, e:{r:0,c:10}} // Homem
+  ];
+  wsOrder['!cols'] = [{wch:16}].concat(new Array(10).fill({wch:6}));
 
   // Folha 2: Por Técnico — detalhe individual, para conferência.
   const rowsByTec = [['Técnico','Sexo','Equipamento','Tamanho','Quantidade']];
@@ -2039,14 +2070,72 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
   });
 
   const wb = XLSX.utils.book_new();
-  const wsOrder = XLSX.utils.aoa_to_sheet(rowsOrder);
-  wsOrder['!cols'] = [{wch:18},{wch:10},{wch:8},{wch:22}];
   const wsByTec = XLSX.utils.aoa_to_sheet(rowsByTec);
   wsByTec['!cols'] = [{wch:20},{wch:10},{wch:18},{wch:8},{wch:10}];
   XLSX.utils.book_append_sheet(wb, wsOrder, 'Encomenda');
   XLSX.utils.book_append_sheet(wb, wsByTec, 'Por Técnico');
   XLSX.writeFile(wb, 'equipamento_encomenda.xlsx');
 });
+
+/* ---------------------------------------------------------------
+   DISPONIBILIDADE: disponibilidade semanal de cada técnico
+   (informativo — não afeta o calendário nem os turnos)
+--------------------------------------------------------------- */
+const STORE_AVAIL = 'tef_turnos_disponibilidade_v1'; // {tecnico: {Seg:'manha'|'tarde'|'noite'|'todo'|'indisponivel'|'', ...}}
+const AVAIL_OPTIONS = [
+  {value:'', label:'—'},
+  {value:'manha', label:'Manhã'},
+  {value:'tarde', label:'Tarde'},
+  {value:'noite', label:'Noite'},
+  {value:'todo', label:'Dia todo'},
+  {value:'indisponivel', label:'Indisponível'}
+];
+
+function loadAvailability(){
+  try{ const raw = localStorage.getItem(STORE_AVAIL); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveAvailability(a){ localStorage.setItem(STORE_AVAIL, JSON.stringify(a)); touchMeta(); }
+let AVAILABILITY = loadAvailability();
+
+function renderDispTab(){
+  const container = document.getElementById('dispCards');
+  container.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+
+  if(names.length === 0){
+    container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
+    return;
+  }
+
+  names.forEach(name=>{
+    const data = AVAILABILITY[name] || {};
+    const card = document.createElement('div');
+    card.className = 'disp-card';
+    let daysHtml = '';
+    WEEK_ORDER.forEach(dayKey=>{
+      const val = data[dayKey] || '';
+      let opts = '';
+      AVAIL_OPTIONS.forEach(o=>{ opts += '<option value="'+o.value+'" '+(val===o.value?'selected':'')+'>'+o.label+'</option>'; });
+      const cls = val==='todo' ? 'disp-todo' : (val==='indisponivel' ? 'disp-indisponivel' : '');
+      daysHtml += '<div class="disp-day"><span>'+dayKey+'</span><select class="'+cls+'" data-name="'+encodeURIComponent(name)+'" data-day="'+dayKey+'">'+opts+'</select></div>';
+    });
+    card.innerHTML = '<h4>'+name+'</h4><div class="disp-grid">'+daysHtml+'</div>';
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const day = e.target.dataset.day;
+      if(!AVAILABILITY[name]) AVAILABILITY[name] = {};
+      if(e.target.value) AVAILABILITY[name][day] = e.target.value;
+      else delete AVAILABILITY[name][day];
+      saveAvailability(AVAILABILITY);
+      e.target.className = e.target.value==='todo' ? 'disp-todo' : (e.target.value==='indisponivel' ? 'disp-indisponivel' : '');
+    });
+  });
+}
 
 /* ---------------------------------------------------------------
    TABS
@@ -2062,11 +2151,13 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-feriados').style.display = tab==='feriados' ? '' : 'none';
     document.getElementById('tab-fin').style.display = tab==='fin' ? '' : 'none';
     document.getElementById('tab-equip').style.display = tab==='equip' ? '' : 'none';
+    document.getElementById('tab-disp').style.display = tab==='disp' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
     if(tab==='fin') renderFinTab();
     if(tab==='equip') renderEquipTab();
+    if(tab==='disp') renderDispTab();
   });
 });
 
@@ -2344,6 +2435,7 @@ function buildExportPayload(){
     rates: RATES,
     feriados: HOLIDAY_ASSIGNMENTS,
     equipamento: EQUIPMENT,
+    disponibilidade: AVAILABILITY,
     exportedAt: nowISO()
   };
 }
@@ -2355,6 +2447,7 @@ function applyImportedData(data){
   if(data.rates){ RATES = data.rates; localStorage.setItem(STORE_RATES, JSON.stringify(RATES)); }
   if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
   if(data.equipamento){ EQUIPMENT = data.equipamento; localStorage.setItem(STORE_EQUIP, JSON.stringify(EQUIPMENT)); }
+  if(data.disponibilidade){ AVAILABILITY = data.disponibilidade; localStorage.setItem(STORE_AVAIL, JSON.stringify(AVAILABILITY)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -2366,6 +2459,8 @@ function applyImportedData(data){
   if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
   const equipTab = document.getElementById('tab-equip');
   if(equipTab && equipTab.style.display !== 'none') renderEquipTab();
+  const dispTab = document.getElementById('tab-disp');
+  if(dispTab && dispTab.style.display !== 'none') renderDispTab();
   updateSyncStatusLabel();
 }
 
