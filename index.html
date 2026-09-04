@@ -210,6 +210,17 @@
   .tec-summary .stat-value{font:700 20px 'Space Grotesk';}
   .tec-summary .stat-value.total{color:var(--accent);}
 
+  .equip-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:18px;}
+  .equip-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
+  .equip-card h4{margin:0 0 10px;font:700 15px 'Space Grotesk';color:var(--ink);}
+  .equip-line{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);}
+  .equip-line:last-child{border-bottom:none;}
+  .equip-line .equip-label{flex:1;font-size:13px;color:var(--ink);}
+  .equip-line select{width:66px;border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 13px 'Inter';background:#fff;}
+  .equip-line select.equip-qty-select{width:52px;text-align:center;}
+  .equip-line input[type=number]{width:52px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 13px 'Inter';}
+  .equip-empty{grid-column:1/-1;color:var(--ink-soft);font-style:italic;padding:14px;}
+
   .fin-scope-bar{display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;flex-wrap:wrap;gap:10px;}
   .fin-scope-bar .tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;}
   .fin-scope-btn{border:none;background:transparent;padding:8px 18px;border-radius:999px;font:600 14px 'Inter';color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;}
@@ -306,6 +317,7 @@
       <button class="tab-btn" data-tab="tec">Técnicos</button>
       <button class="tab-btn" data-tab="feriados">Feriados</button>
       <button class="tab-btn" data-tab="fin">Finanças</button>
+      <button class="tab-btn" data-tab="equip">Equipamento</button>
     </div>
   </div>
 
@@ -418,7 +430,7 @@
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="tecTable">
         <thead>
-          <tr><th>Cor</th><th>Técnico</th><th>Vínculo</th><th>Horas no período</th><th>Valor estimado</th><th></th></tr>
+          <tr><th>Cor</th><th>Técnico</th><th>Sexo</th><th>Vínculo</th><th>Horas no período</th><th>Valor estimado</th><th></th></tr>
         </thead>
         <tbody id="tecTableBody"></tbody>
       </table>
@@ -481,6 +493,15 @@
     </div>
 
     <div class="panel tec-summary" id="finSummary"></div>
+  </div>
+
+  <!-- EQUIPAMENTO TAB -->
+  <div id="tab-equip" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Fardamento entregue a cada técnico. Escolhe o tamanho e escreve a quantidade — grava-se sozinho.
+    </p>
+    <div class="equip-cards" id="equipCards"></div>
+    <div class="panel tec-summary" id="equipSummary"></div>
   </div>
 
 </div>
@@ -1517,7 +1538,7 @@ document.getElementById('btnResetTpl').addEventListener('click', ()=>{
 /* ---------------------------------------------------------------
    TECNICOS: vínculo (dependente/independente), valor/hora, orçamento
 --------------------------------------------------------------- */
-const STORE_TECH = 'tef_turnos_tecnicos_v1';   // {name: {status: 'dependente'|'independente'|null}}
+const STORE_TECH = 'tef_turnos_tecnicos_v1';   // {name: {status: 'dependente'|'independente'|null, gender:'H'|'F'}}
 const STORE_RATES = 'tef_turnos_rates_v1';     // {dependente:number, independente:number}
 
 function loadTechRegistry(){
@@ -1528,6 +1549,43 @@ function loadTechRegistry(){
   return {};
 }
 function saveTechRegistry(r){ localStorage.setItem(STORE_TECH, JSON.stringify(r)); touchMeta(); }
+
+// Lista de primeiros nomes comuns em Portugal, para adivinhar o sexo automaticamente.
+// É só um ponto de partida — fica sempre editável no separador Técnicos.
+const FEMALE_FIRST_NAMES = ['ana','maria','catarina','joana','sofia','beatriz','carolina','marta','rita','sara','ines','inês',
+  'patricia','patrícia','diana','erica','érica','flavia','flávia','marlene','andreia','cristina','fatima','fátima','teresa',
+  'vera','claudia','cláudia','susana','helena','isabel','laura','livia','lívia','mafalda','margarida','raquel','sandra',
+  'tatiana','vanessa','carla','celia','célia','daniela','debora','débora','elisabete','eva','filipa','gabriela','ivone',
+  'julia','júlia','leonor','liliana','luisa','luísa','monica','mónica','natalia','natália','olivia','olívia','paula',
+  'renata','rosa','silvia','sílvia','tania','tânia','vitoria','vitória','carolina','bruna','ines','inês'];
+const MALE_FIRST_NAMES = ['pedro','diogo','marcos','paulo','luis','luís','andre','andré','tiago','joao','joão','miguel',
+  'ricardo','bruno','carlos','nuno','rui','filipe','hugo','jorge','manuel','antonio','antónio','fernando','francisco',
+  'goncalo','gonçalo','henrique','ivo','joel','jose','josé','leonardo','marco','mario','mário','martim','nelson',
+  'rafael','rodrigo','samuel','sergio','sérgio','simao','simão','tomas','tomás','vasco','victor','vitor','vítor',
+  'daniel','diego','duarte','eduardo','fabio','fábio','gabriel','guilherme','ivan','joel','luca','marcelo','mateus',
+  'nicolau','pedro','ruben','rúben','valter'];
+
+function guessGenderFromName(fullName){
+  const first = (fullName||'').trim().split(/\s+/)[0].toLowerCase().replace(/[.,]/g,'');
+  if(FEMALE_FIRST_NAMES.includes(first)) return 'F';
+  if(MALE_FIRST_NAMES.includes(first)) return 'H';
+  if(first.endsWith('a') || first.endsWith('ia')) return 'F'; // heurística de recurso
+  return 'H';
+}
+
+// Ponto único para registar um técnico novo (mantém consistência entre todos os sítios
+// que descobrem nomes automaticamente): estado por classificar, sexo adivinhado pelo nome.
+function ensureTechRegistered(name){
+  if(!(name in TECH_REGISTRY)){
+    TECH_REGISTRY[name] = {status:null, gender: guessGenderFromName(name)};
+    return true;
+  }
+  if(!TECH_REGISTRY[name].gender){
+    TECH_REGISTRY[name].gender = guessGenderFromName(name);
+    return true;
+  }
+  return false;
+}
 
 function loadRates(){
   try{
@@ -1687,11 +1745,11 @@ function renderRateHistory(status, containerId){
 }
 
 function renderTecTab(){
-  // discover any new names and register them (unclassified) without overwriting existing choices
+  // discover any new names and register them (unclassified, gender guessed) without overwriting existing choices
   const allNames = collectAllWorkerNames();
   let changed = false;
   allNames.forEach(name=>{
-    if(!(name in TECH_REGISTRY)){ TECH_REGISTRY[name] = {status:null}; changed = true; }
+    if(ensureTechRegistered(name)) changed = true;
   });
   if(changed) saveTechRegistry(TECH_REGISTRY);
 
@@ -1720,10 +1778,15 @@ function renderTecTab(){
     const tr = document.createElement('tr');
     if(!status) tr.className = 'unclassified';
     const currentColor = colorForName(name).bg;
+    const gender = entry.gender || 'H';
     tr.innerHTML =
       '<td data-label="Cor"><input type="color" class="tec-color-input" value="'+currentColor+'" data-name="'+encodeURIComponent(name)+'" title="Escolher cor de '+name+'"></td>'+
       '<td data-label="Técnico">'+name+'</td>'+
-      '<td data-label="Vínculo"><select data-name="'+encodeURIComponent(name)+'">'+
+      '<td data-label="Sexo"><select class="tec-gender-select" data-name="'+encodeURIComponent(name)+'">'+
+        '<option value="H" '+(gender==='H'?'selected':'')+'>Homem</option>'+
+        '<option value="F" '+(gender==='F'?'selected':'')+'>Mulher</option>'+
+      '</select></td>'+
+      '<td data-label="Vínculo"><select class="tec-status-select" data-name="'+encodeURIComponent(name)+'">'+
         '<option value="" '+(!status?'selected':'')+'>— escolher —</option>'+
         '<option value="dependente" '+(status==='dependente'?'selected':'')+'>Dependente</option>'+
         '<option value="independente" '+(status==='independente'?'selected':'')+'>Independente</option>'+
@@ -1744,7 +1807,15 @@ function renderTecTab(){
     });
   });
 
-  tbody.querySelectorAll('select').forEach(sel=>{
+  tbody.querySelectorAll('.tec-gender-select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      TECH_REGISTRY[name].gender = e.target.value;
+      saveTechRegistry(TECH_REGISTRY);
+    });
+  });
+
+  tbody.querySelectorAll('.tec-status-select').forEach(sel=>{
     sel.addEventListener('change', (e)=>{
       const name = decodeURIComponent(e.target.dataset.name);
       TECH_REGISTRY[name].status = e.target.value || null;
@@ -1799,11 +1870,124 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
   const input = document.getElementById('newTecName');
   const name = input.value.trim();
   if(!name) return;
-  if(!(name in TECH_REGISTRY)) TECH_REGISTRY[name] = {status:null};
+  ensureTechRegistered(name);
   saveTechRegistry(TECH_REGISTRY);
   input.value = '';
   renderTecTab();
 });
+
+/* ---------------------------------------------------------------
+   EQUIPAMENTO: fardamento entregue por técnico e tipo — um tamanho e
+   uma quantidade por linha (o sexo do técnico, em Técnicos, já diz
+   qual a escala/corte a usar; aqui só interessa o tamanho em si).
+--------------------------------------------------------------- */
+const SIZE_LETTERS = ['XS','S','M','L','XL'];
+const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT'];
+const STORE_EQUIP = 'tef_turnos_equipamento_v1'; // {tecnico: {tipo: {size:'M', qty:2}}}
+
+function loadEquipment(){
+  try{ const raw = localStorage.getItem(STORE_EQUIP); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveEquipment(e){ localStorage.setItem(STORE_EQUIP, JSON.stringify(e)); touchMeta(); }
+let EQUIPMENT = loadEquipment();
+
+function computeEquipSummary(){
+  const names = Object.keys(TECH_REGISTRY);
+  let grandTotal = 0;
+  const perType = EQUIP_TYPES.map(type=>{
+    const sizeTotals = {};
+    let typeTotal = 0;
+    names.forEach(name=>{
+      const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
+      if(entry && entry.size && entry.qty>0){
+        sizeTotals[entry.size] = (sizeTotals[entry.size]||0) + entry.qty;
+        typeTotal += entry.qty;
+      }
+    });
+    grandTotal += typeTotal;
+    return {type, typeTotal, sizeTotals};
+  });
+  return {perType, grandTotal};
+}
+
+function renderEquipSummaryPanel(){
+  const {perType, grandTotal} = computeEquipSummary();
+  const summary = document.getElementById('equipSummary');
+  let html = '';
+  perType.forEach(({type, typeTotal, sizeTotals})=>{
+    const breakdown = SIZE_LETTERS
+      .filter(sz=>sizeTotals[sz]>0)
+      .map(sz=>sz+': '+sizeTotals[sz])
+      .join(', ') || 'sem registos';
+    html += '<div><div class="stat-label">'+type+'</div><div class="stat-value">'+typeTotal+'</div>'+
+      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+breakdown+'</div></div>';
+  });
+  html += '<div><div class="stat-label">Total de peças entregues</div><div class="stat-value total">'+grandTotal+'</div></div>';
+  summary.innerHTML = html;
+}
+
+function renderEquipTab(){
+  const container = document.getElementById('equipCards');
+  container.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+
+  if(names.length === 0){
+    container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
+    document.getElementById('equipSummary').innerHTML = '';
+    return;
+  }
+
+  names.forEach(name=>{
+    const card = document.createElement('div');
+    card.className = 'equip-card';
+    let linesHtml = '<h4>'+name+'</h4>';
+    EQUIP_TYPES.forEach(type=>{
+      const entry = (EQUIPMENT[name] && EQUIPMENT[name][type]) || {size:'', qty:0};
+      let sizeOptions = '<option value="">—</option>';
+      SIZE_LETTERS.forEach(sz=>{ sizeOptions += '<option value="'+sz+'" '+(entry.size===sz?'selected':'')+'>'+sz+'</option>'; });
+      let qtyOptions = '<option value="0">—</option>';
+      [1,2,3,4].forEach(n=>{ qtyOptions += '<option value="'+n+'" '+(entry.qty===n?'selected':'')+'>'+n+'</option>'; });
+      linesHtml +=
+        '<div class="equip-line">'+
+          '<span class="equip-label">'+type+'</span>'+
+          '<select class="equip-size-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+sizeOptions+'</select>'+
+          '<select class="equip-qty-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+qtyOptions+'</select>'+
+        '</div>';
+    });
+    card.innerHTML = linesHtml;
+    container.appendChild(card);
+  });
+
+  function persistEntry(name, type, size, qty){
+    if(!EQUIPMENT[name]) EQUIPMENT[name] = {};
+    if(size || qty>0){ EQUIPMENT[name][type] = {size, qty}; }
+    else { delete EQUIPMENT[name][type]; }
+    saveEquipment(EQUIPMENT);
+    renderEquipSummaryPanel();
+  }
+
+  container.querySelectorAll('.equip-size-select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const qtySelect = container.querySelector('.equip-qty-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
+      const qty = parseInt(qtySelect.value,10) || 0;
+      persistEntry(name, type, e.target.value, qty);
+    });
+  });
+  container.querySelectorAll('.equip-qty-select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const sizeSelect = container.querySelector('.equip-size-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
+      const qty = parseInt(e.target.value,10) || 0;
+      persistEntry(name, type, sizeSelect.value, qty);
+    });
+  });
+
+  renderEquipSummaryPanel();
+}
 
 /* ---------------------------------------------------------------
    TABS
@@ -1818,10 +2002,12 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-tec').style.display = tab==='tec' ? '' : 'none';
     document.getElementById('tab-feriados').style.display = tab==='feriados' ? '' : 'none';
     document.getElementById('tab-fin').style.display = tab==='fin' ? '' : 'none';
+    document.getElementById('tab-equip').style.display = tab==='equip' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
     if(tab==='fin') renderFinTab();
+    if(tab==='equip') renderEquipTab();
   });
 });
 
@@ -2098,6 +2284,7 @@ function buildExportPayload(){
     tecnicos: TECH_REGISTRY,
     rates: RATES,
     feriados: HOLIDAY_ASSIGNMENTS,
+    equipamento: EQUIPMENT,
     exportedAt: nowISO()
   };
 }
@@ -2108,6 +2295,7 @@ function applyImportedData(data){
   if(data.tecnicos){ TECH_REGISTRY = data.tecnicos; localStorage.setItem(STORE_TECH, JSON.stringify(TECH_REGISTRY)); }
   if(data.rates){ RATES = data.rates; localStorage.setItem(STORE_RATES, JSON.stringify(RATES)); }
   if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
+  if(data.equipamento){ EQUIPMENT = data.equipamento; localStorage.setItem(STORE_EQUIP, JSON.stringify(EQUIPMENT)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -2117,6 +2305,8 @@ function applyImportedData(data){
   if(tplTab && tplTab.style.display !== 'none') renderTplGrid();
   const ferTab = document.getElementById('tab-feriados');
   if(ferTab && ferTab.style.display !== 'none') renderFeriadosTab();
+  const equipTab = document.getElementById('tab-equip');
+  if(equipTab && equipTab.style.display !== 'none') renderEquipTab();
   updateSyncStatusLabel();
 }
 
