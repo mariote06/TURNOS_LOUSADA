@@ -350,8 +350,8 @@
     <div class="grid" id="calGrid"></div>
 
     <div class="panel">
-      <h3>Feriados no período (Set 2026 – Ago 2027)</h3>
-      <div id="holidayList"></div>
+      <h3>Substituições registadas</h3>
+      <div id="substList"></div>
     </div>
 
     <footer class="note">Os dados ficam guardados apenas neste browser (localStorage). Usa "Exportar ano" regularmente para teres uma cópia de segurança em Excel/CSV.</footer>
@@ -1109,6 +1109,7 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
   saveExceptions(exceptions);
   closeModalOverlay();
   renderCalendar();
+  renderSubstitutionsList();
 });
 
 document.getElementById('btnResetDay').addEventListener('click', ()=>{
@@ -1125,22 +1126,44 @@ document.getElementById('btnResetDay').addEventListener('click', ()=>{
   saveExceptions(exceptions);
   closeModalOverlay();
   renderCalendar();
+  renderSubstitutionsList();
 });
 
 /* ---------------------------------------------------------------
-   HOLIDAY LIST PANEL
+   SUBSTITUTIONS LIST PANEL
 --------------------------------------------------------------- */
-function renderHolidayList(){
-  const el = document.getElementById('holidayList');
+function fmtDatePTLong(iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  return LONG_WEEKDAY[dt.getDay()]+', '+d+' de '+MONTH_NAMES[m-1].toLowerCase()+' de '+y;
+}
+
+function renderSubstitutionsList(){
+  const el = document.getElementById('substList');
   el.innerHTML = '';
-  HOLIDAYS.forEach(h=>{
-    const [y,m,d] = h.date.split('-').map(Number);
-    const dt = new Date(y,m-1,d);
-    const label = LONG_WEEKDAY[dt.getDay()]+', '+d+' de '+MONTH_NAMES[m-1].toLowerCase()+' de '+y;
-    const typeLabel = h.type==='municipal' ? 'Municipal (Lousada)' : h.type==='facultativo' ? 'Facultativo' : 'Nacional';
+  const rows = [];
+  const d = new Date(RANGE_START);
+  while(d <= RANGE_END){
+    const iso = isoDate(d);
+    const dKey = dayKeyOf(d);
+    const shifts = shiftsForDate(iso, dKey);
+    shifts.forEach(s=>{
+      if(s._subst && !s._adhoc && s.substituteName){
+        rows.push({iso, s});
+      }
+    });
+    d.setDate(d.getDate()+1);
+  }
+  if(rows.length === 0){
+    el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;padding:6px 0;">Sem substituições registadas.</div>';
+    return;
+  }
+  rows.forEach(r=>{
+    const exc = exceptions[r.iso];
+    const note = exc && exc.note ? ' — '+exc.note : '';
     const row = document.createElement('div');
     row.className = 'hol-item';
-    row.innerHTML = '<span>'+h.name+' <span class="badge '+h.type+'" style="margin-left:6px;">'+typeLabel+'</span></span><span class="hol-date">'+label+'</span>';
+    row.innerHTML = '<span>'+r.s.start+'–'+r.s.end+' · <strong>'+(r.s.name||'')+'</strong> substituído por <strong>'+r.s.substituteName+'</strong>'+note+'</span><span class="hol-date">'+fmtDatePTLong(r.iso)+'</span>';
     el.appendChild(row);
   });
 }
@@ -1388,6 +1411,7 @@ function renderTplColumn(dayKey){
 document.getElementById('btnSaveTpl').addEventListener('click', ()=>{
   saveTemplateLines(TEMPLATE_LINES);
   renderCalendar();
+  renderSubstitutionsList();
   alert('Horário base guardado.');
 });
 document.getElementById('btnResetTpl').addEventListener('click', ()=>{
@@ -1982,7 +2006,7 @@ function applyImportedData(data){
   if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
-  renderHolidayList();
+  renderSubstitutionsList();
   const tecTab = document.getElementById('tab-tec');
   if(tecTab && tecTab.style.display !== 'none') renderTecTab();
   const tplTab = document.getElementById('tab-tpl');
@@ -2038,7 +2062,7 @@ updateSyncStatusLabel();
   currentMonthIdx = idx>=0 ? idx : 0;
   monthSelect.value = currentMonthIdx;
   renderCalendar();
-  renderHolidayList();
+  renderSubstitutionsList();
 })();
 </script>
 <script>
