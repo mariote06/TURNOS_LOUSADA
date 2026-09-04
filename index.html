@@ -513,6 +513,28 @@
       Fardamento entregue a cada técnico. Escolhe o tamanho e escreve a quantidade — grava-se sozinho.
     </p>
     <div class="equip-cards" id="equipCards"></div>
+
+    <h3 style="font-size:15px;margin:22px 0 10px;">Stock disponível (armazém)</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Quantidades que já tens guardadas. A app calcula sozinha quanto falta encomendar (entregue menos o que está em stock).
+    </p>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="stockTable">
+        <thead>
+          <tr>
+            <th rowspan="2">Equipamento</th>
+            <th colspan="5">Mulher</th>
+            <th colspan="5">Homem</th>
+          </tr>
+          <tr>
+            <th>XS</th><th>S</th><th>M</th><th>L</th><th>XL</th>
+            <th>XS</th><th>S</th><th>M</th><th>L</th><th>XL</th>
+          </tr>
+        </thead>
+        <tbody id="stockTableBody"></tbody>
+      </table>
+    </div>
+
     <div class="panel tec-summary" id="equipSummary"></div>
     <div style="margin-top:16px;">
       <button class="btn primary" id="btnExportEquipExcel">Exportar equipamento (Excel)</button>
@@ -1907,6 +1929,7 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
 const SIZE_LETTERS = ['XS','S','M','L','XL'];
 const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT'];
 const STORE_EQUIP = 'tef_turnos_equipamento_v1'; // {tecnico: {tipo: {size:'M', qty:2}}}
+const STORE_STOCK = 'tef_turnos_stock_v1'; // {tipo: {F:{XS:qtd,...}, H:{...}}}
 
 function loadEquipment(){
   try{ const raw = localStorage.getItem(STORE_EQUIP); if(raw) return JSON.parse(raw); }catch(e){}
@@ -1915,50 +1938,113 @@ function loadEquipment(){
 function saveEquipment(e){ localStorage.setItem(STORE_EQUIP, JSON.stringify(e)); touchMeta(); }
 let EQUIPMENT = loadEquipment();
 
+function loadStock(){
+  try{ const raw = localStorage.getItem(STORE_STOCK); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveStock(s){ localStorage.setItem(STORE_STOCK, JSON.stringify(s)); touchMeta(); }
+let STOCK = loadStock();
+
+// Para cada tipo/sexo/tamanho: quanto foi entregue, quanto há em stock, e quanto falta
+// encomendar (entregue menos stock, nunca negativo — stock a mais não gera "sobra" negativa).
 function computeEquipSummary(){
   const names = Object.keys(TECH_REGISTRY);
-  let grandTotal = 0;
+  let grandDelivered=0, grandStock=0, grandNeeded=0;
   const perType = EQUIP_TYPES.map(type=>{
     const byGender = {
-      H: {label:'Homem', total:0, sizeTotals:{}},
-      F: {label:'Mulher', total:0, sizeTotals:{}}
+      H: {label:'Homem', delivered:0, stock:0, needed:0, sizes:{}},
+      F: {label:'Mulher', delivered:0, stock:0, needed:0, sizes:{}}
     };
     names.forEach(name=>{
       const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
       if(entry && entry.size && entry.qty>0){
         const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
-        byGender[gender].total += entry.qty;
-        byGender[gender].sizeTotals[entry.size] = (byGender[gender].sizeTotals[entry.size]||0) + entry.qty;
+        byGender[gender].delivered += entry.qty;
+        if(!byGender[gender].sizes[entry.size]) byGender[gender].sizes[entry.size] = {delivered:0, stock:0};
+        byGender[gender].sizes[entry.size].delivered += entry.qty;
       }
     });
-    const typeTotal = byGender.H.total + byGender.F.total;
-    grandTotal += typeTotal;
-    return {type, typeTotal, byGender};
+    ['F','H'].forEach(g=>{
+      SIZE_LETTERS.forEach(sz=>{
+        const stockQty = (STOCK[type] && STOCK[type][g] && STOCK[type][g][sz]) || 0;
+        if(stockQty>0){
+          byGender[g].stock += stockQty;
+          if(!byGender[g].sizes[sz]) byGender[g].sizes[sz] = {delivered:0, stock:0};
+          byGender[g].sizes[sz].stock = stockQty;
+        }
+      });
+      Object.keys(byGender[g].sizes).forEach(sz=>{
+        const s = byGender[g].sizes[sz];
+        byGender[g].needed += Math.max(0, s.delivered - s.stock);
+      });
+    });
+    const typeDelivered = byGender.H.delivered + byGender.F.delivered;
+    const typeStock = byGender.H.stock + byGender.F.stock;
+    const typeNeeded = byGender.H.needed + byGender.F.needed;
+    grandDelivered += typeDelivered; grandStock += typeStock; grandNeeded += typeNeeded;
+    return {type, typeDelivered, typeStock, typeNeeded, byGender};
   });
-  return {perType, grandTotal};
+  return {perType, grandDelivered, grandStock, grandNeeded};
 }
 
 function renderEquipSummaryPanel(){
-  const {perType, grandTotal} = computeEquipSummary();
+  const {perType, grandDelivered, grandStock, grandNeeded} = computeEquipSummary();
   const summary = document.getElementById('equipSummary');
   let html = '';
-  let grandH = 0, grandF = 0;
-  perType.forEach(({type, typeTotal, byGender})=>{
-    grandH += byGender.H.total;
-    grandF += byGender.F.total;
+  perType.forEach(({type, typeDelivered, typeStock, typeNeeded, byGender})=>{
     const genderLines = ['H','F'].map(g=>{
       const info = byGender[g];
-      if(info.total===0) return info.label+': 0';
-      const breakdown = SIZE_LETTERS.filter(sz=>info.sizeTotals[sz]>0).map(sz=>sz+':'+info.sizeTotals[sz]).join(', ');
-      return info.label+': '+info.total+' ('+breakdown+')';
-    }).join(' · ');
-    html += '<div><div class="stat-label">'+type+'</div><div class="stat-value">'+typeTotal+'</div>'+
-      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+genderLines+'</div></div>';
+      const breakdown = SIZE_LETTERS
+        .filter(sz=>info.sizes[sz] && (info.sizes[sz].delivered>0 || info.sizes[sz].stock>0))
+        .map(sz=>sz+': entregue '+ (info.sizes[sz].delivered||0) +' / stock '+ (info.sizes[sz].stock||0))
+        .join(', ');
+      return info.label+' — '+ (breakdown || 'sem registos');
+    }).join('<br>');
+    html += '<div><div class="stat-label">'+type+'</div>'+
+      '<div class="stat-value">'+typeDelivered+' entregues</div>'+
+      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+genderLines+'</div>'+
+      '<div style="font-size:12px;margin-top:4px;"><strong style="color:'+(typeNeeded>0?'var(--rust)':'var(--accent)')+';">Falta encomendar: '+typeNeeded+'</strong> · em stock: '+typeStock+'</div>'+
+    '</div>';
   });
-  html += '<div><div class="stat-label">Total Homem</div><div class="stat-value">'+grandH+'</div></div>';
-  html += '<div><div class="stat-label">Total Mulher</div><div class="stat-value">'+grandF+'</div></div>';
-  html += '<div><div class="stat-label">Total de peças entregues</div><div class="stat-value total">'+grandTotal+'</div></div>';
+  html += '<div><div class="stat-label">Total entregue</div><div class="stat-value">'+grandDelivered+'</div></div>';
+  html += '<div><div class="stat-label">Total em stock</div><div class="stat-value">'+grandStock+'</div></div>';
+  html += '<div><div class="stat-label">Total a encomendar</div><div class="stat-value total">'+grandNeeded+'</div></div>';
   summary.innerHTML = html;
+}
+
+function renderStockTable(){
+  const tbody = document.getElementById('stockTableBody');
+  tbody.innerHTML = '';
+  EQUIP_TYPES.forEach(type=>{
+    const tr = document.createElement('tr');
+    let cells = '<td data-label="Equipamento" style="font-weight:700;">'+type+'</td>';
+    ['F','H'].forEach(g=>{
+      const genderLabel = g==='F' ? 'Mulher' : 'Homem';
+      SIZE_LETTERS.forEach(sz=>{
+        const val = (STOCK[type] && STOCK[type][g] && STOCK[type][g][sz]) || 0;
+        cells += '<td data-label="'+genderLabel+' '+sz+'"><input type="number" min="0" inputmode="numeric" '+
+          'style="width:52px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" '+
+          'value="'+(val>0?val:'')+'" placeholder="0" '+
+          'data-type="'+encodeURIComponent(type)+'" data-gender="'+g+'" data-size="'+sz+'"></td>';
+      });
+    });
+    tr.innerHTML = cells;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('input[type=number]').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const type = decodeURIComponent(e.target.dataset.type);
+      const gender = e.target.dataset.gender;
+      const size = e.target.dataset.size;
+      const val = parseInt(e.target.value,10) || 0;
+      if(!STOCK[type]) STOCK[type] = {};
+      if(!STOCK[type][gender]) STOCK[type][gender] = {};
+      if(val>0) STOCK[type][gender][size] = val;
+      else delete STOCK[type][gender][size];
+      saveStock(STOCK);
+      renderEquipSummaryPanel();
+    });
+  });
 }
 
 function renderEquipTab(){
@@ -1966,9 +2052,11 @@ function renderEquipTab(){
   container.innerHTML = '';
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
 
+  renderStockTable(); // independente de haver técnicos ou não
+
   if(names.length === 0){
     container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
-    document.getElementById('equipSummary').innerHTML = '';
+    renderEquipSummaryPanel();
     return;
   }
 
@@ -2029,35 +2117,48 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
     return;
   }
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  const { perType } = computeEquipSummary();
 
-  // Folha 1: Encomenda — matriz Equipamento x (Mulher XS..XL | Homem XS..XL), com totais.
-  const {perType} = computeEquipSummary();
-  const rowsOrder = [
-    ['', 'Mulher','','','','', 'Homem','','','',''],
-    ['', 'XS','S','M','L','XL', 'XS','S','M','L','XL']
-  ];
-  const colTotals = new Array(10).fill(0);
-  perType.forEach(({type, byGender})=>{
-    const rowVals = [];
-    ['F','H'].forEach(g=>{
-      SIZE_LETTERS.forEach(sz=>{
-        const q = byGender[g].sizeTotals[sz] || 0;
-        rowVals.push(q>0 ? q : '');
+  function matrixRows(cellFn){
+    const rows = [
+      ['', 'Mulher','','','','', 'Homem','','','',''],
+      ['', 'XS','S','M','L','XL', 'XS','S','M','L','XL']
+    ];
+    const colTotals = new Array(10).fill(0);
+    perType.forEach(({type, byGender})=>{
+      const rowVals = [];
+      ['F','H'].forEach(g=>{
+        SIZE_LETTERS.forEach(sz=>{
+          const q = cellFn(byGender[g].sizes[sz]);
+          rowVals.push(q>0 ? q : '');
+        });
       });
+      rowVals.forEach((v,i)=>{ if(v) colTotals[i] += v; });
+      rows.push([type, ...rowVals]);
     });
-    rowVals.forEach((v,i)=>{ if(v) colTotals[i] += v; });
-    rowsOrder.push([type, ...rowVals]);
-  });
-  rowsOrder.push(['Totais', ...colTotals.map(v=> v>0 ? v : '')]);
+    rows.push(['Totais', ...colTotals.map(v=> v>0 ? v : '')]);
+    return rows;
+  }
+  function buildMatrixSheet(rows){
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!merges'] = [
+      {s:{r:0,c:1}, e:{r:0,c:5}}, // Mulher
+      {s:{r:0,c:6}, e:{r:0,c:10}} // Homem
+    ];
+    ws['!cols'] = [{wch:16}].concat(new Array(10).fill({wch:6}));
+    return ws;
+  }
 
-  const wsOrder = XLSX.utils.aoa_to_sheet(rowsOrder);
-  wsOrder['!merges'] = [
-    {s:{r:0,c:1}, e:{r:0,c:5}}, // Mulher
-    {s:{r:0,c:6}, e:{r:0,c:10}} // Homem
-  ];
-  wsOrder['!cols'] = [{wch:16}].concat(new Array(10).fill({wch:6}));
+  // Folha 1: Encomenda — quanto falta mesmo encomendar (entregue menos o que já está em stock).
+  const wsOrder = buildMatrixSheet(matrixRows(s => s ? Math.max(0, (s.delivered||0)-(s.stock||0)) : 0));
 
-  // Folha 2: Por Técnico — detalhe individual, para conferência.
+  // Folha 2: Entregue — total distribuído aos técnicos, por sexo e tamanho.
+  const wsDelivered = buildMatrixSheet(matrixRows(s => s ? (s.delivered||0) : 0));
+
+  // Folha 3: Stock — o que já está guardado em armazém.
+  const wsStock = buildMatrixSheet(matrixRows(s => s ? (s.stock||0) : 0));
+
+  // Folha 4: Por Técnico — detalhe individual, para conferência.
   const rowsByTec = [['Técnico','Sexo','Equipamento','Tamanho','Quantidade']];
   names.forEach(name=>{
     const genderLabel = (TECH_REGISTRY[name].gender==='F') ? 'Mulher' : 'Homem';
@@ -2068,11 +2169,13 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
       }
     });
   });
-
-  const wb = XLSX.utils.book_new();
   const wsByTec = XLSX.utils.aoa_to_sheet(rowsByTec);
   wsByTec['!cols'] = [{wch:20},{wch:10},{wch:18},{wch:8},{wch:10}];
+
+  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, wsOrder, 'Encomenda');
+  XLSX.utils.book_append_sheet(wb, wsDelivered, 'Entregue');
+  XLSX.utils.book_append_sheet(wb, wsStock, 'Stock');
   XLSX.utils.book_append_sheet(wb, wsByTec, 'Por Técnico');
   XLSX.writeFile(wb, 'equipamento_encomenda.xlsx');
 });
@@ -2435,6 +2538,7 @@ function buildExportPayload(){
     rates: RATES,
     feriados: HOLIDAY_ASSIGNMENTS,
     equipamento: EQUIPMENT,
+    stock: STOCK,
     disponibilidade: AVAILABILITY,
     exportedAt: nowISO()
   };
@@ -2447,6 +2551,7 @@ function applyImportedData(data){
   if(data.rates){ RATES = data.rates; localStorage.setItem(STORE_RATES, JSON.stringify(RATES)); }
   if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
   if(data.equipamento){ EQUIPMENT = data.equipamento; localStorage.setItem(STORE_EQUIP, JSON.stringify(EQUIPMENT)); }
+  if(data.stock){ STOCK = data.stock; localStorage.setItem(STORE_STOCK, JSON.stringify(STOCK)); }
   if(data.disponibilidade){ AVAILABILITY = data.disponibilidade; localStorage.setItem(STORE_AVAIL, JSON.stringify(AVAILABILITY)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
