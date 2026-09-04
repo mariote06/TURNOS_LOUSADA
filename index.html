@@ -202,6 +202,9 @@
   .tec-table .hrs{font-variant-numeric:tabular-nums;color:var(--ink-soft);}
   .tec-table .val{font-variant-numeric:tabular-nums;font-weight:600;}
   .tec-table td[data-label="Técnico"]{font:700 16px 'Space Grotesk';color:var(--ink);}
+  .tec-color-input{width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:none;}
+  .tec-color-input::-webkit-color-swatch-wrapper{padding:2px;}
+  .tec-color-input::-webkit-color-swatch{border:none;border-radius:5px;}
   .tec-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-top:20px;}
   .tec-summary .stat-label{font:600 11px 'Inter';text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);margin-bottom:4px;}
   .tec-summary .stat-value{font:700 20px 'Space Grotesk';}
@@ -415,7 +418,7 @@
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="tecTable">
         <thead>
-          <tr><th>Técnico</th><th>Vínculo</th><th>Horas no período</th><th>Valor estimado</th><th></th></tr>
+          <tr><th>Cor</th><th>Técnico</th><th>Vínculo</th><th>Horas no período</th><th>Valor estimado</th><th></th></tr>
         </thead>
         <tbody id="tecTableBody"></tbody>
       </table>
@@ -505,11 +508,16 @@
     </div>
 
     <div id="holidayModeBlock" style="display:none;">
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">
-        Em feriados há sempre, no máximo, um único turno das <strong id="holidayShiftLabel"></strong>. Escolhe quem o faz.
-      </p>
-      <label style="font:600 12px 'Inter';color:var(--ink-soft);display:block;margin-bottom:6px;">Técnico atribuído</label>
-      <select id="holidayTecSelect" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;"></select>
+      <div id="holidayClosedMsg" style="display:none;font-size:13.5px;color:var(--ink-soft);padding:6px 0 4px;">
+        O ginásio está encerrado neste dia — não há turno a atribuir.
+      </div>
+      <div id="holidayAssignFields">
+        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">
+          Em feriados há sempre, no máximo, um único turno das <strong id="holidayShiftLabel"></strong>. Escolhe quem o faz.
+        </p>
+        <label style="font:600 12px 'Inter';color:var(--ink-soft);display:block;margin-bottom:6px;">Técnico atribuído</label>
+        <select id="holidayTecSelect" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;"></select>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -599,11 +607,11 @@ const HOLIDAYS = [
   {date:'2026-11-01', name:'Todos os Santos', type:'nacional'},
   {date:'2026-12-01', name:'Restauração da Independência', type:'nacional'},
   {date:'2026-12-08', name:'Imaculada Conceição', type:'nacional'},
-  {date:'2026-12-25', name:'Natal', type:'nacional'},
-  {date:'2027-01-01', name:'Ano Novo', type:'nacional'},
+  {date:'2026-12-25', name:'Natal', type:'nacional', closed:true},
+  {date:'2027-01-01', name:'Ano Novo', type:'nacional', closed:true},
   {date:'2027-02-09', name:'Carnaval', type:'facultativo'},
   {date:'2027-03-26', name:'Sexta-feira Santa', type:'nacional'},
-  {date:'2027-03-28', name:'Páscoa', type:'nacional'},
+  {date:'2027-03-28', name:'Páscoa', type:'nacional', closed:true},
   {date:'2027-04-25', name:'Dia da Liberdade', type:'nacional'},
   {date:'2027-05-01', name:'Dia do Trabalhador', type:'nacional'},
   {date:'2027-05-27', name:'Corpo de Deus', type:'nacional'},
@@ -632,7 +640,66 @@ const TEXT_PALETTE = [
   '#245c3e','#25507e','#9c4335','#8a6314','#5b3c92','#95315f',
   '#1e7a5f','#7a5a1e','#37409c','#6d3b9c','#9c3737','#1f6b82'
 ];
+function hexToRgb(hex){
+  let h = hex.replace('#','');
+  if(h.length===3) h = h.split('').map(c=>c+c).join('');
+  return {r:parseInt(h.substr(0,2),16)||0, g:parseInt(h.substr(2,2),16)||0, b:parseInt(h.substr(4,2),16)||0};
+}
+function rgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){ h=s=0; }
+  else{
+    const d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max){
+      case r: h=(g-b)/d+(g<b?6:0); break;
+      case g: h=(b-r)/d+2; break;
+      default: h=(r-g)/d+4; break;
+    }
+    h/=6;
+  }
+  return {h,s,l};
+}
+function hslToRgb(h,s,l){
+  let r,g,b;
+  if(s===0){ r=g=b=l; }
+  else{
+    const hue2rgb=(p,q,t)=>{
+      if(t<0)t+=1; if(t>1)t-=1;
+      if(t<1/6) return p+(q-p)*6*t;
+      if(t<1/2) return q;
+      if(t<2/3) return p+(q-p)*(2/3-t)*6;
+      return p;
+    };
+    const q = l<0.5 ? l*(1+s) : l+s-l*s;
+    const p = 2*l-q;
+    r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);
+  }
+  return {r:Math.round(r*255), g:Math.round(g*255), b:Math.round(b*255)};
+}
+function clampNum(v,a,b){ return Math.min(b,Math.max(a,v)); }
+function toHex2(n){ return n.toString(16).padStart(2,'0'); }
+
+// Gera uma cor de texto na mesma família da cor de fundo (mais escura ou mais clara,
+// consoante o que for preciso para contraste), em vez de simplesmente preto/branco —
+// mantém o estilo colorido que a paleta original já tinha.
+function contrastTextColor(hex){
+  if(!hex) return '#1c2321';
+  const {r,g,b} = hexToRgb(hex);
+  const {h,s,l} = rgbToHsl(r,g,b);
+  const light = l > 0.55;
+  const targetL = light ? clampNum(l-0.55, 0.20, 0.35) : clampNum(l+0.50, 0.65, 0.85);
+  const targetS = clampNum(Math.max(s, 0.35), 0.35, 0.65);
+  const rgb = hslToRgb(h, targetS, targetL);
+  return '#'+toHex2(rgb.r)+toHex2(rgb.g)+toHex2(rgb.b);
+}
 function colorForName(name){
+  const entry = typeof TECH_REGISTRY !== 'undefined' ? TECH_REGISTRY[name] : null;
+  if(entry && entry.color){
+    return {bg: entry.color, fg: contrastTextColor(entry.color)};
+  }
   let h = 0;
   for(let i=0;i<name.length;i++){ h = (h*31 + name.charCodeAt(i)) >>> 0; }
   const idx = h % COLOR_PALETTE.length;
@@ -707,6 +774,8 @@ function templateSlotsForDate(dayKey, iso){
 // no máximo, um único turno (09:30–12:30) com o técnico atribuído.
 function shiftsForDate(iso, dayKey){
   if(HOLIDAY_MAP[iso]){
+    const h = HOLIDAY_MAP[iso];
+    if(h.closed) return []; // ginásio encerrado neste dia: sem turnos
     const assigned = HOLIDAY_ASSIGNMENTS[iso];
     if(assigned && assigned.trim()){
       return [{id:'holiday_'+iso, start:HOLIDAY_SHIFT.start, end:HOLIDAY_SHIFT.end, name:assigned.trim(), _holiday:true}];
@@ -826,8 +895,8 @@ function renderCalendar(){
     if(holiday) html += '<div class="holiday-name">'+holiday.name+'</div>';
 
     if(shifts.length === 0){
-      html += '<div class="empty-note" style="'+(holiday?'color:var(--rust);font-style:normal;font-weight:600;':'')+'">'+
-        (holiday ? 'Sem técnico atribuído' : ('Sem turnos'+(pontual?' (alterado)':''))) +
+      html += '<div class="empty-note" style="'+(holiday && !holiday.closed?'color:var(--rust);font-style:normal;font-weight:600;':'')+'">'+
+        (holiday ? (holiday.closed ? 'Ginásio encerrado' : 'Sem técnico atribuído') : ('Sem turnos'+(pontual?' (alterado)':''))) +
       '</div>';
     } else {
       html += '<div class="shift-list">';
@@ -909,6 +978,19 @@ function openDayModal(iso, dayKey, dateObj){
   if(editingIsHoliday){
     document.getElementById('normalModeBlock').style.display = 'none';
     document.getElementById('holidayModeBlock').style.display = '';
+
+    if(holiday.closed){
+      document.getElementById('holidayClosedMsg').style.display = '';
+      document.getElementById('holidayAssignFields').style.display = 'none';
+      document.getElementById('btnResetDay').style.display = 'none';
+      document.getElementById('btnSaveDay').style.display = 'none';
+      openModalOverlay();
+      return;
+    }
+    document.getElementById('holidayClosedMsg').style.display = 'none';
+    document.getElementById('holidayAssignFields').style.display = '';
+    document.getElementById('btnResetDay').style.display = '';
+    document.getElementById('btnSaveDay').style.display = '';
     document.getElementById('btnResetDay').textContent = 'Remover técnico atribuído';
     document.getElementById('holidayShiftLabel').textContent = HOLIDAY_SHIFT.start+' às '+HOLIDAY_SHIFT.end;
 
@@ -925,6 +1007,8 @@ function openDayModal(iso, dayKey, dateObj){
 
   document.getElementById('normalModeBlock').style.display = '';
   document.getElementById('holidayModeBlock').style.display = 'none';
+  document.getElementById('btnResetDay').style.display = '';
+  document.getElementById('btnSaveDay').style.display = '';
   document.getElementById('btnResetDay').textContent = 'Repor substituições deste dia';
 
   const exc = exceptions[iso];
@@ -1181,6 +1265,7 @@ function renderFeriadosTab(){
   tbody.innerHTML = '';
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
   HOLIDAYS.forEach(h=>{
+    if(h.closed) return; // ginásio encerrado nesse dia: não há turno a atribuir, não aparece na lista
     const [y,m,d] = h.date.split('-').map(Number);
     const label = pad(d)+'/'+pad(m)+'/'+y;
     const typeLabel = h.type==='municipal' ? 'Municipal' : h.type==='facultativo' ? 'Facultativo' : 'Nacional';
@@ -1634,7 +1719,9 @@ function renderTecTab(){
 
     const tr = document.createElement('tr');
     if(!status) tr.className = 'unclassified';
+    const currentColor = colorForName(name).bg;
     tr.innerHTML =
+      '<td data-label="Cor"><input type="color" class="tec-color-input" value="'+currentColor+'" data-name="'+encodeURIComponent(name)+'" title="Escolher cor de '+name+'"></td>'+
       '<td data-label="Técnico">'+name+'</td>'+
       '<td data-label="Vínculo"><select data-name="'+encodeURIComponent(name)+'">'+
         '<option value="" '+(!status?'selected':'')+'>— escolher —</option>'+
@@ -1646,6 +1733,15 @@ function renderTecTab(){
       '<td class="val" data-label="Valor estimado">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>'+
       '<td data-label="Remover"><button class="rm-tec" title="Remover técnico" data-name="'+encodeURIComponent(name)+'">×</button></td>';
     tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.tec-color-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      TECH_REGISTRY[name].color = e.target.value;
+      saveTechRegistry(TECH_REGISTRY);
+      renderCalendar();
+    });
   });
 
   tbody.querySelectorAll('select').forEach(sel=>{
