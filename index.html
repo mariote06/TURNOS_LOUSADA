@@ -271,8 +271,15 @@
     .row-edit-top .rm{grid-column:2;grid-row:1;justify-self:end;}
     .modal{padding:18px;max-height:92vh;}
 
-    /* tables: ensure columns stay legible, scroll horizontally instead of crushing */
-    .tec-table{min-width:520px;}
+    /* tables: stack into cards instead of forcing horizontal scroll */
+    .tec-table thead{display:none;}
+    .tec-table, .tec-table tbody, .tec-table tr{display:block;width:100%;}
+    .tec-table{min-width:0;}
+    .tec-table tr{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+    .tec-table td{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);text-align:right;}
+    .tec-table td:last-child{border-bottom:none;}
+    .tec-table td::before{content:attr(data-label);font:600 11px 'Inter';color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;text-align:left;flex-shrink:0;}
+    .tec-table td select, .tec-table td input{max-width:60%;}
     .fin-scope-bar{flex-direction:column;align-items:stretch;}
     .fin-period-nav{justify-content:center;}
 
@@ -1182,11 +1189,11 @@ function renderFeriadosTab(){
     let options = '<option value="">— nenhum —</option>';
     names.forEach(n=>{ options += '<option value="'+n+'" '+(assigned===n?'selected':'')+'>'+n+'</option>'; });
     tr.innerHTML =
-      '<td>'+label+'</td>'+
-      '<td>'+h.name+'</td>'+
-      '<td><span class="badge '+h.type+'">'+typeLabel+'</span></td>'+
-      '<td class="hrs">'+HOLIDAY_SHIFT.start+' – '+HOLIDAY_SHIFT.end+'</td>'+
-      '<td><select data-date="'+h.date+'">'+options+'</select></td>';
+      '<td data-label="Data">'+label+'</td>'+
+      '<td data-label="Feriado">'+h.name+'</td>'+
+      '<td data-label="Tipo"><span class="badge '+h.type+'">'+typeLabel+'</span></td>'+
+      '<td class="hrs" data-label="Turno">'+HOLIDAY_SHIFT.start+' – '+HOLIDAY_SHIFT.end+'</td>'+
+      '<td data-label="Técnico atribuído"><select data-date="'+h.date+'">'+options+'</select></td>';
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('select').forEach(sel=>{
@@ -1293,10 +1300,10 @@ function renderFinTab(){
     if(status==='dependente' || status==='independente') totalPaid += b.value;
     const tr = document.createElement('tr');
     tr.innerHTML =
-      '<td>'+name+'</td>'+
-      '<td>'+statusLabel+'</td>'+
-      '<td class="hrs">'+fmtHours(b.hours)+' h</td>'+
-      '<td class="val">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>';
+      '<td data-label="Técnico">'+name+'</td>'+
+      '<td data-label="Vínculo">'+statusLabel+'</td>'+
+      '<td class="hrs" data-label="Horas">'+fmtHours(b.hours)+' h</td>'+
+      '<td class="val" data-label="Ganhos">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>';
     tbody.appendChild(tr);
   });
   if(tbody.children.length===0){
@@ -1627,16 +1634,16 @@ function renderTecTab(){
     const tr = document.createElement('tr');
     if(!status) tr.className = 'unclassified';
     tr.innerHTML =
-      '<td>'+name+'</td>'+
-      '<td><select data-name="'+encodeURIComponent(name)+'">'+
+      '<td data-label="Técnico">'+name+'</td>'+
+      '<td data-label="Vínculo"><select data-name="'+encodeURIComponent(name)+'">'+
         '<option value="" '+(!status?'selected':'')+'>— escolher —</option>'+
         '<option value="dependente" '+(status==='dependente'?'selected':'')+'>Dependente</option>'+
         '<option value="independente" '+(status==='independente'?'selected':'')+'>Independente</option>'+
         '<option value="estagiario" '+(status==='estagiario'?'selected':'')+'>Estagiário</option>'+
       '</select></td>'+
-      '<td class="hrs">'+fmtHours(b.hours)+' h</td>'+
-      '<td class="val">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>'+
-      '<td><button class="rm-tec" title="Remover técnico" data-name="'+encodeURIComponent(name)+'">×</button></td>';
+      '<td class="hrs" data-label="Horas no período">'+fmtHours(b.hours)+' h</td>'+
+      '<td class="val" data-label="Valor estimado">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>'+
+      '<td data-label="Remover"><button class="rm-tec" title="Remover técnico" data-name="'+encodeURIComponent(name)+'">×</button></td>';
     tbody.appendChild(tr);
   });
 
