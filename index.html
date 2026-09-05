@@ -230,6 +230,11 @@
   .tef-stock-add{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
   .tef-stock-add select{border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 12px 'Inter';background:#fff;}
   .tef-stock-add .tsl-add-btn{font:600 12px 'Inter';border:1px dashed var(--accent);color:var(--accent);background:none;border-radius:6px;padding:6px 10px;cursor:pointer;}
+  .equip-order-line{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;
+    padding:8px 10px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;background:#fbfaf7;cursor:pointer;font:500 13px 'Inter';color:var(--ink);}
+  .equip-order-line:hover{background:var(--accent-soft);border-color:var(--accent);}
+  .equip-order-line .eol-hint{font-size:10.5px;color:var(--ink-soft);white-space:nowrap;}
+  .equip-order-line:hover .eol-hint{color:var(--accent);}
   .writeoff-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .writeoff-form select{border:1px solid var(--line);border-radius:7px;padding:8px 8px;font:500 13px 'Inter';background:#fff;}
 
@@ -530,10 +535,9 @@
 
   <!-- EQUIPAMENTO TAB -->
   <div id="tab-equip" style="display:none;">
-    <h3 style="font-size:15px;margin:0 0 6px;">Encomendas</h3>
+    <h3 style="font-size:15px;margin:0 0 6px;">Encomendas por técnico</h3>
     <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 10px;">
-      Equipamento a encomendar para cada técnico. Escolhe o tamanho e a quantidade — grava-se sozinho.
-      Quando o entregares, marca o quadrado "Entregue": sai daqui e passa para o stock desse técnico.
+      Equipamento a encomendar para cada técnico. Adiciona tipo, tamanho e quantidade. Quando entregares, <strong>clica em cima da linha</strong> para confirmar — sai daqui e passa para o stock desse técnico.
     </p>
     <div class="equip-cards" id="equipCards"></div>
 
@@ -543,9 +547,24 @@
     </p>
     <div class="equip-cards" id="tefStockCards"></div>
 
+    <h3 style="font-size:15px;margin:26px 0 6px;">Encomendas para o Ginásio</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Equipamento encomendado diretamente para o armazém (sem ser para um técnico específico). Clica numa linha para confirmar a receção — passa a Stock do Ginásio.
+    </p>
+    <div class="panel" style="padding:14px 16px;">
+      <div id="gymOrderLines"></div>
+      <div class="tef-stock-add" style="margin-top:10px;">
+        <select id="goType"></select>
+        <select id="goGender"><option value="H">Homem</option><option value="F">Mulher</option></select>
+        <select id="goSize"></select>
+        <select id="goQty"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        <button type="button" class="tsl-add-btn" id="btnAddGymOrder">+ Adicionar</button>
+      </div>
+    </div>
+
     <h3 style="font-size:15px;margin:26px 0 6px;">Stock do Ginásio (armazém)</h3>
     <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-      Quantidades disponíveis em armazém — aumentam com devoluções, e também podes ajustar manualmente aqui.
+      Quantidades disponíveis em armazém — aumentam com devoluções e receções de encomenda, e também podes ajustar manualmente aqui.
     </p>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="stockTable">
@@ -1983,18 +2002,21 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
 });
 
 
+
 /* ---------------------------------------------------------------
    EQUIPAMENTO — ciclo de vida completo:
-   Encomenda (por técnico) --[confirmar entrega]--> Stock do TEF
+   Encomenda por técnico --[clicar para confirmar entrega]--> Stock do TEF
+   Encomenda para o Ginásio --[clicar para confirmar receção]--> Stock do Ginásio
    Stock do TEF --[devolver]--> Stock do Ginásio
    Stock do Ginásio --[abater]--> Equipamentos abatidos
 --------------------------------------------------------------- */
 const SIZE_LETTERS = ['XS','S','M','L','XL'];
-const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT'];
-const STORE_EQUIP = 'tef_turnos_equipamento_v1';       // {tecnico: {tipo: {size:'M', qty:2}}}  — encomendas pendentes
-const STORE_TEF_STOCK = 'tef_turnos_stock_tecnico_v1'; // {tecnico: {tipo: {size: qtd}}}         — na posse do técnico
-const STORE_STOCK = 'tef_turnos_stock_v1';             // {tipo: {F:{XS:qtd,...}, H:{...}}}      — armazém do ginásio
-const STORE_WRITTEN_OFF = 'tef_turnos_abatidos_v1';    // {tipo: {F:{XS:qtd,...}, H:{...}}}      — abatidos
+const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT','T-shirt Estagiário','T-shirt Estagiária'];
+const STORE_EQUIP = 'tef_turnos_equipamento_v1';           // {tecnico: {tipo: {tamanho: qtd}}}      — encomendas pendentes por técnico
+const STORE_TEF_STOCK = 'tef_turnos_stock_tecnico_v1';     // {tecnico: {tipo: {tamanho: qtd}}}      — na posse do técnico
+const STORE_STOCK = 'tef_turnos_stock_v1';                 // {tipo: {F:{XS:qtd,...}, H:{...}}}      — armazém do ginásio
+const STORE_WRITTEN_OFF = 'tef_turnos_abatidos_v1';        // {tipo: {F:{XS:qtd,...}, H:{...}}}      — abatidos
+const STORE_GYM_ORDERS = 'tef_turnos_encomendas_ginasio_v1'; // {tipo: {F:{XS:qtd,...}, H:{...}}}    — encomendas diretas para o armazém
 
 function loadEquipment(){
   try{ const raw = localStorage.getItem(STORE_EQUIP); if(raw) return JSON.parse(raw); }catch(e){}
@@ -2024,46 +2046,74 @@ function loadWrittenOff(){
 function saveWrittenOff(w){ localStorage.setItem(STORE_WRITTEN_OFF, JSON.stringify(w)); touchMeta(); }
 let WRITTEN_OFF = loadWrittenOff();
 
-// Opções fixas do formulário de abate — só precisam de ser criadas uma vez.
-(function initWriteOffFormOptions(){
-  const typeSel = document.getElementById('woType');
-  const sizeSel = document.getElementById('woSize');
-  if(typeSel && typeSel.options.length===0){
-    EQUIP_TYPES.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
+function loadGymOrders(){
+  try{ const raw = localStorage.getItem(STORE_GYM_ORDERS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveGymOrders(g){ localStorage.setItem(STORE_GYM_ORDERS, JSON.stringify(g)); touchMeta(); }
+let GYM_ORDERS = loadGymOrders();
+
+// Opções fixas dos formulários — só precisam de ser criadas uma vez.
+(function initEquipFormOptions(){
+  function fillTypeSelect(sel){
+    if(!sel || sel.options.length>0) return;
+    EQUIP_TYPES.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
   }
-  if(sizeSel && sizeSel.options.length===0){
-    SIZE_LETTERS.forEach(sz=>{ const o=document.createElement('option'); o.value=sz; o.textContent=sz; sizeSel.appendChild(o); });
+  function fillSizeSelect(sel){
+    if(!sel || sel.options.length>0) return;
+    SIZE_LETTERS.forEach(sz=>{ const o=document.createElement('option'); o.value=sz; o.textContent=sz; sel.appendChild(o); });
   }
+  fillTypeSelect(document.getElementById('woType'));
+  fillSizeSelect(document.getElementById('woSize'));
+  fillTypeSelect(document.getElementById('goType'));
+  fillSizeSelect(document.getElementById('goSize'));
 })();
 
 /* ---------- Ações do fluxo ---------- */
 
-function confirmDelivery(name, type){
-  const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
-  if(!entry || !entry.size || !entry.qty) return;
-  const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
+function addToEquipmentOrder(name, type, size, qty){
+  if(!type || !size || !qty) return;
+  if(!EQUIPMENT[name]) EQUIPMENT[name] = {};
+  if(!EQUIPMENT[name][type]) EQUIPMENT[name][type] = {};
+  EQUIPMENT[name][type][size] = (EQUIPMENT[name][type][size] || 0) + qty;
+  saveEquipment(EQUIPMENT);
+  renderEquipTab();
+}
 
-  // Se houver stock do ginásio para este tamanho, sai dali primeiro.
+function confirmDeliveryLine(name, type, size){
+  const qty = (EQUIPMENT[name] && EQUIPMENT[name][type] && EQUIPMENT[name][type][size]) || 0;
+  if(qty <= 0) return;
+  if(!confirm('Confirmar entrega de '+qty+'x '+type+' (tamanho '+size+') a '+name+'?')) return;
+
+  const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
   if(!STOCK[type]) STOCK[type] = {};
   if(!STOCK[type][gender]) STOCK[type][gender] = {};
-  const avail = STOCK[type][gender][entry.size] || 0;
-  const fromStock = Math.min(avail, entry.qty);
+  const avail = STOCK[type][gender][size] || 0;
+  const fromStock = Math.min(avail, qty);
   if(fromStock > 0){
     const remaining = avail - fromStock;
-    if(remaining > 0) STOCK[type][gender][entry.size] = remaining;
-    else delete STOCK[type][gender][entry.size];
+    if(remaining > 0) STOCK[type][gender][size] = remaining;
+    else delete STOCK[type][gender][size];
   }
 
-  // Passa para o stock do técnico.
   if(!TEF_STOCK[name]) TEF_STOCK[name] = {};
   if(!TEF_STOCK[name][type]) TEF_STOCK[name][type] = {};
-  TEF_STOCK[name][type][entry.size] = (TEF_STOCK[name][type][entry.size] || 0) + entry.qty;
+  TEF_STOCK[name][type][size] = (TEF_STOCK[name][type][size] || 0) + qty;
 
-  // Sai das encomendas.
-  delete EQUIPMENT[name][type];
+  delete EQUIPMENT[name][type][size];
+  if(Object.keys(EQUIPMENT[name][type]).length === 0) delete EQUIPMENT[name][type];
 
   saveEquipment(EQUIPMENT);
   saveStock(STOCK);
+  saveTefStock(TEF_STOCK);
+  renderEquipTab();
+}
+
+function addToTefStock(name, type, size, qty){
+  if(!type || !size || !qty) return;
+  if(!TEF_STOCK[name]) TEF_STOCK[name] = {};
+  if(!TEF_STOCK[name][type]) TEF_STOCK[name][type] = {};
+  TEF_STOCK[name][type][size] = (TEF_STOCK[name][type][size] || 0) + qty;
   saveTefStock(TEF_STOCK);
   renderEquipTab();
 }
@@ -2083,6 +2133,32 @@ function returnFromTef(name, type, size){
 
   saveStock(STOCK);
   saveTefStock(TEF_STOCK);
+  renderEquipTab();
+}
+
+function addGymOrder(type, gender, size, qty){
+  if(!type || !gender || !size || !qty) return;
+  if(!GYM_ORDERS[type]) GYM_ORDERS[type] = {};
+  if(!GYM_ORDERS[type][gender]) GYM_ORDERS[type][gender] = {};
+  GYM_ORDERS[type][gender][size] = (GYM_ORDERS[type][gender][size] || 0) + qty;
+  saveGymOrders(GYM_ORDERS);
+  renderEquipTab();
+}
+
+function confirmGymOrderReceipt(type, gender, size){
+  const qty = (GYM_ORDERS[type] && GYM_ORDERS[type][gender] && GYM_ORDERS[type][gender][size]) || 0;
+  if(qty <= 0) return;
+  if(!confirm('Confirmar receção de '+qty+'x '+type+' ('+(gender==='F'?'Mulher':'Homem')+', tamanho '+size+') para o Stock do Ginásio?')) return;
+
+  if(!STOCK[type]) STOCK[type] = {};
+  if(!STOCK[type][gender]) STOCK[type][gender] = {};
+  STOCK[type][gender][size] = (STOCK[type][gender][size] || 0) + qty;
+
+  delete GYM_ORDERS[type][gender][size];
+  if(Object.keys(GYM_ORDERS[type][gender]).length === 0) delete GYM_ORDERS[type][gender];
+
+  saveGymOrders(GYM_ORDERS);
+  saveStock(STOCK);
   renderEquipTab();
 }
 
@@ -2118,6 +2194,14 @@ document.getElementById('btnWriteOff').addEventListener('click', ()=>{
   renderEquipTab();
 });
 
+document.getElementById('btnAddGymOrder').addEventListener('click', ()=>{
+  const type = document.getElementById('goType').value;
+  const gender = document.getElementById('goGender').value;
+  const size = document.getElementById('goSize').value;
+  const qty = parseInt(document.getElementById('goQty').value, 10) || 0;
+  addGymOrder(type, gender, size, qty);
+});
+
 /* ---------- Cálculo agregado (para o resumo e a exportação) ---------- */
 
 function computeEquipSummary(){
@@ -2131,9 +2215,13 @@ function computeEquipSummary(){
     names.forEach(name=>{
       const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
       const pend = EQUIPMENT[name] && EQUIPMENT[name][type];
-      if(pend && pend.size && pend.qty>0){
-        byGender[gender].pending += pend.qty;
-        byGender[gender].pendingSizes[pend.size] = (byGender[gender].pendingSizes[pend.size]||0) + pend.qty;
+      if(pend){
+        Object.keys(pend).forEach(sz=>{
+          if(pend[sz]>0){
+            byGender[gender].pending += pend[sz];
+            byGender[gender].pendingSizes[sz] = (byGender[gender].pendingSizes[sz]||0) + pend[sz];
+          }
+        });
       }
       const held = TEF_STOCK[name] && TEF_STOCK[name][type];
       if(held){
@@ -2210,15 +2298,16 @@ function renderWrittenOffSummary(){
   el.innerHTML = html;
 }
 
-/* ---------- Render: cartões de encomendas por técnico ---------- */
+/* ---------- Render: cartões de encomendas por técnico (estilo igual ao Stock) ---------- */
 
 function renderEquipTab(){
   const container = document.getElementById('equipCards');
   container.innerHTML = '';
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
 
-  renderStockTable();       // stock do ginásio — independente de haver técnicos
+  renderStockTable();
   renderTefStockCards(names);
+  renderGymOrders();
   renderWrittenOffSummary();
 
   if(names.length === 0){
@@ -2228,64 +2317,63 @@ function renderEquipTab(){
   }
 
   names.forEach(name=>{
+    const pending = EQUIPMENT[name] || {};
+    const lines = [];
+    EQUIP_TYPES.forEach(type=>{
+      const sizes = pending[type];
+      if(!sizes) return;
+      Object.keys(sizes).forEach(sz=>{
+        if(sizes[sz]>0) lines.push({type, size:sz, qty:sizes[sz]});
+      });
+    });
+
     const card = document.createElement('div');
     card.className = 'equip-card';
-    let linesHtml = '<h4>'+name+'</h4>';
-    EQUIP_TYPES.forEach(type=>{
-      const entry = (EQUIPMENT[name] && EQUIPMENT[name][type]) || {size:'', qty:0};
-      let sizeOptions = '<option value="">—</option>';
-      SIZE_LETTERS.forEach(sz=>{ sizeOptions += '<option value="'+sz+'" '+(entry.size===sz?'selected':'')+'>'+sz+'</option>'; });
-      let qtyOptions = '<option value="0">—</option>';
-      [1,2,3,4].forEach(n=>{ qtyOptions += '<option value="'+n+'" '+(entry.qty===n?'selected':'')+'>'+n+'</option>'; });
-      const hasPending = entry.size && entry.qty>0;
-      linesHtml +=
-        '<div class="equip-line">'+
-          '<span class="equip-label">'+type+'</span>'+
-          '<select class="equip-size-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+sizeOptions+'</select>'+
-          '<select class="equip-qty-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+qtyOptions+'</select>'+
-          (hasPending
-            ? '<label class="equip-deliver-label"><input type="checkbox" class="equip-deliver-check" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'"> Entregue</label>'
-            : '<span class="equip-deliver-label" style="visibility:hidden;">Entregue</span>') +
-        '</div>';
-    });
-    card.innerHTML = linesHtml;
+    let html = '<h4>'+name+'</h4>';
+    if(lines.length===0){
+      html += '<div class="equip-empty" style="grid-column:unset;padding:6px 0;">Sem encomendas pendentes.</div>';
+    } else {
+      lines.forEach(l=>{
+        html += '<button type="button" class="equip-order-line" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">'+
+          '<span>'+l.type+' — '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar entrega</span>'+
+        '</button>';
+      });
+    }
+    let typeOptions = '';
+    EQUIP_TYPES.forEach(t=>{ typeOptions += '<option value="'+t+'">'+t+'</option>'; });
+    let sizeOptions = '';
+    SIZE_LETTERS.forEach(sz=>{ sizeOptions += '<option value="'+sz+'">'+sz+'</option>'; });
+    let qtyOptions = '';
+    [1,2,3,4].forEach(n=>{ qtyOptions += '<option value="'+n+'">'+n+'</option>'; });
+    html +=
+      '<div class="tef-stock-add">'+
+        '<select class="eo-add-type" data-name="'+encodeURIComponent(name)+'">'+typeOptions+'</select>'+
+        '<select class="eo-add-size" data-name="'+encodeURIComponent(name)+'">'+sizeOptions+'</select>'+
+        '<select class="eo-add-qty" data-name="'+encodeURIComponent(name)+'">'+qtyOptions+'</select>'+
+        '<button type="button" class="tsl-add-btn eo-add-btn" data-name="'+encodeURIComponent(name)+'">+ Adicionar</button>'+
+      '</div>';
+
+    card.innerHTML = html;
     container.appendChild(card);
   });
 
-  function persistEntry(name, type, size, qty){
-    if(!EQUIPMENT[name]) EQUIPMENT[name] = {};
-    if(size || qty>0){ EQUIPMENT[name][type] = {size, qty}; }
-    else { delete EQUIPMENT[name][type]; }
-    saveEquipment(EQUIPMENT);
-    renderEquipSummaryPanel();
-  }
-
-  container.querySelectorAll('.equip-size-select').forEach(sel=>{
-    sel.addEventListener('change', (e)=>{
-      const name = decodeURIComponent(e.target.dataset.name);
-      const type = decodeURIComponent(e.target.dataset.type);
-      const qtySelect = container.querySelector('.equip-qty-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
-      const qty = parseInt(qtySelect.value,10) || 0;
-      persistEntry(name, type, e.target.value, qty);
-      renderEquipTab(); // para mostrar/esconder o "Entregue" corretamente
+  container.querySelectorAll('.equip-order-line').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const line = e.target.closest('.equip-order-line');
+      const name = decodeURIComponent(line.dataset.name);
+      const type = decodeURIComponent(line.dataset.type);
+      const size = line.dataset.size;
+      confirmDeliveryLine(name, type, size);
     });
   });
-  container.querySelectorAll('.equip-qty-select').forEach(sel=>{
-    sel.addEventListener('change', (e)=>{
+  container.querySelectorAll('.eo-add-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
       const name = decodeURIComponent(e.target.dataset.name);
-      const type = decodeURIComponent(e.target.dataset.type);
-      const sizeSelect = container.querySelector('.equip-size-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
-      const qty = parseInt(e.target.value,10) || 0;
-      persistEntry(name, type, sizeSelect.value, qty);
-      renderEquipTab();
-    });
-  });
-  container.querySelectorAll('.equip-deliver-check').forEach(chk=>{
-    chk.addEventListener('change', (e)=>{
-      if(!e.target.checked) return;
-      const name = decodeURIComponent(e.target.dataset.name);
-      const type = decodeURIComponent(e.target.dataset.type);
-      confirmDelivery(name, type);
+      const card = e.target.closest('.equip-card');
+      const type = card.querySelector('.eo-add-type').value;
+      const size = card.querySelector('.eo-add-size').value;
+      const qty = parseInt(card.querySelector('.eo-add-qty').value, 10) || 0;
+      addToEquipmentOrder(name, type, size, qty);
     });
   });
 
@@ -2293,15 +2381,6 @@ function renderEquipTab(){
 }
 
 /* ---------- Render: stock na posse de cada técnico ---------- */
-
-function addToTefStock(name, type, size, qty){
-  if(!type || !size || !qty) return;
-  if(!TEF_STOCK[name]) TEF_STOCK[name] = {};
-  if(!TEF_STOCK[name][type]) TEF_STOCK[name][type] = {};
-  TEF_STOCK[name][type][size] = (TEF_STOCK[name][type][size] || 0) + qty;
-  saveTefStock(TEF_STOCK);
-  renderEquipTab();
-}
 
 function renderTefStockCards(names){
   const container = document.getElementById('tefStockCards');
@@ -2335,7 +2414,6 @@ function renderTefStockCards(names){
       });
     }
 
-    // formulário para inserir manualmente equipamento que o técnico já tem
     let typeOptions = '';
     EQUIP_TYPES.forEach(t=>{ typeOptions += '<option value="'+t+'">'+t+'</option>'; });
     let sizeOptions = '';
@@ -2370,6 +2448,43 @@ function renderTefStockCards(names){
       const size = card.querySelector('.tsl-add-size').value;
       const qty = parseInt(card.querySelector('.tsl-add-qty').value, 10) || 0;
       addToTefStock(name, type, size, qty);
+    });
+  });
+}
+
+/* ---------- Render: encomendas diretas para o ginásio ---------- */
+
+function renderGymOrders(){
+  const el = document.getElementById('gymOrderLines');
+  const lines = [];
+  EQUIP_TYPES.forEach(type=>{
+    ['H','F'].forEach(g=>{
+      const sizes = GYM_ORDERS[type] && GYM_ORDERS[type][g];
+      if(!sizes) return;
+      Object.keys(sizes).forEach(sz=>{
+        if(sizes[sz]>0) lines.push({type, gender:g, size:sz, qty:sizes[sz]});
+      });
+    });
+  });
+  if(lines.length===0){
+    el.innerHTML = '<div class="equip-empty" style="grid-column:unset;padding:6px 0;">Sem encomendas pendentes para o ginásio.</div>';
+  } else {
+    let html = '';
+    lines.forEach(l=>{
+      const genderLabel = l.gender==='F' ? 'Mulher' : 'Homem';
+      html += '<button type="button" class="equip-order-line" data-type="'+encodeURIComponent(l.type)+'" data-gender="'+l.gender+'" data-size="'+l.size+'">'+
+        '<span>'+l.type+' — '+genderLabel+' '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar receção</span>'+
+      '</button>';
+    });
+    el.innerHTML = html;
+  }
+  el.querySelectorAll('.equip-order-line').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const line = e.target.closest('.equip-order-line');
+      const type = decodeURIComponent(line.dataset.type);
+      const gender = line.dataset.gender;
+      const size = line.dataset.size;
+      confirmGymOrderReceipt(type, gender, size);
     });
   });
 }
@@ -2447,7 +2562,7 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
       {s:{r:0,c:1}, e:{r:0,c:5}},
       {s:{r:0,c:6}, e:{r:0,c:10}}
     ];
-    ws['!cols'] = [{wch:16}].concat(new Array(10).fill({wch:6}));
+    ws['!cols'] = [{wch:18}].concat(new Array(10).fill({wch:6}));
     return ws;
   }
 
@@ -2468,8 +2583,10 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
         });
       }
       const pend = EQUIPMENT[name] && EQUIPMENT[name][type];
-      if(pend && pend.size && pend.qty>0){
-        rowsByTec.push([name, genderLabel, type, pend.size, pend.qty, 'Pendente']);
+      if(pend){
+        Object.keys(pend).forEach(sz=>{
+          if(pend[sz]>0) rowsByTec.push([name, genderLabel, type, sz, pend[sz], 'Pendente']);
+        });
       }
     });
   });
@@ -2917,6 +3034,7 @@ function buildExportPayload(){
     stock: STOCK,
     tefStock: TEF_STOCK,
     abatidos: WRITTEN_OFF,
+    encomendasGinasio: GYM_ORDERS,
     disponibilidade: AVAILABILITY,
     exportedAt: nowISO()
   };
@@ -2932,6 +3050,7 @@ function applyImportedData(data){
   if(data.stock){ STOCK = data.stock; localStorage.setItem(STORE_STOCK, JSON.stringify(STOCK)); }
   if(data.tefStock){ TEF_STOCK = data.tefStock; localStorage.setItem(STORE_TEF_STOCK, JSON.stringify(TEF_STOCK)); }
   if(data.abatidos){ WRITTEN_OFF = data.abatidos; localStorage.setItem(STORE_WRITTEN_OFF, JSON.stringify(WRITTEN_OFF)); }
+  if(data.encomendasGinasio){ GYM_ORDERS = data.encomendasGinasio; localStorage.setItem(STORE_GYM_ORDERS, JSON.stringify(GYM_ORDERS)); }
   if(data.disponibilidade){ AVAILABILITY = data.disponibilidade; localStorage.setItem(STORE_AVAIL, JSON.stringify(AVAILABILITY)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
