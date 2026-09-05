@@ -230,11 +230,15 @@
   .tef-stock-add{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
   .tef-stock-add select{border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 12px 'Inter';background:#fff;}
   .tef-stock-add .tsl-add-btn{font:600 12px 'Inter';border:1px dashed var(--accent);color:var(--accent);background:none;border-radius:6px;padding:6px 10px;cursor:pointer;}
-  .equip-order-line{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;
-    padding:8px 10px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;background:#fbfaf7;cursor:pointer;font:500 13px 'Inter';color:var(--ink);}
+  .equip-order-row{display:flex;align-items:center;gap:6px;width:100%;margin-bottom:6px;}
+  .equip-order-line{display:flex;justify-content:space-between;align-items:center;gap:8px;flex:1;text-align:left;
+    padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfaf7;cursor:pointer;font:500 13px 'Inter';color:var(--ink);}
   .equip-order-line:hover{background:var(--accent-soft);border-color:var(--accent);}
   .equip-order-line .eol-hint{font-size:10.5px;color:var(--ink-soft);white-space:nowrap;}
   .equip-order-line:hover .eol-hint{color:var(--accent);}
+  .eol-icon-btn{flex-shrink:0;width:30px;height:30px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-size:13px;color:var(--ink-soft);}
+  .eol-icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .eol-icon-btn.eol-remove:hover{border-color:var(--rust);color:var(--rust);}
   .writeoff-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .writeoff-form select{border:1px solid var(--line);border-radius:7px;padding:8px 8px;font:500 13px 'Inter';background:#fff;}
 
@@ -2080,6 +2084,31 @@ function addToEquipmentOrder(name, type, size, qty){
   renderEquipTab();
 }
 
+function editOrderLine(name, type, size){
+  const current = (EQUIPMENT[name] && EQUIPMENT[name][type] && EQUIPMENT[name][type][size]) || 0;
+  const input = prompt('Nova quantidade para '+type+' ('+size+', '+name+'):', current);
+  if(input === null) return; // cancelado
+  const qty = parseInt(input, 10);
+  if(!EQUIPMENT[name] || !EQUIPMENT[name][type]) return;
+  if(isNaN(qty) || qty <= 0){
+    delete EQUIPMENT[name][type][size];
+    if(Object.keys(EQUIPMENT[name][type]).length === 0) delete EQUIPMENT[name][type];
+  } else {
+    EQUIPMENT[name][type][size] = qty;
+  }
+  saveEquipment(EQUIPMENT);
+  renderEquipTab();
+}
+
+function removeOrderLine(name, type, size){
+  if(!confirm('Remover a encomenda pendente de '+type+' ('+size+') para '+name+'?')) return;
+  if(!EQUIPMENT[name] || !EQUIPMENT[name][type]) return;
+  delete EQUIPMENT[name][type][size];
+  if(Object.keys(EQUIPMENT[name][type]).length === 0) delete EQUIPMENT[name][type];
+  saveEquipment(EQUIPMENT);
+  renderEquipTab();
+}
+
 function confirmDeliveryLine(name, type, size){
   const qty = (EQUIPMENT[name] && EQUIPMENT[name][type] && EQUIPMENT[name][type][size]) || 0;
   if(qty <= 0) return;
@@ -2141,6 +2170,31 @@ function addGymOrder(type, gender, size, qty){
   if(!GYM_ORDERS[type]) GYM_ORDERS[type] = {};
   if(!GYM_ORDERS[type][gender]) GYM_ORDERS[type][gender] = {};
   GYM_ORDERS[type][gender][size] = (GYM_ORDERS[type][gender][size] || 0) + qty;
+  saveGymOrders(GYM_ORDERS);
+  renderEquipTab();
+}
+
+function editGymOrderLine(type, gender, size){
+  const current = (GYM_ORDERS[type] && GYM_ORDERS[type][gender] && GYM_ORDERS[type][gender][size]) || 0;
+  const input = prompt('Nova quantidade para '+type+' ('+(gender==='F'?'Mulher':'Homem')+', '+size+'):', current);
+  if(input === null) return;
+  const qty = parseInt(input, 10);
+  if(!GYM_ORDERS[type] || !GYM_ORDERS[type][gender]) return;
+  if(isNaN(qty) || qty <= 0){
+    delete GYM_ORDERS[type][gender][size];
+    if(Object.keys(GYM_ORDERS[type][gender]).length === 0) delete GYM_ORDERS[type][gender];
+  } else {
+    GYM_ORDERS[type][gender][size] = qty;
+  }
+  saveGymOrders(GYM_ORDERS);
+  renderEquipTab();
+}
+
+function removeGymOrderLine(type, gender, size){
+  if(!confirm('Remover a encomenda pendente de '+type+' ('+(gender==='F'?'Mulher':'Homem')+', '+size+') para o ginásio?')) return;
+  if(!GYM_ORDERS[type] || !GYM_ORDERS[type][gender]) return;
+  delete GYM_ORDERS[type][gender][size];
+  if(Object.keys(GYM_ORDERS[type][gender]).length === 0) delete GYM_ORDERS[type][gender];
   saveGymOrders(GYM_ORDERS);
   renderEquipTab();
 }
@@ -2334,9 +2388,13 @@ function renderEquipTab(){
       html += '<div class="equip-empty" style="grid-column:unset;padding:6px 0;">Sem encomendas pendentes.</div>';
     } else {
       lines.forEach(l=>{
-        html += '<button type="button" class="equip-order-line" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">'+
-          '<span>'+l.type+' — '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar entrega</span>'+
-        '</button>';
+        html += '<div class="equip-order-row">'+
+          '<button type="button" class="equip-order-line" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">'+
+            '<span>'+l.type+' — '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar entrega</span>'+
+          '</button>'+
+          '<button type="button" class="eol-icon-btn eol-edit" title="Editar quantidade" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">✎</button>'+
+          '<button type="button" class="eol-icon-btn eol-remove" title="Remover" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">×</button>'+
+        '</div>';
       });
     }
     let typeOptions = '';
@@ -2364,6 +2422,22 @@ function renderEquipTab(){
       const type = decodeURIComponent(line.dataset.type);
       const size = line.dataset.size;
       confirmDeliveryLine(name, type, size);
+    });
+  });
+  container.querySelectorAll('.eol-edit').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const size = e.target.dataset.size;
+      editOrderLine(name, type, size);
+    });
+  });
+  container.querySelectorAll('.eol-remove').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const size = e.target.dataset.size;
+      removeOrderLine(name, type, size);
     });
   });
   container.querySelectorAll('.eo-add-btn').forEach(btn=>{
@@ -2472,9 +2546,13 @@ function renderGymOrders(){
     let html = '';
     lines.forEach(l=>{
       const genderLabel = l.gender==='F' ? 'Mulher' : 'Homem';
-      html += '<button type="button" class="equip-order-line" data-type="'+encodeURIComponent(l.type)+'" data-gender="'+l.gender+'" data-size="'+l.size+'">'+
-        '<span>'+l.type+' — '+genderLabel+' '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar receção</span>'+
-      '</button>';
+      html += '<div class="equip-order-row">'+
+        '<button type="button" class="equip-order-line" data-type="'+encodeURIComponent(l.type)+'" data-gender="'+l.gender+'" data-size="'+l.size+'">'+
+          '<span>'+l.type+' — '+genderLabel+' '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar receção</span>'+
+        '</button>'+
+        '<button type="button" class="eol-icon-btn eol-edit" title="Editar quantidade" data-type="'+encodeURIComponent(l.type)+'" data-gender="'+l.gender+'" data-size="'+l.size+'">✎</button>'+
+        '<button type="button" class="eol-icon-btn eol-remove" title="Remover" data-type="'+encodeURIComponent(l.type)+'" data-gender="'+l.gender+'" data-size="'+l.size+'">×</button>'+
+      '</div>';
     });
     el.innerHTML = html;
   }
@@ -2485,6 +2563,22 @@ function renderGymOrders(){
       const gender = line.dataset.gender;
       const size = line.dataset.size;
       confirmGymOrderReceipt(type, gender, size);
+    });
+  });
+  el.querySelectorAll('.eol-edit').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const type = decodeURIComponent(e.target.dataset.type);
+      const gender = e.target.dataset.gender;
+      const size = e.target.dataset.size;
+      editGymOrderLine(type, gender, size);
+    });
+  });
+  el.querySelectorAll('.eol-remove').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const type = decodeURIComponent(e.target.dataset.type);
+      const gender = e.target.dataset.gender;
+      const size = e.target.dataset.size;
+      removeGymOrderLine(type, gender, size);
     });
   });
 }
