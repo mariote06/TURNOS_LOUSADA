@@ -341,6 +341,29 @@
     .rate-col{min-width:0;}
     .rate-add-row{flex-direction:column;align-items:stretch;}
     .rate-add-row .btn{width:100%;}
+
+    /* Disponibilidade: encolhe a grelha semanal para caber sem scroll horizontal apertado */
+    .disp-card{padding:12px;overflow-x:visible;}
+    .disp-week-table{font-size:10px;width:100%;table-layout:fixed;}
+    .disp-week-table th:first-child, .disp-week-table td:first-child{width:52px;}
+    .disp-week-table th{padding:2px;font-size:9px;}
+    .disp-week-table td{padding:2px;}
+    .disp-week-table td.disp-timelabel{font-size:8.5px;padding-right:2px;white-space:normal;line-height:1.15;overflow-wrap:break-word;word-break:break-word;}
+    .disp-slot-btn{width:100%;min-width:0;height:28px;font-size:9px;padding:0;}
+    .disp-slot-empty{width:100%;height:28px;}
+    .disp-legend{font-size:10.5px;}
+
+    /* Equipamento: forma tudo empilhado e com alvos de toque maiores */
+    .equip-cards{grid-template-columns:1fr;}
+    .tef-stock-add, .equip-line{flex-wrap:wrap;}
+    .tef-stock-add select, .tef-stock-add .tsl-add-btn{flex:1 1 auto;min-width:0;}
+    .equip-order-row{flex-wrap:wrap;}
+    .equip-order-line{padding:10px;}
+    .equip-order-line .eol-hint{display:none;}
+    .eol-icon-btn{width:34px;height:34px;font-size:14px;}
+    .tef-stock-line{flex-wrap:wrap;}
+    .tef-stock-line button{padding:7px 12px;}
+    .writeoff-form select, .writeoff-form button{font-size:13px;}
   }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -2760,7 +2783,7 @@ function renderDispTab(){
 
     let bodyRows = '';
     slots.forEach(slot=>{
-      let rowCells = '<td class="disp-timelabel">'+slot.start+'–'+slot.end+'</td>';
+      let rowCells = '<td class="disp-timelabel">'+slot.start+'–<wbr>'+slot.end+'</td>';
       WEEK_ORDER.forEach(dayKey=>{
         if(dayHasSlot(dayKey, slot.start, slot.end)){
           const key = dayKey+'|'+slot.start+'-'+slot.end;
