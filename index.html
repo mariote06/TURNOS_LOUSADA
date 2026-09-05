@@ -369,10 +369,11 @@
     <div class="sync-buttons">
       <button class="btn primary" id="btnLinkFile">Criar novo ficheiro (1ª vez)</button>
       <button class="btn primary" id="btnLinkExistingFile">Ligar a ficheiro já existente</button>
+      <button class="btn" id="btnSyncNow" style="display:none;">Sincronizar agora</button>
       <button class="btn" id="btnReactivateLink" style="display:none;">Reativar ligação</button>
       <button class="btn ghost" id="btnUnlinkFile" style="display:none;">Desligar ficheiro</button>
     </div>
-    <div class="sync-hint">"Criar novo ficheiro" só na primeira vez, num dos dispositivos, dentro da tua pasta OneDrive. Nos outros dispositivos, usa "Ligar a ficheiro já existente" e escolhe esse mesmo ficheiro — os dados sincronizam automaticamente sempre que este ficheiro estiver dentro da pasta OneDrive.</div>
+    <div class="sync-hint">"Criar novo ficheiro" só na primeira vez, num dos dispositivos, dentro da tua pasta OneDrive. Nos outros dispositivos, usa "Ligar a ficheiro já existente" e escolhe esse mesmo ficheiro — os dados sincronizam automaticamente sempre que este ficheiro estiver dentro da pasta OneDrive. Antes de editares depois de mudares de aparelho, carrega em "Sincronizar agora" para teres a certeza que já tens a versão mais recente.</div>
   </div>
 
   <div class="sync-bar">
@@ -2944,6 +2945,7 @@ function updateLinkUI(state){
   const statusEl = document.getElementById('linkStatus');
   const linkBtn = document.getElementById('btnLinkFile');
   const linkExistingBtn = document.getElementById('btnLinkExistingFile');
+  const syncNowBtn = document.getElementById('btnSyncNow');
   const unlinkBtn = document.getElementById('btnUnlinkFile');
   const reactivateBtn = document.getElementById('btnReactivateLink');
 
@@ -2951,18 +2953,21 @@ function updateLinkUI(state){
     statusEl.innerHTML = '<span class="dot-warn"></span> Ligado a "'+linkedFileHandle.name+'" — precisa de confirmação';
     linkBtn.style.display = 'none';
     linkExistingBtn.style.display = 'none';
+    syncNowBtn.style.display = 'none';
     unlinkBtn.style.display = '';
     reactivateBtn.style.display = '';
   } else if(linkedFileHandle){
     statusEl.innerHTML = '<span class="dot-ok"></span> Ligado a "'+linkedFileHandle.name+'"';
     linkBtn.style.display = 'none';
     linkExistingBtn.style.display = 'none';
+    syncNowBtn.style.display = '';
     unlinkBtn.style.display = '';
     reactivateBtn.style.display = 'none';
   } else {
     statusEl.innerHTML = '<span class="dot-off"></span> Nenhum ficheiro ligado';
     linkBtn.style.display = '';
     linkExistingBtn.style.display = '';
+    syncNowBtn.style.display = 'none';
     unlinkBtn.style.display = 'none';
     reactivateBtn.style.display = 'none';
   }
@@ -3047,6 +3052,16 @@ document.getElementById('btnReactivateLink').addEventListener('click', async ()=
     const perm = await linkedFileHandle.requestPermission({mode:'readwrite'});
     if(perm === 'granted'){ updateLinkUI(); await syncFromLinkedFile(true); }
   }catch(e){}
+});
+
+document.getElementById('btnSyncNow').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('linkStatus');
+  const original = statusEl.innerHTML;
+  statusEl.innerHTML = '<span class="dot-off"></span> A sincronizar…';
+  await syncFromLinkedFile(true);
+  if(document.getElementById('linkStatus').innerHTML === '<span class="dot-off"></span> A sincronizar…'){
+    updateLinkUI();
+  }
 });
 
 document.getElementById('btnUnlinkFile').addEventListener('click', async ()=>{
