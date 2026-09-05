@@ -220,6 +220,18 @@
   .equip-line select.equip-qty-select{width:52px;text-align:center;}
   .equip-line input[type=number]{width:52px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 13px 'Inter';}
   .equip-empty{grid-column:1/-1;color:var(--ink-soft);font-style:italic;padding:14px;}
+  .equip-line .equip-deliver-label{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--ink-soft);white-space:nowrap;}
+  .equip-line .equip-deliver-label input[type=checkbox]{width:15px;height:15px;cursor:pointer;}
+  .tef-stock-line{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .tef-stock-line:last-child{border-bottom:none;}
+  .tef-stock-line .tsl-label{flex:1;}
+  .tef-stock-line button{font:600 11px 'Inter';border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--ink-soft);}
+  .tef-stock-line button:hover{border-color:var(--rust);color:var(--rust);}
+  .tef-stock-add{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+  .tef-stock-add select{border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 12px 'Inter';background:#fff;}
+  .tef-stock-add .tsl-add-btn{font:600 12px 'Inter';border:1px dashed var(--accent);color:var(--accent);background:none;border-radius:6px;padding:6px 10px;cursor:pointer;}
+  .writeoff-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .writeoff-form select{border:1px solid var(--line);border-radius:7px;padding:8px 8px;font:500 13px 'Inter';background:#fff;}
 
   .disp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:14px;margin-bottom:18px;align-items:start;}
   .disp-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;}
@@ -269,6 +281,8 @@
     .fin-scope-bar .tabs{width:auto;}
 
     .disp-cards{grid-template-columns:1fr;}
+    .writeoff-form{flex-direction:column;align-items:stretch;}
+    .writeoff-form select, .writeoff-form button{width:100%;}
 
     /* sync bars: full-width stacked buttons, easier to tap */
     .sync-buttons{flex-direction:column;}
@@ -516,14 +530,22 @@
 
   <!-- EQUIPAMENTO TAB -->
   <div id="tab-equip" style="display:none;">
-    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
-      Fardamento entregue a cada técnico. Escolhe o tamanho e escreve a quantidade — grava-se sozinho.
+    <h3 style="font-size:15px;margin:0 0 6px;">Encomendas</h3>
+    <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 10px;">
+      Equipamento a encomendar para cada técnico. Escolhe o tamanho e a quantidade — grava-se sozinho.
+      Quando o entregares, marca o quadrado "Entregue": sai daqui e passa para o stock desse técnico.
     </p>
     <div class="equip-cards" id="equipCards"></div>
 
-    <h3 style="font-size:15px;margin:22px 0 10px;">Stock disponível (armazém)</h3>
+    <h3 style="font-size:15px;margin:26px 0 6px;">Stock de cada TEF</h3>
     <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-      Quantidades que já tens guardadas. A app calcula sozinha quanto falta encomendar (entregue menos o que está em stock).
+      Equipamento que já está na posse de cada técnico (confirmado como entregue, ou inserido manualmente aqui). Usa "Devolver" se o técnico ou estagiário devolver alguma peça — volta para o Stock do Ginásio.
+    </p>
+    <div class="equip-cards" id="tefStockCards"></div>
+
+    <h3 style="font-size:15px;margin:26px 0 6px;">Stock do Ginásio (armazém)</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Quantidades disponíveis em armazém — aumentam com devoluções, e também podes ajustar manualmente aqui.
     </p>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="stockTable">
@@ -542,6 +564,23 @@
       </table>
     </div>
 
+    <h3 style="font-size:15px;margin:26px 0 6px;">Abater equipamento</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Retira peças de circulação (danificadas, descartadas) — sai do Stock do Ginásio e passa a "Abatido".
+    </p>
+    <div class="panel" style="padding:14px 16px;">
+      <div class="writeoff-form">
+        <select id="woType"></select>
+        <select id="woGender"><option value="H">Homem</option><option value="F">Mulher</option></select>
+        <select id="woSize"></select>
+        <select id="woQty"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        <button class="btn" id="btnWriteOff">Abater</button>
+      </div>
+      <div id="woMsg" style="font-size:12px;color:var(--rust);margin-top:8px;"></div>
+    </div>
+    <div class="panel tec-summary" id="writtenOffSummary"></div>
+
+    <h3 style="font-size:15px;margin:26px 0 6px;">Resumo geral</h3>
     <div class="panel tec-summary" id="equipSummary"></div>
     <div style="margin-top:16px;">
       <button class="btn primary" id="btnExportEquipExcel">Exportar equipamento (Excel)</button>
@@ -1943,15 +1982,19 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
   renderTecTab();
 });
 
+
 /* ---------------------------------------------------------------
-   EQUIPAMENTO: fardamento entregue por técnico e tipo — um tamanho e
-   uma quantidade por linha (o sexo do técnico, em Técnicos, já diz
-   qual a escala/corte a usar; aqui só interessa o tamanho em si).
+   EQUIPAMENTO — ciclo de vida completo:
+   Encomenda (por técnico) --[confirmar entrega]--> Stock do TEF
+   Stock do TEF --[devolver]--> Stock do Ginásio
+   Stock do Ginásio --[abater]--> Equipamentos abatidos
 --------------------------------------------------------------- */
 const SIZE_LETTERS = ['XS','S','M','L','XL'];
 const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT'];
-const STORE_EQUIP = 'tef_turnos_equipamento_v1'; // {tecnico: {tipo: {size:'M', qty:2}}}
-const STORE_STOCK = 'tef_turnos_stock_v1'; // {tipo: {F:{XS:qtd,...}, H:{...}}}
+const STORE_EQUIP = 'tef_turnos_equipamento_v1';       // {tecnico: {tipo: {size:'M', qty:2}}}  — encomendas pendentes
+const STORE_TEF_STOCK = 'tef_turnos_stock_tecnico_v1'; // {tecnico: {tipo: {size: qtd}}}         — na posse do técnico
+const STORE_STOCK = 'tef_turnos_stock_v1';             // {tipo: {F:{XS:qtd,...}, H:{...}}}      — armazém do ginásio
+const STORE_WRITTEN_OFF = 'tef_turnos_abatidos_v1';    // {tipo: {F:{XS:qtd,...}, H:{...}}}      — abatidos
 
 function loadEquipment(){
   try{ const raw = localStorage.getItem(STORE_EQUIP); if(raw) return JSON.parse(raw); }catch(e){}
@@ -1960,6 +2003,13 @@ function loadEquipment(){
 function saveEquipment(e){ localStorage.setItem(STORE_EQUIP, JSON.stringify(e)); touchMeta(); }
 let EQUIPMENT = loadEquipment();
 
+function loadTefStock(){
+  try{ const raw = localStorage.getItem(STORE_TEF_STOCK); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveTefStock(s){ localStorage.setItem(STORE_TEF_STOCK, JSON.stringify(s)); touchMeta(); }
+let TEF_STOCK = loadTefStock();
+
 function loadStock(){
   try{ const raw = localStorage.getItem(STORE_STOCK); if(raw) return JSON.parse(raw); }catch(e){}
   return {};
@@ -1967,72 +2017,364 @@ function loadStock(){
 function saveStock(s){ localStorage.setItem(STORE_STOCK, JSON.stringify(s)); touchMeta(); }
 let STOCK = loadStock();
 
-// Para cada tipo/sexo/tamanho: quanto foi entregue, quanto há em stock, e quanto falta
-// encomendar (entregue menos stock, nunca negativo — stock a mais não gera "sobra" negativa).
+function loadWrittenOff(){
+  try{ const raw = localStorage.getItem(STORE_WRITTEN_OFF); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveWrittenOff(w){ localStorage.setItem(STORE_WRITTEN_OFF, JSON.stringify(w)); touchMeta(); }
+let WRITTEN_OFF = loadWrittenOff();
+
+// Opções fixas do formulário de abate — só precisam de ser criadas uma vez.
+(function initWriteOffFormOptions(){
+  const typeSel = document.getElementById('woType');
+  const sizeSel = document.getElementById('woSize');
+  if(typeSel && typeSel.options.length===0){
+    EQUIP_TYPES.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
+  }
+  if(sizeSel && sizeSel.options.length===0){
+    SIZE_LETTERS.forEach(sz=>{ const o=document.createElement('option'); o.value=sz; o.textContent=sz; sizeSel.appendChild(o); });
+  }
+})();
+
+/* ---------- Ações do fluxo ---------- */
+
+function confirmDelivery(name, type){
+  const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
+  if(!entry || !entry.size || !entry.qty) return;
+  const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
+
+  // Se houver stock do ginásio para este tamanho, sai dali primeiro.
+  if(!STOCK[type]) STOCK[type] = {};
+  if(!STOCK[type][gender]) STOCK[type][gender] = {};
+  const avail = STOCK[type][gender][entry.size] || 0;
+  const fromStock = Math.min(avail, entry.qty);
+  if(fromStock > 0){
+    const remaining = avail - fromStock;
+    if(remaining > 0) STOCK[type][gender][entry.size] = remaining;
+    else delete STOCK[type][gender][entry.size];
+  }
+
+  // Passa para o stock do técnico.
+  if(!TEF_STOCK[name]) TEF_STOCK[name] = {};
+  if(!TEF_STOCK[name][type]) TEF_STOCK[name][type] = {};
+  TEF_STOCK[name][type][entry.size] = (TEF_STOCK[name][type][entry.size] || 0) + entry.qty;
+
+  // Sai das encomendas.
+  delete EQUIPMENT[name][type];
+
+  saveEquipment(EQUIPMENT);
+  saveStock(STOCK);
+  saveTefStock(TEF_STOCK);
+  renderEquipTab();
+}
+
+function returnFromTef(name, type, size){
+  const qty = (TEF_STOCK[name] && TEF_STOCK[name][type] && TEF_STOCK[name][type][size]) || 0;
+  if(qty <= 0) return;
+  if(!confirm('Devolver '+qty+'x '+type+' (tamanho '+size+') de '+name+' para o Stock do Ginásio?')) return;
+
+  const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
+  if(!STOCK[type]) STOCK[type] = {};
+  if(!STOCK[type][gender]) STOCK[type][gender] = {};
+  STOCK[type][gender][size] = (STOCK[type][gender][size] || 0) + qty;
+
+  delete TEF_STOCK[name][type][size];
+  if(Object.keys(TEF_STOCK[name][type]).length === 0) delete TEF_STOCK[name][type];
+
+  saveStock(STOCK);
+  saveTefStock(TEF_STOCK);
+  renderEquipTab();
+}
+
+document.getElementById('btnWriteOff').addEventListener('click', ()=>{
+  const type = document.getElementById('woType').value;
+  const gender = document.getElementById('woGender').value;
+  const size = document.getElementById('woSize').value;
+  const qty = parseInt(document.getElementById('woQty').value, 10) || 0;
+  const msg = document.getElementById('woMsg');
+
+  const avail = (STOCK[type] && STOCK[type][gender] && STOCK[type][gender][size]) || 0;
+  if(avail <= 0){
+    msg.style.color = 'var(--rust)';
+    msg.textContent = 'Não há stock desse tamanho para abater.';
+    return;
+  }
+  const actual = Math.min(avail, qty);
+  const remaining = avail - actual;
+  if(remaining > 0) STOCK[type][gender][size] = remaining;
+  else delete STOCK[type][gender][size];
+
+  if(!WRITTEN_OFF[type]) WRITTEN_OFF[type] = {};
+  if(!WRITTEN_OFF[type][gender]) WRITTEN_OFF[type][gender] = {};
+  WRITTEN_OFF[type][gender][size] = (WRITTEN_OFF[type][gender][size] || 0) + actual;
+
+  saveStock(STOCK);
+  saveWrittenOff(WRITTEN_OFF);
+
+  msg.style.color = actual < qty ? 'var(--rust)' : 'var(--accent)';
+  msg.textContent = actual < qty
+    ? ('Só havia '+avail+' em stock — foram abatidas '+actual+'.')
+    : (actual+' peça(s) abatida(s) com sucesso.');
+  renderEquipTab();
+});
+
+/* ---------- Cálculo agregado (para o resumo e a exportação) ---------- */
+
 function computeEquipSummary(){
   const names = Object.keys(TECH_REGISTRY);
-  let grandDelivered=0, grandStock=0, grandNeeded=0;
+  let grandPending=0, grandDelivered=0, grandStock=0, grandWrittenOff=0, grandNeeded=0;
   const perType = EQUIP_TYPES.map(type=>{
     const byGender = {
-      H: {label:'Homem', delivered:0, stock:0, needed:0, sizes:{}},
-      F: {label:'Mulher', delivered:0, stock:0, needed:0, sizes:{}}
+      H: {label:'Homem', pending:0, pendingSizes:{}, delivered:0, deliveredSizes:{}, stock:0, stockSizes:{}, writtenOff:0, writtenOffSizes:{}, needed:0},
+      F: {label:'Mulher', pending:0, pendingSizes:{}, delivered:0, deliveredSizes:{}, stock:0, stockSizes:{}, writtenOff:0, writtenOffSizes:{}, needed:0}
     };
     names.forEach(name=>{
-      const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
-      if(entry && entry.size && entry.qty>0){
-        const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
-        byGender[gender].delivered += entry.qty;
-        if(!byGender[gender].sizes[entry.size]) byGender[gender].sizes[entry.size] = {delivered:0, stock:0};
-        byGender[gender].sizes[entry.size].delivered += entry.qty;
+      const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
+      const pend = EQUIPMENT[name] && EQUIPMENT[name][type];
+      if(pend && pend.size && pend.qty>0){
+        byGender[gender].pending += pend.qty;
+        byGender[gender].pendingSizes[pend.size] = (byGender[gender].pendingSizes[pend.size]||0) + pend.qty;
+      }
+      const held = TEF_STOCK[name] && TEF_STOCK[name][type];
+      if(held){
+        Object.keys(held).forEach(sz=>{
+          byGender[gender].delivered += held[sz];
+          byGender[gender].deliveredSizes[sz] = (byGender[gender].deliveredSizes[sz]||0) + held[sz];
+        });
       }
     });
     ['F','H'].forEach(g=>{
       SIZE_LETTERS.forEach(sz=>{
         const stockQty = (STOCK[type] && STOCK[type][g] && STOCK[type][g][sz]) || 0;
-        if(stockQty>0){
-          byGender[g].stock += stockQty;
-          if(!byGender[g].sizes[sz]) byGender[g].sizes[sz] = {delivered:0, stock:0};
-          byGender[g].sizes[sz].stock = stockQty;
-        }
+        if(stockQty>0){ byGender[g].stock += stockQty; byGender[g].stockSizes[sz] = stockQty; }
+        const woQty = (WRITTEN_OFF[type] && WRITTEN_OFF[type][g] && WRITTEN_OFF[type][g][sz]) || 0;
+        if(woQty>0){ byGender[g].writtenOff += woQty; byGender[g].writtenOffSizes[sz] = woQty; }
       });
-      Object.keys(byGender[g].sizes).forEach(sz=>{
-        const s = byGender[g].sizes[sz];
-        byGender[g].needed += Math.max(0, s.delivered - s.stock);
+      Object.keys(byGender[g].pendingSizes).forEach(sz=>{
+        byGender[g].needed += Math.max(0, byGender[g].pendingSizes[sz] - (byGender[g].stockSizes[sz]||0));
       });
     });
+    const typePending = byGender.H.pending + byGender.F.pending;
     const typeDelivered = byGender.H.delivered + byGender.F.delivered;
     const typeStock = byGender.H.stock + byGender.F.stock;
+    const typeWrittenOff = byGender.H.writtenOff + byGender.F.writtenOff;
     const typeNeeded = byGender.H.needed + byGender.F.needed;
-    grandDelivered += typeDelivered; grandStock += typeStock; grandNeeded += typeNeeded;
-    return {type, typeDelivered, typeStock, typeNeeded, byGender};
+    grandPending += typePending; grandDelivered += typeDelivered; grandStock += typeStock;
+    grandWrittenOff += typeWrittenOff; grandNeeded += typeNeeded;
+    return {type, typePending, typeDelivered, typeStock, typeWrittenOff, typeNeeded, byGender};
   });
-  return {perType, grandDelivered, grandStock, grandNeeded};
+  return {perType, grandPending, grandDelivered, grandStock, grandWrittenOff, grandNeeded};
 }
 
 function renderEquipSummaryPanel(){
-  const {perType, grandDelivered, grandStock, grandNeeded} = computeEquipSummary();
+  const {perType, grandPending, grandDelivered, grandStock, grandWrittenOff, grandNeeded} = computeEquipSummary();
   const summary = document.getElementById('equipSummary');
   let html = '';
-  perType.forEach(({type, typeDelivered, typeStock, typeNeeded, byGender})=>{
-    const genderLines = ['H','F'].map(g=>{
-      const info = byGender[g];
-      const breakdown = SIZE_LETTERS
-        .filter(sz=>info.sizes[sz] && (info.sizes[sz].delivered>0 || info.sizes[sz].stock>0))
-        .map(sz=>sz+': entregue '+ (info.sizes[sz].delivered||0) +' / stock '+ (info.sizes[sz].stock||0))
-        .join(', ');
-      return info.label+' — '+ (breakdown || 'sem registos');
-    }).join('<br>');
+  perType.forEach(({type, typePending, typeDelivered, typeStock, typeNeeded})=>{
     html += '<div><div class="stat-label">'+type+'</div>'+
       '<div class="stat-value">'+typeDelivered+' entregues</div>'+
-      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+genderLines+'</div>'+
-      '<div style="font-size:12px;margin-top:4px;"><strong style="color:'+(typeNeeded>0?'var(--rust)':'var(--accent)')+';">Falta encomendar: '+typeNeeded+'</strong> · em stock: '+typeStock+'</div>'+
+      '<div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">Pendente: '+typePending+' · Em stock: '+typeStock+'</div>'+
+      '<div style="font-size:12px;margin-top:4px;"><strong style="color:'+(typeNeeded>0?'var(--rust)':'var(--accent)')+';">Falta encomendar: '+typeNeeded+'</strong></div>'+
     '</div>';
   });
+  html += '<div><div class="stat-label">Total pendente</div><div class="stat-value">'+grandPending+'</div></div>';
   html += '<div><div class="stat-label">Total entregue</div><div class="stat-value">'+grandDelivered+'</div></div>';
   html += '<div><div class="stat-label">Total em stock</div><div class="stat-value">'+grandStock+'</div></div>';
+  html += '<div><div class="stat-label">Total abatido</div><div class="stat-value">'+grandWrittenOff+'</div></div>';
   html += '<div><div class="stat-label">Total a encomendar</div><div class="stat-value total">'+grandNeeded+'</div></div>';
   summary.innerHTML = html;
 }
+
+function renderWrittenOffSummary(){
+  const {perType, grandWrittenOff} = computeEquipSummary();
+  const el = document.getElementById('writtenOffSummary');
+  let html = '';
+  let any = false;
+  perType.forEach(({type, typeWrittenOff, byGender})=>{
+    if(typeWrittenOff<=0) return;
+    any = true;
+    const breakdown = ['H','F'].map(g=>{
+      const info = byGender[g];
+      if(info.writtenOff<=0) return '';
+      const sizes = SIZE_LETTERS.filter(sz=>info.writtenOffSizes[sz]>0).map(sz=>sz+':'+info.writtenOffSizes[sz]).join(', ');
+      return info.label+' — '+sizes;
+    }).filter(Boolean).join(' · ');
+    html += '<div><div class="stat-label">'+type+'</div><div class="stat-value">'+typeWrittenOff+'</div>'+
+      '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+breakdown+'</div></div>';
+  });
+  if(!any){
+    el.innerHTML = '<div class="equip-empty" style="grid-column:1/-1;padding:6px 0;">Ainda não há peças abatidas.</div>';
+    return;
+  }
+  html += '<div><div class="stat-label">Total abatido</div><div class="stat-value total">'+grandWrittenOff+'</div></div>';
+  el.innerHTML = html;
+}
+
+/* ---------- Render: cartões de encomendas por técnico ---------- */
+
+function renderEquipTab(){
+  const container = document.getElementById('equipCards');
+  container.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+
+  renderStockTable();       // stock do ginásio — independente de haver técnicos
+  renderTefStockCards(names);
+  renderWrittenOffSummary();
+
+  if(names.length === 0){
+    container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
+    renderEquipSummaryPanel();
+    return;
+  }
+
+  names.forEach(name=>{
+    const card = document.createElement('div');
+    card.className = 'equip-card';
+    let linesHtml = '<h4>'+name+'</h4>';
+    EQUIP_TYPES.forEach(type=>{
+      const entry = (EQUIPMENT[name] && EQUIPMENT[name][type]) || {size:'', qty:0};
+      let sizeOptions = '<option value="">—</option>';
+      SIZE_LETTERS.forEach(sz=>{ sizeOptions += '<option value="'+sz+'" '+(entry.size===sz?'selected':'')+'>'+sz+'</option>'; });
+      let qtyOptions = '<option value="0">—</option>';
+      [1,2,3,4].forEach(n=>{ qtyOptions += '<option value="'+n+'" '+(entry.qty===n?'selected':'')+'>'+n+'</option>'; });
+      const hasPending = entry.size && entry.qty>0;
+      linesHtml +=
+        '<div class="equip-line">'+
+          '<span class="equip-label">'+type+'</span>'+
+          '<select class="equip-size-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+sizeOptions+'</select>'+
+          '<select class="equip-qty-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+qtyOptions+'</select>'+
+          (hasPending
+            ? '<label class="equip-deliver-label"><input type="checkbox" class="equip-deliver-check" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'"> Entregue</label>'
+            : '<span class="equip-deliver-label" style="visibility:hidden;">Entregue</span>') +
+        '</div>';
+    });
+    card.innerHTML = linesHtml;
+    container.appendChild(card);
+  });
+
+  function persistEntry(name, type, size, qty){
+    if(!EQUIPMENT[name]) EQUIPMENT[name] = {};
+    if(size || qty>0){ EQUIPMENT[name][type] = {size, qty}; }
+    else { delete EQUIPMENT[name][type]; }
+    saveEquipment(EQUIPMENT);
+    renderEquipSummaryPanel();
+  }
+
+  container.querySelectorAll('.equip-size-select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const qtySelect = container.querySelector('.equip-qty-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
+      const qty = parseInt(qtySelect.value,10) || 0;
+      persistEntry(name, type, e.target.value, qty);
+      renderEquipTab(); // para mostrar/esconder o "Entregue" corretamente
+    });
+  });
+  container.querySelectorAll('.equip-qty-select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const sizeSelect = container.querySelector('.equip-size-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
+      const qty = parseInt(e.target.value,10) || 0;
+      persistEntry(name, type, sizeSelect.value, qty);
+      renderEquipTab();
+    });
+  });
+  container.querySelectorAll('.equip-deliver-check').forEach(chk=>{
+    chk.addEventListener('change', (e)=>{
+      if(!e.target.checked) return;
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      confirmDelivery(name, type);
+    });
+  });
+
+  renderEquipSummaryPanel();
+}
+
+/* ---------- Render: stock na posse de cada técnico ---------- */
+
+function addToTefStock(name, type, size, qty){
+  if(!type || !size || !qty) return;
+  if(!TEF_STOCK[name]) TEF_STOCK[name] = {};
+  if(!TEF_STOCK[name][type]) TEF_STOCK[name][type] = {};
+  TEF_STOCK[name][type][size] = (TEF_STOCK[name][type][size] || 0) + qty;
+  saveTefStock(TEF_STOCK);
+  renderEquipTab();
+}
+
+function renderTefStockCards(names){
+  const container = document.getElementById('tefStockCards');
+  container.innerHTML = '';
+
+  if(names.length === 0){
+    container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
+    return;
+  }
+
+  names.forEach(name=>{
+    const held = TEF_STOCK[name] || {};
+    const lines = [];
+    EQUIP_TYPES.forEach(type=>{
+      const sizes = held[type];
+      if(!sizes) return;
+      Object.keys(sizes).forEach(sz=>{
+        if(sizes[sz]>0) lines.push({type, size:sz, qty:sizes[sz]});
+      });
+    });
+
+    const card = document.createElement('div');
+    card.className = 'equip-card';
+    let html = '<h4>'+name+'</h4>';
+    if(lines.length===0){
+      html += '<div class="equip-empty" style="grid-column:unset;padding:6px 0;">Sem equipamento registado.</div>';
+    } else {
+      lines.forEach(l=>{
+        html += '<div class="tef-stock-line"><span class="tsl-label">'+l.type+' — '+l.size+' × '+l.qty+'</span>'+
+          '<button type="button" class="tsl-return-btn" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">Devolver</button></div>';
+      });
+    }
+
+    // formulário para inserir manualmente equipamento que o técnico já tem
+    let typeOptions = '';
+    EQUIP_TYPES.forEach(t=>{ typeOptions += '<option value="'+t+'">'+t+'</option>'; });
+    let sizeOptions = '';
+    SIZE_LETTERS.forEach(sz=>{ sizeOptions += '<option value="'+sz+'">'+sz+'</option>'; });
+    let qtyOptions = '';
+    [1,2,3,4].forEach(n=>{ qtyOptions += '<option value="'+n+'">'+n+'</option>'; });
+    html +=
+      '<div class="tef-stock-add">'+
+        '<select class="tsl-add-type" data-name="'+encodeURIComponent(name)+'">'+typeOptions+'</select>'+
+        '<select class="tsl-add-size" data-name="'+encodeURIComponent(name)+'">'+sizeOptions+'</select>'+
+        '<select class="tsl-add-qty" data-name="'+encodeURIComponent(name)+'">'+qtyOptions+'</select>'+
+        '<button type="button" class="tsl-add-btn" data-name="'+encodeURIComponent(name)+'">+ Adicionar</button>'+
+      '</div>';
+
+    card.innerHTML = html;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('.tsl-return-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const size = e.target.dataset.size;
+      returnFromTef(name, type, size);
+    });
+  });
+  container.querySelectorAll('.tsl-add-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const card = e.target.closest('.equip-card');
+      const type = card.querySelector('.tsl-add-type').value;
+      const size = card.querySelector('.tsl-add-size').value;
+      const qty = parseInt(card.querySelector('.tsl-add-qty').value, 10) || 0;
+      addToTefStock(name, type, size, qty);
+    });
+  });
+}
+
+/* ---------- Render: stock do ginásio (armazém) ---------- */
 
 function renderStockTable(){
   const tbody = document.getElementById('stockTableBody');
@@ -2069,69 +2411,7 @@ function renderStockTable(){
   });
 }
 
-function renderEquipTab(){
-  const container = document.getElementById('equipCards');
-  container.innerHTML = '';
-  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
-
-  renderStockTable(); // independente de haver técnicos ou não
-
-  if(names.length === 0){
-    container.innerHTML = '<div class="equip-empty">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</div>';
-    renderEquipSummaryPanel();
-    return;
-  }
-
-  names.forEach(name=>{
-    const card = document.createElement('div');
-    card.className = 'equip-card';
-    let linesHtml = '<h4>'+name+'</h4>';
-    EQUIP_TYPES.forEach(type=>{
-      const entry = (EQUIPMENT[name] && EQUIPMENT[name][type]) || {size:'', qty:0};
-      let sizeOptions = '<option value="">—</option>';
-      SIZE_LETTERS.forEach(sz=>{ sizeOptions += '<option value="'+sz+'" '+(entry.size===sz?'selected':'')+'>'+sz+'</option>'; });
-      let qtyOptions = '<option value="0">—</option>';
-      [1,2,3,4].forEach(n=>{ qtyOptions += '<option value="'+n+'" '+(entry.qty===n?'selected':'')+'>'+n+'</option>'; });
-      linesHtml +=
-        '<div class="equip-line">'+
-          '<span class="equip-label">'+type+'</span>'+
-          '<select class="equip-size-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+sizeOptions+'</select>'+
-          '<select class="equip-qty-select" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(type)+'">'+qtyOptions+'</select>'+
-        '</div>';
-    });
-    card.innerHTML = linesHtml;
-    container.appendChild(card);
-  });
-
-  function persistEntry(name, type, size, qty){
-    if(!EQUIPMENT[name]) EQUIPMENT[name] = {};
-    if(size || qty>0){ EQUIPMENT[name][type] = {size, qty}; }
-    else { delete EQUIPMENT[name][type]; }
-    saveEquipment(EQUIPMENT);
-    renderEquipSummaryPanel();
-  }
-
-  container.querySelectorAll('.equip-size-select').forEach(sel=>{
-    sel.addEventListener('change', (e)=>{
-      const name = decodeURIComponent(e.target.dataset.name);
-      const type = decodeURIComponent(e.target.dataset.type);
-      const qtySelect = container.querySelector('.equip-qty-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
-      const qty = parseInt(qtySelect.value,10) || 0;
-      persistEntry(name, type, e.target.value, qty);
-    });
-  });
-  container.querySelectorAll('.equip-qty-select').forEach(sel=>{
-    sel.addEventListener('change', (e)=>{
-      const name = decodeURIComponent(e.target.dataset.name);
-      const type = decodeURIComponent(e.target.dataset.type);
-      const sizeSelect = container.querySelector('.equip-size-select[data-name="'+e.target.dataset.name+'"][data-type="'+e.target.dataset.type+'"]');
-      const qty = parseInt(e.target.value,10) || 0;
-      persistEntry(name, type, sizeSelect.value, qty);
-    });
-  });
-
-  renderEquipSummaryPanel();
-}
+/* ---------- Exportar Excel ---------- */
 
 document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
   if(typeof XLSX === 'undefined'){
@@ -2151,7 +2431,7 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
       const rowVals = [];
       ['F','H'].forEach(g=>{
         SIZE_LETTERS.forEach(sz=>{
-          const q = cellFn(byGender[g].sizes[sz]);
+          const q = cellFn(byGender[g], sz);
           rowVals.push(q>0 ? q : '');
         });
       });
@@ -2164,40 +2444,44 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', ()=>{
   function buildMatrixSheet(rows){
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!merges'] = [
-      {s:{r:0,c:1}, e:{r:0,c:5}}, // Mulher
-      {s:{r:0,c:6}, e:{r:0,c:10}} // Homem
+      {s:{r:0,c:1}, e:{r:0,c:5}},
+      {s:{r:0,c:6}, e:{r:0,c:10}}
     ];
     ws['!cols'] = [{wch:16}].concat(new Array(10).fill({wch:6}));
     return ws;
   }
 
-  // Folha 1: Encomenda — quanto falta mesmo encomendar (entregue menos o que já está em stock).
-  const wsOrder = buildMatrixSheet(matrixRows(s => s ? Math.max(0, (s.delivered||0)-(s.stock||0)) : 0));
+  const wsOrder = buildMatrixSheet(matrixRows((g,sz)=> Math.max(0, (g.pendingSizes[sz]||0) - (g.stockSizes[sz]||0))));
+  const wsPending = buildMatrixSheet(matrixRows((g,sz)=> g.pendingSizes[sz]||0));
+  const wsDelivered = buildMatrixSheet(matrixRows((g,sz)=> g.deliveredSizes[sz]||0));
+  const wsStock = buildMatrixSheet(matrixRows((g,sz)=> g.stockSizes[sz]||0));
+  const wsWrittenOff = buildMatrixSheet(matrixRows((g,sz)=> g.writtenOffSizes[sz]||0));
 
-  // Folha 2: Entregue — total distribuído aos técnicos, por sexo e tamanho.
-  const wsDelivered = buildMatrixSheet(matrixRows(s => s ? (s.delivered||0) : 0));
-
-  // Folha 3: Stock — o que já está guardado em armazém.
-  const wsStock = buildMatrixSheet(matrixRows(s => s ? (s.stock||0) : 0));
-
-  // Folha 4: Por Técnico — detalhe individual, para conferência.
-  const rowsByTec = [['Técnico','Sexo','Equipamento','Tamanho','Quantidade']];
+  const rowsByTec = [['Técnico','Sexo','Equipamento','Tamanho','Quantidade','Estado']];
   names.forEach(name=>{
     const genderLabel = (TECH_REGISTRY[name].gender==='F') ? 'Mulher' : 'Homem';
     EQUIP_TYPES.forEach(type=>{
-      const entry = EQUIPMENT[name] && EQUIPMENT[name][type];
-      if(entry && entry.size && entry.qty>0){
-        rowsByTec.push([name, genderLabel, type, entry.size, entry.qty]);
+      const held = TEF_STOCK[name] && TEF_STOCK[name][type];
+      if(held){
+        Object.keys(held).forEach(sz=>{
+          if(held[sz]>0) rowsByTec.push([name, genderLabel, type, sz, held[sz], 'Entregue']);
+        });
+      }
+      const pend = EQUIPMENT[name] && EQUIPMENT[name][type];
+      if(pend && pend.size && pend.qty>0){
+        rowsByTec.push([name, genderLabel, type, pend.size, pend.qty, 'Pendente']);
       }
     });
   });
   const wsByTec = XLSX.utils.aoa_to_sheet(rowsByTec);
-  wsByTec['!cols'] = [{wch:20},{wch:10},{wch:18},{wch:8},{wch:10}];
+  wsByTec['!cols'] = [{wch:20},{wch:10},{wch:18},{wch:8},{wch:10},{wch:10}];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, wsOrder, 'Encomenda');
+  XLSX.utils.book_append_sheet(wb, wsPending, 'Pendente');
   XLSX.utils.book_append_sheet(wb, wsDelivered, 'Entregue');
   XLSX.utils.book_append_sheet(wb, wsStock, 'Stock');
+  XLSX.utils.book_append_sheet(wb, wsWrittenOff, 'Abatidos');
   XLSX.utils.book_append_sheet(wb, wsByTec, 'Por Técnico');
   XLSX.writeFile(wb, 'equipamento_encomenda.xlsx');
 });
@@ -2631,6 +2915,8 @@ function buildExportPayload(){
     feriados: HOLIDAY_ASSIGNMENTS,
     equipamento: EQUIPMENT,
     stock: STOCK,
+    tefStock: TEF_STOCK,
+    abatidos: WRITTEN_OFF,
     disponibilidade: AVAILABILITY,
     exportedAt: nowISO()
   };
@@ -2644,6 +2930,8 @@ function applyImportedData(data){
   if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
   if(data.equipamento){ EQUIPMENT = data.equipamento; localStorage.setItem(STORE_EQUIP, JSON.stringify(EQUIPMENT)); }
   if(data.stock){ STOCK = data.stock; localStorage.setItem(STORE_STOCK, JSON.stringify(STOCK)); }
+  if(data.tefStock){ TEF_STOCK = data.tefStock; localStorage.setItem(STORE_TEF_STOCK, JSON.stringify(TEF_STOCK)); }
+  if(data.abatidos){ WRITTEN_OFF = data.abatidos; localStorage.setItem(STORE_WRITTEN_OFF, JSON.stringify(WRITTEN_OFF)); }
   if(data.disponibilidade){ AVAILABILITY = data.disponibilidade; localStorage.setItem(STORE_AVAIL, JSON.stringify(AVAILABILITY)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
