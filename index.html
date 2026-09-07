@@ -3879,6 +3879,15 @@ document.getElementById('importFileInput').addEventListener('change', (e)=>{
     const when = data.exportedAt ? fmtDateTimePT(data.exportedAt) : 'data desconhecida';
     if(confirm('Importar dados de '+when+'? Isto substitui os dados atuais neste dispositivo.')){
       applyImportedData(data);
+      // Uma importação manual é uma ação deliberada feita agora — a partir daqui, este
+      // é o estado mais recente, mesmo que o ficheiro importado tivesse uma data mais antiga.
+      // Sem isto, a próxima sincronização podia achar o ficheiro do OneDrive "mais recente"
+      // e desfazer a importação (é o que estava a fazer os currículos "desaparecerem").
+      saveMeta({updatedAt: nowISO()});
+      updateSyncStatusLabel();
+      if(typeof linkedFileHandle !== 'undefined' && linkedFileHandle){
+        writeLinkedFile(buildExportPayload());
+      }
       alert('Dados importados com sucesso.');
     }
   };
