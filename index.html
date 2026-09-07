@@ -235,6 +235,9 @@
   .recrut-form-grid label{display:flex;flex-direction:column;gap:6px;font:600 12px 'Inter';color:var(--ink-soft);}
   .recrut-form-grid input, .recrut-form-grid select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;}
   .candidate-card h4{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .candidate-photo{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--line);}
+  .candidate-name-row{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+  .candidate-name-text{flex:1;min-width:0;overflow-wrap:break-word;}
   .candidate-status-badge{font:600 10.5px 'Inter';padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.02em;background:var(--fac-bg);color:var(--fac-ink);}
   .candidate-status-badge.st-contratado{background:var(--accent-soft);color:var(--accent);}
   .candidate-status-badge.st-rejeitado{background:var(--rust-soft);color:var(--rust);}
@@ -791,6 +794,9 @@
       </label>
       <label class="aval-plano-label" style="margin-top:10px;display:block;">Currículo (PDF, Word, imagem...)
         <input type="file" id="recrutCvInput" style="display:block;margin-top:6px;">
+      </label>
+      <label class="aval-plano-label" style="margin-top:10px;display:block;">Foto (opcional)
+        <input type="file" id="recrutFotoInput" accept="image/*" style="display:block;margin-top:6px;">
       </label>
       <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;">
         <button class="btn primary" id="btnAddCandidate">Adicionar candidato</button>
@@ -3342,6 +3348,15 @@ async function cvDbDelete(id){
 const CANDIDATE_STATUSES = ['Novo','Entrevista marcada','Em avaliação','Contratado','Rejeitado'];
 function statusSlug(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-'); }
 
+function fileToDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 document.getElementById('btnAddCandidate').addEventListener('click', async ()=>{
   const nome = document.getElementById('recrutNome').value.trim();
   if(!nome){ alert('Indica o nome do candidato.'); return; }
@@ -3353,9 +3368,16 @@ document.getElementById('btnAddCandidate').addEventListener('click', async ()=>{
   const notas = document.getElementById('recrutNotas').value.trim();
   const fileInput = document.getElementById('recrutCvInput');
   const file = fileInput.files[0];
+  const fotoInput = document.getElementById('recrutFotoInput');
+  const fotoFile = fotoInput.files[0];
 
   const id = 'cand_'+Date.now();
-  const candidate = {id, nome, idade, telefone, email, estado, notas, cvFileName: file ? file.name : null, createdAt: nowISO()};
+  let foto = null;
+  if(fotoFile){
+    try{ foto = await fileToDataUrl(fotoFile); }
+    catch(e){ /* segue sem foto se falhar */ }
+  }
+  const candidate = {id, nome, idade, telefone, email, estado, notas, foto, cvFileName: file ? file.name : null, createdAt: nowISO()};
 
   if(file){
     try{ await cvDbSet(id, {blob:file, filename:file.name, type:file.type}); }
@@ -3372,6 +3394,7 @@ document.getElementById('btnAddCandidate').addEventListener('click', async ()=>{
   document.getElementById('recrutEstado').value = 'Novo';
   document.getElementById('recrutNotas').value = '';
   fileInput.value = '';
+  fotoInput.value = '';
 
   renderCandidates();
 });
@@ -3430,7 +3453,10 @@ function renderCandidates(){
     if(c.telefone) meta += '📞 '+c.telefone+'<br>';
     if(c.email) meta += '✉️ '+c.email;
     card.innerHTML =
-      '<h4>'+c.nome+'<span class="candidate-status-badge st-'+statusSlug(c.estado)+'">'+c.estado+'</span></h4>'+
+      '<h4><span class="candidate-name-row">'+
+        (c.foto ? '<img class="candidate-photo" src="'+c.foto+'" alt="">' : '')+
+        '<span class="candidate-name-text">'+c.nome+'</span>'+
+      '</span><span class="candidate-status-badge st-'+statusSlug(c.estado)+'">'+c.estado+'</span></h4>'+
       (meta ? '<div class="candidate-meta">'+meta+'</div>' : '')+
       (c.notas ? '<div class="candidate-notes">'+c.notas+'</div>' : '')+
       (c.cvFileName
