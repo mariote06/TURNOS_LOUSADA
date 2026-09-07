@@ -210,6 +210,40 @@
   .tec-summary .stat-value{font:700 20px 'Space Grotesk';}
   .tec-summary .stat-value.total{color:var(--accent);}
 
+  .aval-header-row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px;}
+  .aval-header-row label{display:flex;flex-direction:column;gap:6px;font:600 12px 'Inter';color:var(--ink-soft);}
+  .aval-header-row select, .aval-header-row input{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;min-width:220px;}
+  .aval-group{margin-bottom:18px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .aval-group-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fbfaf7;border-bottom:1px solid var(--line);}
+  .aval-group-head h4{margin:0;font:700 13.5px 'Space Grotesk';color:var(--ink);}
+  .aval-group-avg{font:600 12px 'Inter';color:var(--ink-soft);}
+  .aval-crit-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);}
+  .aval-crit-row:last-child{border-bottom:none;}
+  .aval-crit-text{flex:1;min-width:0;}
+  .aval-crit-label{font:600 13px 'Inter';color:var(--ink);}
+  .aval-crit-desc{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .aval-crit-score{flex-shrink:0;border:1px solid var(--line);border-radius:7px;padding:7px 6px;font:600 13px 'Inter';background:#fff;width:64px;text-align:center;}
+  .aval-result{display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:14px;margin:6px 0 16px;background:var(--accent-soft);border-radius:10px;}
+  .aval-class-desc{flex:1;min-width:200px;font-size:12.5px;color:var(--ink-soft);}
+  .aval-plano-label{display:block;font:600 12px 'Inter';color:var(--ink-soft);}
+  .aval-plano-label textarea{display:block;width:100%;margin-top:6px;min-height:70px;border:1px solid var(--line);border-radius:8px;padding:10px;font:400 13px 'Inter';resize:vertical;}
+  .tier-badge{display:inline-block;font:700 11px 'Inter';padding:3px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;}
+  .tier-badge.tier-top{background:var(--accent-soft);color:var(--accent);}
+  .tier-badge.tier-average{background:var(--gold-bg);color:var(--gold-ink);}
+  .tier-badge.tier-low{background:var(--rust-soft);color:var(--rust);}
+  .recrut-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+  .recrut-form-grid label{display:flex;flex-direction:column;gap:6px;font:600 12px 'Inter';color:var(--ink-soft);}
+  .recrut-form-grid input, .recrut-form-grid select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;}
+  .candidate-card h4{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .candidate-status-badge{font:600 10.5px 'Inter';padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.02em;background:var(--fac-bg);color:var(--fac-ink);}
+  .candidate-status-badge.st-contratado{background:var(--accent-soft);color:var(--accent);}
+  .candidate-status-badge.st-rejeitado{background:var(--rust-soft);color:var(--rust);}
+  .candidate-meta{font-size:12.5px;color:var(--ink-soft);margin:6px 0;line-height:1.5;}
+  .candidate-notes{font-size:12.5px;color:var(--ink);background:#fbfaf7;border-radius:7px;padding:8px 10px;margin:8px 0;white-space:pre-wrap;}
+  .candidate-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+  .candidate-actions select{border:1px solid var(--line);border-radius:7px;padding:6px 8px;font:500 12px 'Inter';}
+  .candidate-cv-label{font-size:11.5px;color:var(--ink-soft);}
+
   .equip-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:18px;}
   .equip-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
   .equip-card h4{margin:0 0 10px;font:700 15px 'Space Grotesk';color:var(--ink);}
@@ -383,6 +417,8 @@
       <button class="tab-btn" data-tab="fin">Finanças</button>
       <button class="tab-btn" data-tab="equip">Equipamento</button>
       <button class="tab-btn" data-tab="disp">Disponibilidade</button>
+      <button class="tab-btn" data-tab="aval">Avaliação</button>
+      <button class="tab-btn" data-tab="recrut">Recrutamento</button>
     </div>
   </div>
 
@@ -655,6 +691,111 @@
         <tbody id="dispShiftTableBody"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- AVALIAÇÃO TAB -->
+  <div id="tab-aval" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Grelha de avaliação de desempenho do TEF de sala — 15 critérios em 5 parâmetros, pontuados de 1 a 5. A pontuação total e a classificação calculam-se sozinhas.
+    </p>
+
+    <div class="panel" style="padding:16px 18px;">
+      <div class="aval-header-row">
+        <label>Técnico
+          <select id="avalTecnico"></select>
+        </label>
+        <label>Data
+          <input type="date" id="avalData">
+        </label>
+      </div>
+
+      <div id="avalGroups"></div>
+
+      <div class="aval-result">
+        <div><div class="stat-label">Pontuação total</div><div class="stat-value" id="avalTotalScore">0</div></div>
+        <div><div class="stat-label">Classificação</div><div class="stat-value" id="avalClassLabel">—</div></div>
+        <div class="aval-class-desc" id="avalClassDesc"></div>
+      </div>
+
+      <label class="aval-plano-label">Plano de melhoria
+        <textarea id="avalPlano" placeholder="Pontos a trabalhar, ações combinadas, prazo de revisão..."></textarea>
+      </label>
+
+      <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;">
+        <button class="btn primary" id="btnSaveAval">Guardar avaliação</button>
+        <button class="btn ghost" id="btnClearAval">Limpar formulário</button>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">Histórico de avaliações</h3>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="avalHistoryTable">
+        <thead>
+          <tr><th>Data</th><th>Técnico</th><th>Pontuação</th><th>Classificação</th><th></th></tr>
+        </thead>
+        <tbody id="avalHistoryBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;">
+      <button class="btn" id="btnExportAvalExcel">Exportar avaliações (Excel)</button>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">Distribuição por desempenho</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Com base na avaliação mais recente de cada técnico: Top Performer (≥45 pontos) · Average Performer (30–44) · Low Performer (&lt;30).
+    </p>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="tierTable">
+        <thead>
+          <tr><th>Técnico</th><th>Última avaliação</th><th>Pontuação</th><th>Patamar</th></tr>
+        </thead>
+        <tbody id="tierTableBody"></tbody>
+      </table>
+    </div>
+    <div class="panel tec-summary" id="tierSummary"></div>
+  </div>
+
+  <!-- RECRUTAMENTO TAB -->
+  <div id="tab-recrut" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Candidatos a TEF, com o respetivo currículo. Os ficheiros de CV ficam guardados só neste dispositivo (não sincronizam entre PC/telemóvel) — os dados do candidato (nome, contacto, estado, notas) sincronizam normalmente.
+    </p>
+
+    <div class="panel" style="padding:16px 18px;">
+      <h3 style="font-size:14px;margin:0 0 12px;">Novo candidato</h3>
+      <div class="recrut-form-grid">
+        <label>Nome
+          <input type="text" id="recrutNome" placeholder="Nome do candidato">
+        </label>
+        <label>Telefone
+          <input type="text" id="recrutTelefone" placeholder="912 345 678">
+        </label>
+        <label>Email
+          <input type="text" id="recrutEmail" placeholder="nome@email.com">
+        </label>
+        <label>Estado
+          <select id="recrutEstado">
+            <option value="Novo">Novo</option>
+            <option value="Entrevista marcada">Entrevista marcada</option>
+            <option value="Em avaliação">Em avaliação</option>
+            <option value="Contratado">Contratado</option>
+            <option value="Rejeitado">Rejeitado</option>
+          </select>
+        </label>
+      </div>
+      <label class="aval-plano-label" style="margin-top:10px;display:block;">Notas
+        <textarea id="recrutNotas" placeholder="Impressões da entrevista, disponibilidade, etc."></textarea>
+      </label>
+      <label class="aval-plano-label" style="margin-top:10px;display:block;">Currículo (PDF, Word, imagem...)
+        <input type="file" id="recrutCvInput" style="display:block;margin-top:6px;">
+      </label>
+      <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;">
+        <button class="btn primary" id="btnAddCandidate">Adicionar candidato</button>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">Candidatos</h3>
+    <div class="equip-cards" id="candidateCards"></div>
   </div>
 
 </div>
@@ -2852,6 +2993,469 @@ function renderDispShiftSummary(){
 }
 
 /* ---------------------------------------------------------------
+   AVALIAÇÃO — grelha de desempenho do TEF de sala
+   15 critérios em 5 parâmetros, pontuados 1-5. Pontuação total
+   (soma, 15-75) e classificação calculadas automaticamente.
+--------------------------------------------------------------- */
+const EVAL_GROUPS = [
+  {name:'Perfil de cliente / prescrição', criteria:[
+    {key:'historico_cliente', label:'Histórico do Cliente', desc:'Compreensão e utilização do histórico do cliente (lesões, objectivos, experiências anteriores)'},
+    {key:'origem_prescricao', label:'Origem da Prescrição do Treino', desc:'TEF; PT; Play 30; Standard; Aulas de Grupo; Externa; sem prescrição'}
+  ]},
+  {name:'Variáveis do Treino', criteria:[
+    {key:'variaveis_treino', label:'Variáveis do treino', desc:'Controlo da carga, volume, intensidade, frequência, descanso'},
+    {key:'metodologias', label:'Metodologias de treino', desc:'Domina as metodologias e apresenta aos clientes diferentes metodologias de treinos: super série, circuito, drop set, tri set, etc'},
+    {key:'progressoes', label:'Progressões', desc:'Ajuste contínuo aos exercícios para a evolução do treino'}
+  ]},
+  {name:'Comunicação', criteria:[
+    {key:'empatia', label:'Empatia', desc:'Capacidade de compreender as necessidades emocionais do cliente'},
+    {key:'energia_motivacao', label:'Energia e Motivação', desc:'Habilidade para motivar e envolver os clientes'},
+    {key:'clareza', label:'Clareza na explicação', desc:'Comunicação clara e adaptada às necessidades do cliente'},
+    {key:'relacao_confianca', label:'Criação de relação / confiança', desc:'Construção de vínculo e de confiança com o cliente'}
+  ]},
+  {name:'Foco / Missão', criteria:[
+    {key:'presente', label:'Estar "Presente"', desc:'Atenção, concentração e disponibilidade durante todo o turno'},
+    {key:'compromisso', label:'Compromisso com os objectivos do cliente', desc:'Alinhamento constante entre o treino e os objectivos do cliente'},
+    {key:'observacao_ajuste', label:'Observação e ajuste contínuo', desc:'Monitorização e ajustes frequentes durante os treinos'},
+    {key:'feedback', label:'Feedback e acompanhamento do progresso', desc:'Gestão eficaz de horários e planeamento de treinos a médio/longo prazo'}
+  ]},
+  {name:'Higiene e Segurança', criteria:[
+    {key:'manutencao_espaco', label:'Manutenção do espaço e segurança', desc:'Garantir a limpeza, organização dos equipamentos e a segurança durante os treinos'},
+    {key:'aparencia', label:'Aparência', desc:'Utiliza sempre uniforme/equipamento adequado'}
+  ]}
+];
+const EVAL_CLASS_TABLE = [
+  {min:60, label:'Excelente', desc:'Excede consistentemente as expectativas, demonstrando alto nível de competência em todas as áreas.'},
+  {min:45, label:'Muito bom', desc:'Responde muito bem na maioria dos critérios, com pequenos pontos a melhorar.'},
+  {min:30, label:'Regular', desc:'Cumpre os requisitos básicos, mas existem áreas claras que podem ser melhoradas.'},
+  {min:18, label:'Insatisfatório', desc:'O desempenho é abaixo do esperado em várias áreas, necessitando de intervenção e melhorias.'},
+  {min:-Infinity, label:'Não satisfaz os requisitos', desc:'Apresenta sérias deficiências e não atende às expectativas mínimas para o acompanhamento aos clientes.'}
+];
+function classifyAvalScore(total){
+  for(const tier of EVAL_CLASS_TABLE){ if(total >= tier.min) return tier; }
+  return EVAL_CLASS_TABLE[EVAL_CLASS_TABLE.length-1];
+}
+
+const STORE_AVAL = 'tef_turnos_avaliacoes_v1'; // [{id, tecnico, date, scores:{critKey:1-5}, plano, createdAt}]
+function loadAvaliacoes(){
+  try{ const raw = localStorage.getItem(STORE_AVAL); if(raw) return JSON.parse(raw); }catch(e){}
+  return [];
+}
+function saveAvaliacoes(a){ localStorage.setItem(STORE_AVAL, JSON.stringify(a)); touchMeta(); }
+let AVALIACOES = loadAvaliacoes();
+let editingAvalId = null;
+
+function renderAvalGroups(scores){
+  const el = document.getElementById('avalGroups');
+  el.innerHTML = '';
+  EVAL_GROUPS.forEach(group=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'aval-group';
+    let rows = '';
+    group.criteria.forEach(c=>{
+      const val = (scores && scores[c.key]) || '';
+      let opts = '<option value="">—</option>';
+      [1,2,3,4,5].forEach(n=>{ opts += '<option value="'+n+'" '+(String(val)===String(n)?'selected':'')+'>'+n+'</option>'; });
+      rows += '<div class="aval-crit-row">'+
+        '<div class="aval-crit-text"><div class="aval-crit-label">'+c.label+'</div><div class="aval-crit-desc">'+c.desc+'</div></div>'+
+        '<select class="aval-score-select" data-key="'+c.key+'">'+opts+'</select>'+
+      '</div>';
+    });
+    wrap.innerHTML =
+      '<div class="aval-group-head"><h4>'+group.name+'</h4><span class="aval-group-avg" data-group="'+group.name+'">média: —</span></div>'+
+      rows;
+    el.appendChild(wrap);
+  });
+  el.querySelectorAll('.aval-score-select').forEach(sel=>{
+    sel.addEventListener('change', updateAvalTotals);
+  });
+  updateAvalTotals();
+}
+
+function getAvalScores(){
+  const scores = {};
+  document.querySelectorAll('.aval-score-select').forEach(sel=>{
+    if(sel.value) scores[sel.dataset.key] = parseInt(sel.value,10);
+  });
+  return scores;
+}
+
+function updateAvalTotals(){
+  const scores = getAvalScores();
+  EVAL_GROUPS.forEach(group=>{
+    const vals = group.criteria.map(c=>scores[c.key]).filter(v=>v!==undefined);
+    const avgEl = document.querySelector('.aval-group-avg[data-group="'+group.name+'"]');
+    if(avgEl) avgEl.textContent = vals.length ? ('média: '+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1)) : 'média: —';
+  });
+  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  document.getElementById('avalTotalScore').textContent = total;
+  const tier = classifyAvalScore(total);
+  const hasAny = Object.keys(scores).length>0;
+  document.getElementById('avalClassLabel').textContent = hasAny ? tier.label : '—';
+  document.getElementById('avalClassDesc').textContent = hasAny ? tier.desc : '';
+}
+
+function populateAvalTecnicoSelect(){
+  const sel = document.getElementById('avalTecnico');
+  const current = sel.value;
+  const names = Object.keys(TECH_REGISTRY)
+    .filter(n => (TECH_REGISTRY[n].status||'') !== 'estagiario')
+    .sort((a,b)=>a.localeCompare(b,'pt'));
+  sel.innerHTML = names.map(n=>'<option value="'+n+'">'+n+'</option>').join('');
+  if(names.includes(current)) sel.value = current;
+}
+
+function clearAvalForm(){
+  editingAvalId = null;
+  document.getElementById('avalData').value = isoDate(new Date());
+  renderAvalGroups({});
+  document.getElementById('avalPlano').value = '';
+}
+
+function renderAvalTab(){
+  populateAvalTecnicoSelect();
+  if(!document.getElementById('avalData').value) document.getElementById('avalData').value = isoDate(new Date());
+  if(editingAvalId === null) renderAvalGroups({});
+  renderAvalHistory();
+}
+
+document.getElementById('btnSaveAval').addEventListener('click', ()=>{
+  const tecnico = document.getElementById('avalTecnico').value;
+  const date = document.getElementById('avalData').value;
+  if(!tecnico){ alert('Escolhe um técnico.'); return; }
+  if(!date){ alert('Escolhe uma data.'); return; }
+  const scores = getAvalScores();
+  if(Object.keys(scores).length === 0){ alert('Pontua pelo menos um critério.'); return; }
+  const plano = document.getElementById('avalPlano').value.trim();
+
+  if(editingAvalId){
+    const idx = AVALIACOES.findIndex(a=>a.id===editingAvalId);
+    if(idx>=0) AVALIACOES[idx] = {...AVALIACOES[idx], tecnico, date, scores, plano};
+  } else {
+    AVALIACOES.push({id:'aval_'+Date.now(), tecnico, date, scores, plano, createdAt:nowISO()});
+  }
+  saveAvaliacoes(AVALIACOES);
+  clearAvalForm();
+  renderAvalHistory();
+  alert('Avaliação guardada.');
+});
+
+document.getElementById('btnClearAval').addEventListener('click', ()=>{
+  if(confirm('Limpar o formulário? Perdes as pontuações ainda não guardadas.')) clearAvalForm();
+});
+
+function renderAvalHistory(){
+  renderTierTable();
+  const tbody = document.getElementById('avalHistoryBody');
+  tbody.innerHTML = '';
+  const sorted = AVALIACOES.slice().sort((a,b)=> b.date.localeCompare(a.date));
+  if(sorted.length===0){
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há avaliações guardadas.</td></tr>';
+    return;
+  }
+  sorted.forEach(a=>{
+    const total = Object.values(a.scores).reduce((x,y)=>x+y,0);
+    const tier = classifyAvalScore(total);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td data-label="Data">'+fmtDatePT(a.date)+'</td>'+
+      '<td data-label="Técnico" style="font-weight:700;">'+a.tecnico+'</td>'+
+      '<td data-label="Pontuação" class="hrs">'+total+' / 75</td>'+
+      '<td data-label="Classificação">'+tier.label+'</td>'+
+      '<td data-label=""><button class="rm-tec" title="Editar" data-id="'+a.id+'" data-action="edit" style="color:var(--accent);font-size:13px;">✎</button> '+
+        '<button class="rm-tec" title="Remover" data-id="'+a.id+'" data-action="del">×</button></td>';
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('button[data-action="edit"]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const a = AVALIACOES.find(x=>x.id===e.target.dataset.id);
+      if(!a) return;
+      editingAvalId = a.id;
+      document.getElementById('avalTecnico').value = a.tecnico;
+      document.getElementById('avalData').value = a.date;
+      renderAvalGroups(a.scores);
+      document.getElementById('avalPlano').value = a.plano || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+  });
+  tbody.querySelectorAll('button[data-action="del"]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      if(!confirm('Remover esta avaliação?')) return;
+      AVALIACOES = AVALIACOES.filter(x=>x.id!==e.target.dataset.id);
+      saveAvaliacoes(AVALIACOES);
+      renderAvalHistory();
+    });
+  });
+}
+
+document.getElementById('btnExportAvalExcel').addEventListener('click', ()=>{
+  if(typeof XLSX === 'undefined'){
+    alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online da primeira vez que exportas).');
+    return;
+  }
+  if(AVALIACOES.length===0){ alert('Ainda não há avaliações guardadas.'); return; }
+  const header = ['Data','Técnico'];
+  EVAL_GROUPS.forEach(g=> g.criteria.forEach(c=> header.push(c.label)));
+  header.push('Pontuação Total','Classificação','Plano de melhoria');
+  const rows = [header];
+  AVALIACOES.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(a=>{
+    const total = Object.values(a.scores).reduce((x,y)=>x+y,0);
+    const tier = classifyAvalScore(total);
+    const row = [fmtDatePT(a.date), a.tecnico];
+    EVAL_GROUPS.forEach(g=> g.criteria.forEach(c=> row.push(a.scores[c.key] ?? '')));
+    row.push(total, tier.label, a.plano || '');
+    rows.push(row);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:12},{wch:16}].concat(EVAL_GROUPS.flatMap(g=>g.criteria.map(()=>({wch:14})))).concat([{wch:12},{wch:14},{wch:30}]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Avaliações');
+  XLSX.writeFile(wb, 'avaliacoes_tef.xlsx');
+});
+
+/* ---------- Distribuição por desempenho: Top / Average / Low Performer ---------- */
+
+function tierFromScore(total){
+  if(total >= 45) return {key:'top', label:'Top Performer'};
+  if(total >= 30) return {key:'average', label:'Average Performer'};
+  return {key:'low', label:'Low Performer'};
+}
+
+function getLatestEvalPerTecnico(){
+  const map = {};
+  AVALIACOES.forEach(a=>{
+    if(!map[a.tecnico] || a.date > map[a.tecnico].date) map[a.tecnico] = a;
+  });
+  return map;
+}
+
+function renderTierTable(){
+  const tbody = document.getElementById('tierTableBody');
+  tbody.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY)
+    .filter(n => (TECH_REGISTRY[n].status||'') !== 'estagiario')
+    .sort((a,b)=>a.localeCompare(b,'pt'));
+  const latest = getLatestEvalPerTecnico();
+
+  const rows = names.map(name=>{
+    const a = latest[name];
+    if(!a) return {name, date:null, total:null, tier:null};
+    const total = Object.values(a.scores).reduce((x,y)=>x+y,0);
+    return {name, date:a.date, total, tier:tierFromScore(total)};
+  });
+  // avaliados primeiro (maior pontuação primeiro), depois quem ainda não tem avaliação
+  rows.sort((a,b)=>{
+    if(a.total===null && b.total===null) return a.name.localeCompare(b.name,'pt');
+    if(a.total===null) return 1;
+    if(b.total===null) return -1;
+    return b.total - a.total;
+  });
+
+  if(rows.length===0){
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
+  } else {
+    rows.forEach(r=>{
+      const tr = document.createElement('tr');
+      if(r.tier===null){
+        tr.innerHTML =
+          '<td data-label="Técnico" style="font-weight:700;">'+r.name+'</td>'+
+          '<td data-label="Última avaliação">—</td>'+
+          '<td data-label="Pontuação" class="hrs">—</td>'+
+          '<td data-label="Patamar"><span style="color:var(--ink-soft);font-style:italic;font-size:12px;">sem avaliação</span></td>';
+      } else {
+        tr.innerHTML =
+          '<td data-label="Técnico" style="font-weight:700;">'+r.name+'</td>'+
+          '<td data-label="Última avaliação">'+fmtDatePT(r.date)+'</td>'+
+          '<td data-label="Pontuação" class="hrs">'+r.total+' / 75</td>'+
+          '<td data-label="Patamar"><span class="tier-badge tier-'+r.tier.key+'">'+r.tier.label+'</span></td>';
+      }
+      tbody.appendChild(tr);
+    });
+  }
+
+  const counts = {top:0, average:0, low:0, none:0};
+  rows.forEach(r=>{ r.tier ? counts[r.tier.key]++ : counts.none++; });
+  const summary = document.getElementById('tierSummary');
+  summary.innerHTML =
+    '<div><div class="stat-label">Top Performer</div><div class="stat-value" style="color:var(--accent);">'+counts.top+'</div></div>'+
+    '<div><div class="stat-label">Average Performer</div><div class="stat-value" style="color:var(--gold-ink);">'+counts.average+'</div></div>'+
+    '<div><div class="stat-label">Low Performer</div><div class="stat-value" style="color:var(--rust);">'+counts.low+'</div></div>'+
+    (counts.none>0 ? '<div><div class="stat-label">Sem avaliação</div><div class="stat-value">'+counts.none+'</div></div>' : '');
+}
+
+/* ---------------------------------------------------------------
+   RECRUTAMENTO — candidatos a TEF + currículo
+   Os dados do candidato (nome, contacto, estado, notas) ficam no
+   localStorage normal (sincronizam como o resto). O ficheiro do CV
+   em si é guardado no IndexedDB, só neste dispositivo — ficheiros
+   binários não cabem bem no ficheiro JSON de sincronização.
+--------------------------------------------------------------- */
+const STORE_CANDIDATES = 'tef_turnos_candidatos_v1'; // [{id, nome, telefone, email, estado, notas, cvFileName, createdAt}]
+function loadCandidates(){
+  try{ const raw = localStorage.getItem(STORE_CANDIDATES); if(raw) return JSON.parse(raw); }catch(e){}
+  return [];
+}
+function saveCandidates(c){ localStorage.setItem(STORE_CANDIDATES, JSON.stringify(c)); touchMeta(); }
+let CANDIDATES = loadCandidates();
+
+function cvDbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open('tef_recrutamento_db', 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore('cvs'); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function cvDbSet(id, val){
+  const db = await cvDbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('cvs', 'readwrite');
+    tx.objectStore('cvs').put(val, id);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function cvDbGet(id){
+  const db = await cvDbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('cvs', 'readonly');
+    const req = tx.objectStore('cvs').get(id);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function cvDbDelete(id){
+  const db = await cvDbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('cvs', 'readwrite');
+    tx.objectStore('cvs').delete(id);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+const CANDIDATE_STATUSES = ['Novo','Entrevista marcada','Em avaliação','Contratado','Rejeitado'];
+function statusSlug(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-'); }
+
+document.getElementById('btnAddCandidate').addEventListener('click', async ()=>{
+  const nome = document.getElementById('recrutNome').value.trim();
+  if(!nome){ alert('Indica o nome do candidato.'); return; }
+  const telefone = document.getElementById('recrutTelefone').value.trim();
+  const email = document.getElementById('recrutEmail').value.trim();
+  const estado = document.getElementById('recrutEstado').value;
+  const notas = document.getElementById('recrutNotas').value.trim();
+  const fileInput = document.getElementById('recrutCvInput');
+  const file = fileInput.files[0];
+
+  const id = 'cand_'+Date.now();
+  const candidate = {id, nome, telefone, email, estado, notas, cvFileName: file ? file.name : null, createdAt: nowISO()};
+
+  if(file){
+    try{ await cvDbSet(id, {blob:file, filename:file.name, type:file.type}); }
+    catch(e){ alert('Não foi possível guardar o CV neste dispositivo: '+e.message); }
+  }
+
+  CANDIDATES.push(candidate);
+  saveCandidates(CANDIDATES);
+
+  document.getElementById('recrutNome').value = '';
+  document.getElementById('recrutTelefone').value = '';
+  document.getElementById('recrutEmail').value = '';
+  document.getElementById('recrutEstado').value = 'Novo';
+  document.getElementById('recrutNotas').value = '';
+  fileInput.value = '';
+
+  renderCandidates();
+});
+
+async function replaceCandidateCv(id, file){
+  try{
+    await cvDbSet(id, {blob:file, filename:file.name, type:file.type});
+    const c = CANDIDATES.find(x=>x.id===id);
+    if(c){ c.cvFileName = file.name; saveCandidates(CANDIDATES); }
+    renderCandidates();
+  }catch(e){ alert('Não foi possível guardar o CV: '+e.message); }
+}
+
+async function downloadCandidateCv(id){
+  try{
+    const entry = await cvDbGet(id);
+    if(!entry){ alert('Este CV não está guardado neste dispositivo (pode ter sido carregado noutro aparelho).'); return; }
+    const url = URL.createObjectURL(entry.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = entry.filename || 'curriculo';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }catch(e){ alert('Não foi possível abrir o CV: '+e.message); }
+}
+
+async function deleteCandidate(id){
+  if(!confirm('Remover este candidato e o respetivo CV?')) return;
+  CANDIDATES = CANDIDATES.filter(c=>c.id!==id);
+  saveCandidates(CANDIDATES);
+  try{ await cvDbDelete(id); }catch(e){}
+  renderCandidates();
+}
+
+function updateCandidateStatus(id, estado){
+  const c = CANDIDATES.find(x=>x.id===id);
+  if(c){ c.estado = estado; saveCandidates(CANDIDATES); renderCandidates(); }
+}
+
+function renderCandidates(){
+  const container = document.getElementById('candidateCards');
+  container.innerHTML = '';
+  if(CANDIDATES.length===0){
+    container.innerHTML = '<div class="equip-empty">Ainda não há candidatos registados.</div>';
+    return;
+  }
+  const sorted = CANDIDATES.slice().sort((a,b)=> b.createdAt.localeCompare(a.createdAt));
+  sorted.forEach(c=>{
+    const card = document.createElement('div');
+    card.className = 'equip-card candidate-card';
+    let statusOptions = CANDIDATE_STATUSES.map(s=>'<option value="'+s+'" '+(c.estado===s?'selected':'')+'>'+s+'</option>').join('');
+    let meta = '';
+    if(c.telefone) meta += '📞 '+c.telefone+'<br>';
+    if(c.email) meta += '✉️ '+c.email;
+    card.innerHTML =
+      '<h4>'+c.nome+'<span class="candidate-status-badge st-'+statusSlug(c.estado)+'">'+c.estado+'</span></h4>'+
+      (meta ? '<div class="candidate-meta">'+meta+'</div>' : '')+
+      (c.notas ? '<div class="candidate-notes">'+c.notas+'</div>' : '')+
+      (c.cvFileName
+        ? '<div class="candidate-cv-label">CV: '+c.cvFileName+'</div>'
+        : '<div class="candidate-cv-label" style="font-style:italic;">Sem CV carregado</div>') +
+      '<div class="candidate-actions">'+
+        '<select class="cand-status-select" data-id="'+c.id+'">'+statusOptions+'</select>'+
+        (c.cvFileName ? '<button type="button" class="btn ghost cand-download-btn" data-id="'+c.id+'">Descarregar CV</button>' : '')+
+        '<label class="btn ghost" style="cursor:pointer;">'+(c.cvFileName?'Substituir CV':'Carregar CV')+
+          '<input type="file" class="cand-cv-input" data-id="'+c.id+'" style="display:none;">'+
+        '</label>'+
+        '<button type="button" class="btn danger cand-delete-btn" data-id="'+c.id+'">Remover</button>'+
+      '</div>';
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('.cand-status-select').forEach(sel=>{
+    sel.addEventListener('change', (e)=> updateCandidateStatus(e.target.dataset.id, e.target.value));
+  });
+  container.querySelectorAll('.cand-download-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=> downloadCandidateCv(e.target.dataset.id));
+  });
+  container.querySelectorAll('.cand-cv-input').forEach(inp=>{
+    inp.addEventListener('change', (e)=>{
+      const file = e.target.files[0];
+      if(file) replaceCandidateCv(e.target.dataset.id, file);
+    });
+  });
+  container.querySelectorAll('.cand-delete-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=> deleteCandidate(e.target.dataset.id));
+  });
+}
+
+/* ---------------------------------------------------------------
    TABS
 --------------------------------------------------------------- */
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -2866,12 +3470,16 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-fin').style.display = tab==='fin' ? '' : 'none';
     document.getElementById('tab-equip').style.display = tab==='equip' ? '' : 'none';
     document.getElementById('tab-disp').style.display = tab==='disp' ? '' : 'none';
+    document.getElementById('tab-aval').style.display = tab==='aval' ? '' : 'none';
+    document.getElementById('tab-recrut').style.display = tab==='recrut' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
     if(tab==='fin') renderFinTab();
     if(tab==='equip') renderEquipTab();
     if(tab==='disp') renderDispTab();
+    if(tab==='aval') renderAvalTab();
+    if(tab==='recrut') renderCandidates();
   });
 });
 
@@ -3168,6 +3776,8 @@ function buildExportPayload(){
     abatidos: WRITTEN_OFF,
     encomendasGinasio: GYM_ORDERS,
     disponibilidade: AVAILABILITY,
+    avaliacoes: AVALIACOES,
+    candidatos: CANDIDATES,
     exportedAt: nowISO()
   };
 }
@@ -3184,6 +3794,8 @@ function applyImportedData(data){
   if(data.abatidos){ WRITTEN_OFF = data.abatidos; localStorage.setItem(STORE_WRITTEN_OFF, JSON.stringify(WRITTEN_OFF)); }
   if(data.encomendasGinasio){ GYM_ORDERS = data.encomendasGinasio; localStorage.setItem(STORE_GYM_ORDERS, JSON.stringify(GYM_ORDERS)); }
   if(data.disponibilidade){ AVAILABILITY = data.disponibilidade; localStorage.setItem(STORE_AVAIL, JSON.stringify(AVAILABILITY)); }
+  if(data.avaliacoes){ AVALIACOES = data.avaliacoes; localStorage.setItem(STORE_AVAL, JSON.stringify(AVALIACOES)); }
+  if(data.candidatos){ CANDIDATES = data.candidatos; localStorage.setItem(STORE_CANDIDATES, JSON.stringify(CANDIDATES)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -3197,6 +3809,10 @@ function applyImportedData(data){
   if(equipTab && equipTab.style.display !== 'none') renderEquipTab();
   const dispTab = document.getElementById('tab-disp');
   if(dispTab && dispTab.style.display !== 'none') renderDispTab();
+  const recrutTab = document.getElementById('tab-recrut');
+  if(recrutTab && recrutTab.style.display !== 'none') renderCandidates();
+  const avalTab = document.getElementById('tab-aval');
+  if(avalTab && avalTab.style.display !== 'none') renderAvalTab();
   updateSyncStatusLabel();
 }
 
