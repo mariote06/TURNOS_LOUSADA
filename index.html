@@ -422,6 +422,7 @@
       <button class="tab-btn" data-tab="disp">Disponibilidade</button>
       <button class="tab-btn" data-tab="aval">Avaliação</button>
       <button class="tab-btn" data-tab="recrut">Recrutamento</button>
+      <button class="tab-btn" data-tab="ptcount">Contabilização PT</button>
     </div>
   </div>
 
@@ -805,6 +806,29 @@
 
     <h3 style="font-size:15px;margin:26px 0 10px;">Candidatos</h3>
     <div class="equip-cards" id="candidateCards"></div>
+  </div>
+
+  <!-- CONTABILIZAÇÃO PT TAB -->
+  <div id="tab-ptcount" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Contagem de sessões de PT por técnico — internos (clientes do ginásio) e externos. Os valores gravam-se automaticamente ao escreveres.
+    </p>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="ptCountTable">
+        <thead>
+          <tr><th>PT</th><th>Internos</th><th>Externos</th><th>Total</th></tr>
+        </thead>
+        <tbody id="ptCountTableBody"></tbody>
+        <tfoot>
+          <tr style="font-weight:700;background:#fbfaf7;">
+            <td data-label="Total">TOTAL</td>
+            <td data-label="Internos" id="ptCountTotalInternos">0</td>
+            <td data-label="Externos" id="ptCountTotalExternos">0</td>
+            <td data-label="Total" id="ptCountTotalGeral">0</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
 
 </div>
@@ -3491,6 +3515,71 @@ function renderCandidates(){
 }
 
 /* ---------------------------------------------------------------
+   CONTABILIZAÇÃO PT — sessões internas/externas por técnico
+--------------------------------------------------------------- */
+const STORE_PT_COUNTS = 'tef_turnos_pt_contagem_v1'; // {tecnico: {internos:N, externos:N}}
+function loadPtCounts(){
+  try{ const raw = localStorage.getItem(STORE_PT_COUNTS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function savePtCounts(p){ localStorage.setItem(STORE_PT_COUNTS, JSON.stringify(p)); touchMeta(); }
+let PT_COUNTS = loadPtCounts();
+
+function renderPtCountTab(){
+  const tbody = document.getElementById('ptCountTableBody');
+  tbody.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+
+  if(names.length === 0){
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
+    updatePtCountTotals();
+    return;
+  }
+
+  names.forEach(name=>{
+    const entry = PT_COUNTS[name] || {internos:0, externos:0};
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td data-label="PT" style="font-weight:700;">'+name+'</td>'+
+      '<td data-label="Internos"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="internos" '+
+        'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry.internos>0?entry.internos:'')+'" placeholder="0"></td>'+
+      '<td data-label="Externos"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="externos" '+
+        'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry.externos>0?entry.externos:'')+'" placeholder="0"></td>'+
+      '<td data-label="Total" class="hrs pt-row-total">'+((entry.internos||0)+(entry.externos||0))+'</td>';
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.pt-count-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const field = e.target.dataset.field;
+      const val = parseInt(e.target.value, 10) || 0;
+      if(!PT_COUNTS[name]) PT_COUNTS[name] = {internos:0, externos:0};
+      PT_COUNTS[name][field] = val;
+      savePtCounts(PT_COUNTS);
+      const row = e.target.closest('tr');
+      const internos = PT_COUNTS[name].internos || 0;
+      const externos = PT_COUNTS[name].externos || 0;
+      row.querySelector('.pt-row-total').textContent = internos + externos;
+      updatePtCountTotals();
+    });
+  });
+
+  updatePtCountTotals();
+}
+
+function updatePtCountTotals(){
+  let totalInternos = 0, totalExternos = 0;
+  Object.values(PT_COUNTS).forEach(e=>{
+    totalInternos += e.internos || 0;
+    totalExternos += e.externos || 0;
+  });
+  document.getElementById('ptCountTotalInternos').textContent = totalInternos;
+  document.getElementById('ptCountTotalExternos').textContent = totalExternos;
+  document.getElementById('ptCountTotalGeral').textContent = totalInternos + totalExternos;
+}
+
+/* ---------------------------------------------------------------
    TABS
 --------------------------------------------------------------- */
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -3507,6 +3596,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-disp').style.display = tab==='disp' ? '' : 'none';
     document.getElementById('tab-aval').style.display = tab==='aval' ? '' : 'none';
     document.getElementById('tab-recrut').style.display = tab==='recrut' ? '' : 'none';
+    document.getElementById('tab-ptcount').style.display = tab==='ptcount' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
@@ -3515,6 +3605,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(tab==='disp') renderDispTab();
     if(tab==='aval') renderAvalTab();
     if(tab==='recrut') renderCandidates();
+    if(tab==='ptcount') renderPtCountTab();
   });
 });
 
@@ -3813,6 +3904,7 @@ function buildExportPayload(){
     disponibilidade: AVAILABILITY,
     avaliacoes: AVALIACOES,
     candidatos: CANDIDATES,
+    ptContagem: PT_COUNTS,
     exportedAt: nowISO()
   };
 }
@@ -3831,6 +3923,7 @@ function applyImportedData(data){
   if(data.disponibilidade){ AVAILABILITY = data.disponibilidade; localStorage.setItem(STORE_AVAIL, JSON.stringify(AVAILABILITY)); }
   if(data.avaliacoes){ AVALIACOES = data.avaliacoes; localStorage.setItem(STORE_AVAL, JSON.stringify(AVALIACOES)); }
   if(data.candidatos){ CANDIDATES = data.candidatos; localStorage.setItem(STORE_CANDIDATES, JSON.stringify(CANDIDATES)); }
+  if(data.ptContagem){ PT_COUNTS = data.ptContagem; localStorage.setItem(STORE_PT_COUNTS, JSON.stringify(PT_COUNTS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -3846,6 +3939,8 @@ function applyImportedData(data){
   if(dispTab && dispTab.style.display !== 'none') renderDispTab();
   const recrutTab = document.getElementById('tab-recrut');
   if(recrutTab && recrutTab.style.display !== 'none') renderCandidates();
+  const ptTab = document.getElementById('tab-ptcount');
+  if(ptTab && ptTab.style.display !== 'none') renderPtCountTab();
   const avalTab = document.getElementById('tab-aval');
   if(avalTab && avalTab.style.display !== 'none') renderAvalTab();
   updateSyncStatusLabel();
