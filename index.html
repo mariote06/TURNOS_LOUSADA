@@ -117,6 +117,9 @@
     align-self:flex-end;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;
     background:rgba(255,255,255,.65);border:1px solid var(--rust);color:var(--rust);display:inline-block;
   }
+  .shift-chip.on-ferias{outline:2px dashed #b8860b;outline-offset:1px;}
+  .ferias-flag{align-self:flex-end;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;
+    background:rgba(255,255,255,.75);border:1px solid #b8860b;color:#8a6314;display:inline-block;margin-top:2px;}
   .empty-note{font-size:10.5px;color:var(--ink-soft);font-style:italic;margin-top:2px;}
   .exc-flag{position:absolute;top:6px;right:6px;font-size:9px;color:var(--rust);font-weight:700;}
 
@@ -270,6 +273,17 @@
   .tef-stock-add{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
   .tef-stock-add select{border:1px solid var(--line);border-radius:6px;padding:6px 4px;font:500 12px 'Inter';background:#fff;}
   .tef-stock-add .tsl-add-btn{font:600 12px 'Inter';border:1px dashed var(--accent);color:var(--accent);background:none;border-radius:6px;padding:6px 10px;cursor:pointer;}
+  .ferias-stats{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 12px;}
+  .ferias-stats .stat-label{font:600 10.5px 'Inter';text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);margin-bottom:2px;}
+  .ferias-stats .stat-value{font:700 18px 'Space Grotesk';}
+  .ferias-stats .stat-value.saldo-neg{color:var(--rust);}
+  .ferias-entitle-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .ferias-entitle-row input{width:90px;border:1px solid var(--line);border-radius:7px;padding:7px 8px;font:600 13px 'Inter';}
+  .ferias-add-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .ferias-add-row input[type=date]{border:1px solid var(--line);border-radius:7px;padding:7px 8px;font:500 13px 'Inter';}
+  .ferias-day-line{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+  .ferias-day-line:last-child{border-bottom:none;}
+  .ferias-day-line button{border:none;background:none;color:#a83232;cursor:pointer;font-size:14px;}
   .equip-order-row{display:flex;align-items:center;gap:6px;width:100%;margin-bottom:6px;}
   .equip-order-line{display:flex;justify-content:space-between;align-items:center;gap:8px;flex:1;text-align:left;
     padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfaf7;cursor:pointer;font:500 13px 'Inter';color:var(--ink);}
@@ -429,6 +443,7 @@
       <button class="tab-btn" data-tab="aval">Avaliação</button>
       <button class="tab-btn" data-tab="recrut">Recrutamento</button>
       <button class="tab-btn" data-tab="ptcount">Contabilização PT</button>
+      <button class="tab-btn" data-tab="ferias">Férias</button>
     </div>
   </div>
 
@@ -837,6 +852,14 @@
     </div>
   </div>
 
+  <!-- FÉRIAS TAB -->
+  <div id="tab-ferias" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Saldo de férias (em horas) dos técnicos com vínculo Dependente. Define as horas atribuídas e marca os dias de férias — as horas do turno base desse dia descontam automaticamente do saldo.
+    </p>
+    <div class="equip-cards" id="feriasCards"></div>
+  </div>
+
 </div>
 
 <datalist id="tecnicosDatalist"></datalist>
@@ -1201,7 +1224,7 @@ function shiftsForDate(iso, dayKey){
   let result = base.map(slot=>{
     if(exc && exc.slotOverrides && exc.slotOverrides[slot.id]){
       const ov = exc.slotOverrides[slot.id];
-      return {id:slot.id, start:ov.start||slot.start, end:ov.end||slot.end, name:slot.name, substituteName:(ov.substituteName||'').trim(), _subst:true};
+      return {id:slot.id, start:ov.start||slot.start, end:ov.end||slot.end, name:slot.name, substituteName:(ov.substituteName||'').trim(), payTitular:!!ov.payTitular, _subst:true};
     }
     return slot;
   });
@@ -1317,7 +1340,9 @@ function renderCalendar(){
       shifts.forEach(s=>{
         const c = colorForName(s.name || '');
         const subBox = s.substituteName ? '<div class="subst-box">'+s.substituteName+'</div>' : '';
-        html += '<div class="shift-chip" style="background:'+c.bg+';color:'+c.fg+'"><div class="chip-main"><span class="t">'+s.start+'</span><span style="flex:1;text-align:right;font-weight:600;">'+ (s.name||'') +'</span></div>'+subBox+'</div>';
+        const onFerias = s.name && FERIAS_DIAS[s.name] && FERIAS_DIAS[s.name][iso] !== undefined;
+        const feriasFlag = onFerias ? '<div class="ferias-flag">🌴 Férias'+(s.substituteName?'':' — sem substituto')+'</div>' : '';
+        html += '<div class="shift-chip'+(onFerias?' on-ferias':'')+'" style="background:'+c.bg+';color:'+c.fg+'"><div class="chip-main"><span class="t">'+s.start+'</span><span style="flex:1;text-align:right;font-weight:600;">'+ (s.name||'') +'</span></div>'+subBox+feriasFlag+'</div>';
       });
       html += '</div>';
     }
@@ -1438,6 +1463,7 @@ function openDayModal(iso, dayKey, dateObj){
       end: override ? (override.end||v.end) : v.end,
       name: v.name,
       substituteName: override ? (override.substituteName||'') : '',
+      payTitular: override ? !!override.payTitular : false,
       pontual: !!override || removedPontual,
       removed: removedPontual,
       isNew: false
@@ -1466,6 +1492,7 @@ function renderModalRows(){
     // In pontual mode for a template slot, the name shown is the regular TEF and stays locked —
     // the substitute goes in its own field below.
     const nameLocked = !row.isNew && row.pontual && !row.removed;
+    const titularIsDependente = row.name && TECH_REGISTRY[row.name] && TECH_REGISTRY[row.name].status === 'dependente';
     wrap.innerHTML =
       '<div class="row-edit-top">'+
         '<input type="time" value="'+row.start+'" data-idx="'+idx+'" data-field="start" '+(row.removed?'disabled':'')+'>'+
@@ -1478,6 +1505,12 @@ function renderModalRows(){
       (nameLocked
         ? '<div style="margin-top:6px;"><input type="text" value="'+(row.substituteName||'')+'" placeholder="Nome de quem substitui '+row.name+'" list="tecnicosDatalist" data-idx="'+idx+'" data-field="substituteName" style="width:100%;border:1px solid var(--rust);border-radius:7px;padding:7px 8px;font:500 13px \'Inter\';background:var(--rust-soft);"></div>'
         : '') +
+      (nameLocked && titularIsDependente
+        ? '<label style="display:flex;align-items:center;gap:6px;font:500 11.5px \'Inter\';color:var(--ink-soft);margin-top:6px;">'+
+            '<input type="checkbox" data-idx="'+idx+'" data-field="payTitular" '+(row.payTitular?'checked':'')+'> '+
+            'O Dependente ('+row.name+') recebe as horas e paga diretamente ao colega'+
+          '</label>'
+        : '') +
       '<div class="row-edit-meta">'+
         (row.removed
           ? '<span class="hint subst">Turno removido — '+(row.pontual ? 'só neste dia' : 'a partir de '+fmtDatePT(editingIso)+' em diante')+'</span>'
@@ -1486,6 +1519,13 @@ function renderModalRows(){
         (row.removed ? '' : hintPerm) +
       '</div>';
     modalRows.appendChild(wrap);
+  });
+
+  modalRows.querySelectorAll('input[type=checkbox][data-field=payTitular]').forEach(chk=>{
+    chk.addEventListener('change', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      editingRows[idx].payTitular = e.target.checked;
+    });
   });
 
   modalRows.querySelectorAll('input[type=text], input[type=time]').forEach(inp=>{
@@ -1588,7 +1628,7 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
       const timeChanged = base && (base.start!==row.start || base.end!==row.end);
       const hasSubstitute = row.substituteName && row.substituteName.trim().length>0;
       if(timeChanged || hasSubstitute){
-        newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : ''};
+        newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : '', payTitular: hasSubstitute ? !!row.payTitular : false};
       }
     } else {
       // permanent: only add a new version if it actually differs from what's active today
@@ -1778,7 +1818,7 @@ function computeFinancePeriod(start, end){
     const dKey = dayKeyOf(d);
     const shifts = shiftsForDate(iso, dKey);
     shifts.forEach(s=>{
-      const worker = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : (s.name||'').trim();
+      const worker = (s.substituteName && s.substituteName.trim() && !s.payTitular) ? s.substituteName.trim() : (s.name||'').trim();
       if(!worker) return;
       const hrs = hoursBetween(s.start, s.end);
       totalHours += hrs;
@@ -2110,7 +2150,7 @@ function computeBudgetPerWorker(){
     const dKey = dayKeyOf(d);
     const shifts = shiftsForDate(iso, dKey);
     shifts.forEach(s=>{
-      const worker = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : (s.name||'').trim();
+      const worker = (s.substituteName && s.substituteName.trim() && !s.payTitular) ? s.substituteName.trim() : (s.name||'').trim();
       if(!worker) return;
       const hrs = hoursBetween(s.start, s.end);
       if(!data[worker]) data[worker] = {hours:0, value:0};
@@ -3665,6 +3705,131 @@ function updatePtCountTotals(){
 }
 
 /* ---------------------------------------------------------------
+   FÉRIAS — saldo de horas dos técnicos Dependentes. Marcar um dia
+   como férias desconta automaticamente as horas do turno base desse
+   técnico nesse dia (não conta substituições, só o horário normal
+   que teriam nesse dia).
+--------------------------------------------------------------- */
+const STORE_FERIAS_HORAS = 'tef_turnos_ferias_horas_v1'; // {tecnico: horasAtribuidas}
+const STORE_FERIAS_DIAS = 'tef_turnos_ferias_dias_v1';   // {tecnico: {iso: horasDescontadas}}
+
+function loadFeriasHoras(){
+  try{ const raw = localStorage.getItem(STORE_FERIAS_HORAS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveFeriasHoras(f){ localStorage.setItem(STORE_FERIAS_HORAS, JSON.stringify(f)); touchMeta(); }
+let FERIAS_HORAS = loadFeriasHoras();
+
+function loadFeriasDias(){
+  try{ const raw = localStorage.getItem(STORE_FERIAS_DIAS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveFeriasDias(f){ localStorage.setItem(STORE_FERIAS_DIAS, JSON.stringify(f)); touchMeta(); }
+let FERIAS_DIAS = loadFeriasDias();
+
+// Horas do turno base (Horário Base, sem considerar substituições) que este
+// técnico teria neste dia — é isto que sai do saldo de férias ao marcar o dia.
+function getBaseHoursForTecnico(name, iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  const dateObj = new Date(y, m-1, d);
+  const dKey = dayKeyOf(dateObj);
+  const slots = templateSlotsForDate(dKey, iso);
+  let hours = 0;
+  slots.forEach(s=>{ if(s.name === name) hours += hoursBetween(s.start, s.end); });
+  return hours;
+}
+
+function addFeriasDay(name, iso){
+  if(!iso) return;
+  const hours = getBaseHoursForTecnico(name, iso);
+  if(!FERIAS_DIAS[name]) FERIAS_DIAS[name] = {};
+  FERIAS_DIAS[name][iso] = hours;
+  saveFeriasDias(FERIAS_DIAS);
+  renderFeriasTab();
+  renderCalendar();
+}
+
+function removeFeriasDay(name, iso){
+  if(FERIAS_DIAS[name]){
+    delete FERIAS_DIAS[name][iso];
+    saveFeriasDias(FERIAS_DIAS);
+    renderFeriasTab();
+    renderCalendar();
+  }
+}
+
+function renderFeriasTab(){
+  const container = document.getElementById('feriasCards');
+  container.innerHTML = '';
+  const names = Object.keys(TECH_REGISTRY)
+    .filter(n => TECH_REGISTRY[n].status === 'dependente')
+    .sort((a,b)=>a.localeCompare(b,'pt'));
+
+  if(names.length === 0){
+    container.innerHTML = '<div class="equip-empty">Ainda não há técnicos com vínculo Dependente — define o vínculo no separador Técnicos.</div>';
+    return;
+  }
+
+  names.forEach(name=>{
+    const entitled = FERIAS_HORAS[name] || 0;
+    const daysMap = FERIAS_DIAS[name] || {};
+    const days = Object.keys(daysMap).sort();
+    const used = days.reduce((sum,iso)=> sum + (daysMap[iso]||0), 0);
+    const saldo = entitled - used;
+
+    const card = document.createElement('div');
+    card.className = 'equip-card';
+    let html = '<h4>'+name+'</h4>';
+    html += '<div class="ferias-entitle-row"><label style="font:600 12px \'Inter\';color:var(--ink-soft);">Horas de férias atribuídas</label>'+
+      '<input type="number" min="0" step="0.5" class="ferias-entitle-input" data-name="'+encodeURIComponent(name)+'" value="'+(entitled>0?entitled:'')+'" placeholder="0"></div>';
+    html += '<div class="ferias-stats">'+
+      '<div><div class="stat-label">Horas gastas</div><div class="stat-value">'+fmtHours(used)+' h</div></div>'+
+      '<div><div class="stat-label">Saldo restante</div><div class="stat-value '+(saldo<0?'saldo-neg':'')+'">'+fmtHours(saldo)+' h</div></div>'+
+    '</div>';
+    if(days.length===0){
+      html += '<div class="equip-empty" style="grid-column:unset;padding:4px 0;">Sem dias de férias marcados.</div>';
+    } else {
+      days.forEach(iso=>{
+        html += '<div class="ferias-day-line"><span>'+fmtDatePT(iso)+' — '+fmtHours(daysMap[iso]||0)+' h</span>'+
+          '<button type="button" class="ferias-remove-btn" data-name="'+encodeURIComponent(name)+'" data-iso="'+iso+'" title="Remover">×</button></div>';
+      });
+    }
+    html += '<div class="ferias-add-row">'+
+      '<input type="date" class="ferias-add-date" data-name="'+encodeURIComponent(name)+'">'+
+      '<button type="button" class="tsl-add-btn ferias-add-btn" data-name="'+encodeURIComponent(name)+'">+ Marcar férias</button>'+
+    '</div>';
+
+    card.innerHTML = html;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('.ferias-entitle-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      FERIAS_HORAS[name] = parseFloat(e.target.value) || 0;
+      saveFeriasHoras(FERIAS_HORAS);
+      renderFeriasTab();
+    });
+  });
+  container.querySelectorAll('.ferias-add-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const card = e.target.closest('.equip-card');
+      const iso = card.querySelector('.ferias-add-date').value;
+      if(!iso){ alert('Escolhe uma data.'); return; }
+      addFeriasDay(name, iso);
+    });
+  });
+  container.querySelectorAll('.ferias-remove-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const iso = e.target.dataset.iso;
+      removeFeriasDay(name, iso);
+    });
+  });
+}
+
+/* ---------------------------------------------------------------
    TABS
 --------------------------------------------------------------- */
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -3682,6 +3847,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-aval').style.display = tab==='aval' ? '' : 'none';
     document.getElementById('tab-recrut').style.display = tab==='recrut' ? '' : 'none';
     document.getElementById('tab-ptcount').style.display = tab==='ptcount' ? '' : 'none';
+    document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
@@ -3691,6 +3857,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(tab==='aval') renderAvalTab();
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
+    if(tab==='ferias') renderFeriasTab();
   });
 });
 
@@ -3990,6 +4157,8 @@ function buildExportPayload(){
     avaliacoes: AVALIACOES,
     candidatos: CANDIDATES,
     ptContagem: PT_COUNTS,
+    feriasHoras: FERIAS_HORAS,
+    feriasDias: FERIAS_DIAS,
     exportedAt: nowISO()
   };
 }
@@ -4009,6 +4178,8 @@ function applyImportedData(data){
   if(data.avaliacoes){ AVALIACOES = data.avaliacoes; localStorage.setItem(STORE_AVAL, JSON.stringify(AVALIACOES)); }
   if(data.candidatos){ CANDIDATES = data.candidatos; localStorage.setItem(STORE_CANDIDATES, JSON.stringify(CANDIDATES)); }
   if(data.ptContagem){ PT_COUNTS = data.ptContagem; localStorage.setItem(STORE_PT_COUNTS, JSON.stringify(PT_COUNTS)); }
+  if(data.feriasHoras){ FERIAS_HORAS = data.feriasHoras; localStorage.setItem(STORE_FERIAS_HORAS, JSON.stringify(FERIAS_HORAS)); }
+  if(data.feriasDias){ FERIAS_DIAS = data.feriasDias; localStorage.setItem(STORE_FERIAS_DIAS, JSON.stringify(FERIAS_DIAS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -4026,6 +4197,8 @@ function applyImportedData(data){
   if(recrutTab && recrutTab.style.display !== 'none') renderCandidates();
   const ptTab = document.getElementById('tab-ptcount');
   if(ptTab && ptTab.style.display !== 'none') renderPtCountTab();
+  const feriasTab = document.getElementById('tab-ferias');
+  if(feriasTab && feriasTab.style.display !== 'none') renderFeriasTab();
   const avalTab = document.getElementById('tab-aval');
   if(avalTab && avalTab.style.display !== 'none') renderAvalTab();
   updateSyncStatusLabel();
