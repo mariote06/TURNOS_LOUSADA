@@ -200,6 +200,9 @@
   .tec-table select{border:1px solid var(--line);border-radius:7px;padding:5px 7px;font:500 12.5px 'Inter';background:#fff;}
   .tec-table .rm-tec{border:none;background:none;color:#a83232;cursor:pointer;font-size:15px;}
   .tec-table .hrs{font-variant-numeric:tabular-nums;color:var(--ink-soft);}
+  .year-divider{background:var(--accent);color:#fff;font:700 13px 'Space Grotesk';letter-spacing:.03em;padding:8px 14px !important;cursor:pointer;user-select:none;}
+  .year-divider:hover{opacity:.9;}
+  .year-caret{display:inline-block;width:12px;}
   .tec-table .val{font-variant-numeric:tabular-nums;font-weight:600;}
   .tec-table td[data-label="Técnico"]{font:700 16px 'Space Grotesk';color:var(--ink);}
   .tec-color-input{width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:none;}
@@ -372,6 +375,9 @@
     .tec-table td:last-child{border-bottom:none;}
     .tec-table td::before{content:attr(data-label);font:600 11px 'Inter';color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;text-align:left;flex-shrink:0;}
     .tec-table td select, .tec-table td input{max-width:60%;}
+    .tec-table tr:has(.year-divider){background:none;border:none;padding:0;margin-bottom:6px;}
+    .tec-table td.year-divider{display:block;text-align:center;border-radius:8px;border-bottom:none;}
+    .tec-table td.year-divider::before{content:none;}
     .fin-scope-bar{flex-direction:column;align-items:stretch;}
     .fin-period-nav{justify-content:center;}
 
@@ -410,7 +416,7 @@
 
   <div class="topbar">
     <div>
-      <h1 class="brand">Turnos de Sala <small>Equipa de Técnicos de Exercício Físico · Set 2026 — Ago 2027</small></h1>
+      <h1 class="brand">Turnos de Sala <small>Equipa de Técnicos de Exercício Físico · Set 2026 — Dez 2030</small></h1>
     </div>
     <div class="tabs">
       <button class="tab-btn active" data-tab="cal">Calendário</button>
@@ -502,7 +508,7 @@
   <div id="tab-tec" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
       Define o vínculo de cada técnico (dependente ou independente) e o valor/hora de cada tipo de vínculo.
-      As horas são calculadas a partir do calendário Set 2026 – Ago 2027: se um turno foi substituído nesse dia,
+      As horas são calculadas a partir do calendário Set 2026 – Dez 2030: se um turno foi substituído nesse dia,
       as horas contam para quem substituiu, não para o titular. Quando atualizares um valor/hora, indica a partir
       de que data entra em vigor — os turnos anteriores a essa data mantêm o valor antigo.
     </p>
@@ -886,7 +892,7 @@ const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julh
 const LONG_WEEKDAY = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 
 const RANGE_START = new Date(2026,8,1);   // 1 Set 2026
-const RANGE_END   = new Date(2027,7,31);  // 31 Ago 2027
+const RANGE_END   = new Date(2030,11,31); // 31 Dez 2030
 
 function pad(n){ return n<10 ? '0'+n : ''+n; }
 function isoDate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
@@ -949,7 +955,7 @@ function buildDefaultLines(){
 }
 
 // Feriados nacionais obrigatórios (data fixa ou móvel calculada) + feriado municipal de Lousada
-// (última segunda-feira de julho) + Carnaval (facultativo), dentro do período Set/2026 - Ago/2027.
+// (última segunda-feira de julho) + Carnaval (facultativo), dentro do período Set/2026 - Dez/2027.
 const HOLIDAYS = [
   {date:'2026-10-05', name:'Implantação da República', type:'nacional'},
   {date:'2026-11-01', name:'Todos os Santos', type:'nacional'},
@@ -967,7 +973,65 @@ const HOLIDAYS = [
   {date:'2027-05-27', name:'Corpo de Deus', type:'nacional'},
   {date:'2027-06-10', name:'Dia de Portugal, de Camões e das Comunidades', type:'nacional'},
   {date:'2027-07-26', name:'Feriado Municipal de Lousada', type:'municipal'},
-  {date:'2027-08-15', name:'Assunção de Nossa Senhora', type:'nacional'}
+  {date:'2027-08-15', name:'Assunção de Nossa Senhora', type:'nacional'},
+  {date:'2027-10-05', name:'Implantação da República', type:'nacional'},
+  {date:'2027-11-01', name:'Todos os Santos', type:'nacional'},
+  {date:'2027-12-01', name:'Restauração da Independência', type:'nacional'},
+  {date:'2027-12-08', name:'Imaculada Conceição', type:'nacional'},
+  {date:'2027-12-24', name:'Véspera de Natal', type:'facultativo'},
+  {date:'2027-12-25', name:'Natal', type:'nacional', closed:true},
+  {date:'2027-12-31', name:'Véspera de Ano Novo', type:'facultativo'},
+  {date:'2028-01-01', name:'Ano Novo', type:'nacional', closed:true},
+  {date:'2028-02-29', name:'Carnaval', type:'facultativo'},
+  {date:'2028-04-14', name:'Sexta-feira Santa', type:'nacional'},
+  {date:'2028-04-16', name:'Páscoa', type:'nacional', closed:true},
+  {date:'2028-04-25', name:'Dia da Liberdade', type:'nacional'},
+  {date:'2028-05-01', name:'Dia do Trabalhador', type:'nacional'},
+  {date:'2028-06-10', name:'Dia de Portugal, de Camões e das Comunidades', type:'nacional'},
+  {date:'2028-06-15', name:'Corpo de Deus', type:'nacional'},
+  {date:'2028-07-31', name:'Feriado Municipal de Lousada', type:'municipal'},
+  {date:'2028-08-15', name:'Assunção de Nossa Senhora', type:'nacional'},
+  {date:'2028-10-05', name:'Implantação da República', type:'nacional'},
+  {date:'2028-11-01', name:'Todos os Santos', type:'nacional'},
+  {date:'2028-12-01', name:'Restauração da Independência', type:'nacional'},
+  {date:'2028-12-08', name:'Imaculada Conceição', type:'nacional'},
+  {date:'2028-12-24', name:'Véspera de Natal', type:'facultativo'},
+  {date:'2028-12-25', name:'Natal', type:'nacional', closed:true},
+  {date:'2028-12-31', name:'Véspera de Ano Novo', type:'facultativo'},
+  {date:'2029-01-01', name:'Ano Novo', type:'nacional', closed:true},
+  {date:'2029-02-13', name:'Carnaval', type:'facultativo'},
+  {date:'2029-03-30', name:'Sexta-feira Santa', type:'nacional'},
+  {date:'2029-04-01', name:'Páscoa', type:'nacional', closed:true},
+  {date:'2029-04-25', name:'Dia da Liberdade', type:'nacional'},
+  {date:'2029-05-01', name:'Dia do Trabalhador', type:'nacional'},
+  {date:'2029-05-31', name:'Corpo de Deus', type:'nacional'},
+  {date:'2029-06-10', name:'Dia de Portugal, de Camões e das Comunidades', type:'nacional'},
+  {date:'2029-07-30', name:'Feriado Municipal de Lousada', type:'municipal'},
+  {date:'2029-08-15', name:'Assunção de Nossa Senhora', type:'nacional'},
+  {date:'2029-10-05', name:'Implantação da República', type:'nacional'},
+  {date:'2029-11-01', name:'Todos os Santos', type:'nacional'},
+  {date:'2029-12-01', name:'Restauração da Independência', type:'nacional'},
+  {date:'2029-12-08', name:'Imaculada Conceição', type:'nacional'},
+  {date:'2029-12-24', name:'Véspera de Natal', type:'facultativo'},
+  {date:'2029-12-25', name:'Natal', type:'nacional', closed:true},
+  {date:'2029-12-31', name:'Véspera de Ano Novo', type:'facultativo'},
+  {date:'2030-01-01', name:'Ano Novo', type:'nacional', closed:true},
+  {date:'2030-03-05', name:'Carnaval', type:'facultativo'},
+  {date:'2030-04-19', name:'Sexta-feira Santa', type:'nacional'},
+  {date:'2030-04-21', name:'Páscoa', type:'nacional', closed:true},
+  {date:'2030-04-25', name:'Dia da Liberdade', type:'nacional'},
+  {date:'2030-05-01', name:'Dia do Trabalhador', type:'nacional'},
+  {date:'2030-06-10', name:'Dia de Portugal, de Camões e das Comunidades', type:'nacional'},
+  {date:'2030-06-20', name:'Corpo de Deus', type:'nacional'},
+  {date:'2030-07-29', name:'Feriado Municipal de Lousada', type:'municipal'},
+  {date:'2030-08-15', name:'Assunção de Nossa Senhora', type:'nacional'},
+  {date:'2030-10-05', name:'Implantação da República', type:'nacional'},
+  {date:'2030-11-01', name:'Todos os Santos', type:'nacional'},
+  {date:'2030-12-01', name:'Restauração da Independência', type:'nacional'},
+  {date:'2030-12-08', name:'Imaculada Conceição', type:'nacional'},
+  {date:'2030-12-24', name:'Véspera de Natal', type:'facultativo'},
+  {date:'2030-12-25', name:'Natal', type:'nacional', closed:true},
+  {date:'2030-12-31', name:'Véspera de Ano Novo', type:'facultativo'}
 ];
 const HOLIDAY_MAP = {};
 HOLIDAYS.forEach(h => HOLIDAY_MAP[h.date] = h);
@@ -1159,11 +1223,11 @@ function dayHasPontualStuff(iso){
          (exc.note && exc.note.trim().length>0);
 }
 
-// month index 0 = Setembro 2026 ... 11 = Agosto 2027
+// month index 0 = Setembro 2026 ... 51 = Dezembro 2030
 const MONTH_LIST = [];
 (function buildMonthList(){
   let y = 2026, m = 8; // Sept = index 8
-  for(let i=0;i<12;i++){
+  for(let i=0;i<52;i++){
     MONTH_LIST.push({year:y, month:m});
     m++; if(m>11){ m=0; y++; }
   }
@@ -1186,7 +1250,7 @@ document.getElementById('prevMonth').addEventListener('click', ()=>{
   if(currentMonthIdx>0){ currentMonthIdx--; monthSelect.value = currentMonthIdx; renderCalendar(); }
 });
 document.getElementById('nextMonth').addEventListener('click', ()=>{
-  if(currentMonthIdx<11){ currentMonthIdx++; monthSelect.value = currentMonthIdx; renderCalendar(); }
+  if(currentMonthIdx<MONTH_LIST.length-1){ currentMonthIdx++; monthSelect.value = currentMonthIdx; renderCalendar(); }
 });
 document.getElementById('btnToday').addEventListener('click', ()=>{
   const today = new Date();
@@ -1610,17 +1674,30 @@ function renderSubstitutionsList(){
   });
 }
 
+let feriadosExpandedYears = new Set();
+
 function renderFeriadosTab(){
   const tbody = document.getElementById('feriadosTableBody');
   tbody.innerHTML = '';
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  let lastYear = null;
   HOLIDAYS.forEach(h=>{
     if(h.closed) return; // ginásio encerrado nesse dia: não há turno a atribuir, não aparece na lista
     const [y,m,d] = h.date.split('-').map(Number);
+    if(y !== lastYear){
+      lastYear = y;
+      const expanded = feriadosExpandedYears.has(y);
+      const yearRow = document.createElement('tr');
+      yearRow.className = 'year-divider-row';
+      yearRow.innerHTML = '<td colspan="5" class="year-divider" data-year="'+y+'"><span class="year-caret">'+(expanded?'▾':'▸')+'</span> '+y+'</td>';
+      tbody.appendChild(yearRow);
+    }
     const label = pad(d)+'/'+pad(m)+'/'+y;
     const typeLabel = h.type==='municipal' ? 'Municipal' : h.type==='facultativo' ? 'Facultativo' : 'Nacional';
     const assigned = HOLIDAY_ASSIGNMENTS[h.date] || '';
     const tr = document.createElement('tr');
+    tr.dataset.year = y;
+    if(!feriadosExpandedYears.has(y)) tr.style.display = 'none';
     if(!assigned) tr.className = 'unclassified';
     let options = '<option value="">— nenhum —</option>';
     names.forEach(n=>{ options += '<option value="'+n+'" '+(assigned===n?'selected':'')+'>'+n+'</option>'; });
@@ -1631,6 +1708,14 @@ function renderFeriadosTab(){
       '<td class="hrs" data-label="Turno">'+HOLIDAY_SHIFT.start+' – '+HOLIDAY_SHIFT.end+'</td>'+
       '<td data-label="Técnico atribuído"><select data-date="'+h.date+'">'+options+'</select></td>';
     tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.year-divider').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const y = parseInt(el.dataset.year, 10);
+      if(feriadosExpandedYears.has(y)) feriadosExpandedYears.delete(y);
+      else feriadosExpandedYears.add(y);
+      renderFeriadosTab();
+    });
   });
   tbody.querySelectorAll('select').forEach(sel=>{
     sel.addEventListener('change', (e)=>{
@@ -1671,7 +1756,7 @@ function currentFinRange(){
 }
 
 function finPeriodLabelText(range){
-  if(finScope==='year') return 'Set 2026 – Ago 2027 (época completa)';
+  if(finScope==='year') return 'Set 2026 – Dez 2030 (época completa)';
   if(finScope==='month') return MONTH_NAMES[finRefDate.getMonth()]+' '+finRefDate.getFullYear();
   const s=range.start, e=range.end;
   return pad(s.getDate())+'/'+pad(s.getMonth()+1)+' – '+pad(e.getDate())+'/'+pad(e.getMonth()+1)+'/'+e.getFullYear();
@@ -2172,7 +2257,7 @@ function renderTecTab(){
     (totalUnclassifiedHours>0.05 ? '<div><div class="stat-label">Horas por classificar</div><div class="stat-value" style="color:var(--rust)">'+fmtHours(totalUnclassifiedHours)+' h</div></div>' : '') +
     '<div><div class="stat-label">Valor · Dependentes</div><div class="stat-value">'+fmtEUR(totalDepVal)+'</div></div>'+
     '<div><div class="stat-label">Valor · Independentes</div><div class="stat-value">'+fmtEUR(totalIndVal)+'</div></div>'+
-    '<div><div class="stat-label">Orçamento total (Set 2026 – Ago 2027)</div><div class="stat-value total">'+fmtEUR(grandTotal)+'</div></div>';
+    '<div><div class="stat-label">Orçamento total (Set 2026 – Dez 2030)</div><div class="stat-value total">'+fmtEUR(grandTotal)+'</div></div>';
 }
 
 document.getElementById('btnAddRateDep').addEventListener('click', ()=>{
@@ -3639,7 +3724,7 @@ document.getElementById('btnExport').addEventListener('click', ()=>{
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'turnos_TEF_set2026_ago2027.csv';
+  a.download = 'turnos_TEF_set2026_dez2030.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
