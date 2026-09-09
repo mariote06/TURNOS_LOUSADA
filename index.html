@@ -235,6 +235,14 @@
   .aval-class-desc{flex:1;min-width:200px;font-size:12.5px;color:var(--ink-soft);}
   .aval-plano-label{display:block;font:600 12px 'Inter';color:var(--ink-soft);}
   .aval-plano-label textarea{display:block;width:100%;margin-top:6px;min-height:70px;border:1px solid var(--line);border-radius:8px;padding:10px;font:400 13px 'Inter';resize:vertical;}
+  .aval-summary-panel{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+  .aval-summary-col{background:#fbfaf7;border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .aval-summary-col h4{margin:0 0 8px;font-size:12.5px;}
+  .aval-summary-list{font-size:12.5px;color:var(--ink);line-height:1.7;white-space:pre-line;}
+  .aval-summary-list:empty::before{content:'—';color:var(--ink-soft);font-style:italic;}
+  .aval-plan-suggestion{background:var(--gold-bg);border-radius:10px;padding:12px 14px;margin-bottom:16px;}
+  .aval-plan-suggestion h4{margin:0 0 8px;font-size:12.5px;color:var(--gold-ink);}
+  .aval-plan-suggestion .aval-summary-list{color:var(--ink);}
   .tier-badge{display:inline-block;font:700 11px 'Inter';padding:3px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;}
   .tier-badge.tier-top{background:var(--accent-soft);color:var(--accent);}
   .tier-badge.tier-average{background:var(--gold-bg);color:var(--gold-ink);}
@@ -347,6 +355,7 @@
     .fin-scope-bar .tabs{width:auto;}
 
     .disp-cards{grid-template-columns:1fr;}
+    .aval-summary-panel{grid-template-columns:1fr;}
     .writeoff-form{flex-direction:column;align-items:stretch;}
     .writeoff-form select, .writeoff-form button{width:100%;}
 
@@ -427,6 +436,7 @@
   }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -753,6 +763,26 @@
         <div class="aval-class-desc" id="avalClassDesc"></div>
       </div>
 
+      <div class="aval-summary-panel">
+        <div class="aval-summary-col">
+          <h4>🟢 Critérios Top Performer <span style="font-weight:400;color:var(--ink-soft);">(pontuação 4-5)</span></h4>
+          <div id="avalTopList" class="aval-summary-list"></div>
+        </div>
+        <div class="aval-summary-col">
+          <h4>🟡 Critérios Average Performer <span style="font-weight:400;color:var(--ink-soft);">(pontuação 3)</span></h4>
+          <div id="avalAverageList" class="aval-summary-list"></div>
+        </div>
+        <div class="aval-summary-col">
+          <h4>🔴 Critérios Low Performer <span style="font-weight:400;color:var(--ink-soft);">(pontuação 1-2)</span></h4>
+          <div id="avalLowList" class="aval-summary-list"></div>
+        </div>
+      </div>
+      <div class="aval-plan-suggestion">
+        <h4>Plano de desenvolvimento sugerido — para atingir Top Performer</h4>
+        <div id="avalPlanSuggestion" class="aval-summary-list"></div>
+        <button type="button" class="btn ghost" id="btnUseAvalSuggestion" style="margin-top:8px;">Usar esta sugestão no Plano de melhoria</button>
+      </div>
+
       <label class="aval-plano-label">Plano de melhoria
         <textarea id="avalPlano" placeholder="Pontos a trabalhar, ações combinadas, prazo de revisão..."></textarea>
       </label>
@@ -760,6 +790,7 @@
       <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;">
         <button class="btn primary" id="btnSaveAval">Guardar avaliação</button>
         <button class="btn ghost" id="btnClearAval">Limpar formulário</button>
+        <button class="btn" id="btnExportAvalPdf">📄 Exportar relatório para o técnico (PDF)</button>
       </div>
     </div>
 
@@ -783,7 +814,7 @@
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="tierTable">
         <thead>
-          <tr><th>Técnico</th><th>Última avaliação</th><th>Pontuação</th><th>Patamar</th></tr>
+          <tr><th>Técnico</th><th>Última avaliação</th><th>Pontuação</th><th>Patamar</th><th></th></tr>
         </thead>
         <tbody id="tierTableBody"></tbody>
       </table>
@@ -3219,6 +3250,45 @@ function classifyAvalScore(total){
   return EVAL_CLASS_TABLE[EVAL_CLASS_TABLE.length-1];
 }
 
+// Sugestão de ação de desenvolvimento para quando um critério fica em nível baixo (1-2).
+const CRITERION_SUGGESTIONS = {
+  historico_cliente: 'Reforçar o levantamento e registo do histórico de cada cliente antes da primeira sessão (lesões, objetivos, experiência prévia).',
+  origem_prescricao: 'Confirmar sempre a origem da prescrição do treino e adaptar a abordagem em conformidade.',
+  variaveis_treino: 'Rever a definição de carga, volume, intensidade e descanso em cada plano de treino.',
+  metodologias: 'Diversificar as metodologias de treino aplicadas (circuito, super série, drop set, etc.) consoante o cliente.',
+  progressoes: 'Planear progressões mais estruturadas, com objetivos de evolução definidos por período.',
+  empatia: 'Trabalhar a escuta ativa e a atenção às necessidades emocionais do cliente durante a sessão.',
+  energia_motivacao: 'Aumentar o nível de energia e motivação transmitido ao cliente ao longo do treino.',
+  clareza: 'Simplificar as explicações e confirmar sempre que o cliente compreendeu a instrução.',
+  relacao_confianca: 'Investir mais tempo na construção de relação e confiança com os clientes habituais.',
+  presente: 'Reduzir distrações e manter presença ativa e atenta durante todo o turno.',
+  compromisso: 'Alinhar continuamente o treino com os objetivos pessoais definidos pelo cliente.',
+  observacao_ajuste: 'Observar com mais frequência a execução dos exercícios e ajustar em tempo real.',
+  feedback: 'Dar feedback mais regular sobre o progresso e rever o planeamento a médio/longo prazo.',
+  manutencao_espaco: 'Reforçar a organização, limpeza e segurança do espaço de treino.',
+  aparencia: 'Assegurar sempre a utilização do uniforme/equipamento adequado.'
+};
+
+// Analisa as pontuações de uma avaliação: critérios em nível Top (4-5), Low (1-2), e
+// uma sugestão de plano de desenvolvimento focada nos critérios fracos.
+function analyzeEvalScores(scores){
+  const top = [], average = [], low = [];
+  EVAL_GROUPS.forEach(g=> g.criteria.forEach(c=>{
+    const val = scores[c.key];
+    if(val===undefined || val===null || val==='') return;
+    if(val>=4) top.push(c.label);
+    else if(val===3) average.push({label:c.label, key:c.key});
+    else if(val<=2) low.push({label:c.label, key:c.key});
+  }));
+  const lowLines = low.map(w => '- '+(CRITERION_SUGGESTIONS[w.key]||('Trabalhar: '+w.label)));
+  const avgLines = average.map(w => '- '+(CRITERION_SUGGESTIONS[w.key]||('Trabalhar: '+w.label)));
+  let planText = '';
+  if(lowLines.length>0) planText += lowLines.join('\n');
+  if(avgLines.length>0) planText += (planText ? '\n' : '') + avgLines.join('\n');
+  if(!planText) planText = 'Sem critérios abaixo do nível Top — manter o desempenho atual e continuar a monitorizar.';
+  return {top, average, low, planText};
+}
+
 const STORE_AVAL = 'tef_turnos_avaliacoes_v1'; // [{id, tecnico, date, scores:{critKey:1-5}, plano, createdAt}]
 function loadAvaliacoes(){
   try{ const raw = localStorage.getItem(STORE_AVAL); if(raw) return JSON.parse(raw); }catch(e){}
@@ -3276,6 +3346,12 @@ function updateAvalTotals(){
   const hasAny = Object.keys(scores).length>0;
   document.getElementById('avalClassLabel').textContent = hasAny ? tier.label : '—';
   document.getElementById('avalClassDesc').textContent = hasAny ? tier.desc : '';
+
+  const {top, average, low, planText} = analyzeEvalScores(scores);
+  document.getElementById('avalTopList').textContent = top.length ? top.map(l=>'✓ '+l).join('\n') : '';
+  document.getElementById('avalAverageList').textContent = average.length ? average.map(l=>'• '+l.label).join('\n') : '';
+  document.getElementById('avalLowList').textContent = low.length ? low.map(l=>'✕ '+l.label).join('\n') : '';
+  document.getElementById('avalPlanSuggestion').textContent = hasAny ? planText : '';
 }
 
 function populateAvalTecnicoSelect(){
@@ -3325,6 +3401,144 @@ document.getElementById('btnSaveAval').addEventListener('click', ()=>{
 
 document.getElementById('btnClearAval').addEventListener('click', ()=>{
   if(confirm('Limpar o formulário? Perdes as pontuações ainda não guardadas.')) clearAvalForm();
+});
+
+document.getElementById('btnUseAvalSuggestion').addEventListener('click', ()=>{
+  const suggestion = document.getElementById('avalPlanSuggestion').textContent.trim();
+  if(!suggestion){ alert('Ainda não há pontuações suficientes para gerar uma sugestão.'); return; }
+  const textarea = document.getElementById('avalPlano');
+  textarea.value = textarea.value.trim() ? (textarea.value.trim()+'\n\n'+suggestion) : suggestion;
+});
+
+document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
+  const jspdfLib = window.jspdf;
+  if(!jspdfLib){
+    alert('Não foi possível carregar a biblioteca de PDF (precisas de estar online da primeira vez que exportas).');
+    return;
+  }
+  const nome = document.getElementById('avalTecnico').value;
+  const dataIso = document.getElementById('avalData').value;
+  if(!nome){ alert('Escolhe um técnico primeiro.'); return; }
+  const scores = getAvalScores();
+  if(Object.keys(scores).length === 0){ alert('Ainda não há pontuações para gerar o relatório.'); return; }
+
+  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  const fiveTier = classifyAvalScore(total);
+  const threeTier = tierFromScore(total);
+  const {top, average, low} = analyzeEvalScores(scores);
+
+  // Mensagem de abertura motivadora, adaptada ao patamar atual.
+  let intro;
+  if(threeTier.key === 'top'){
+    intro = 'Parabéns, '+nome+'! O teu desempenho está num nível muito elevado — és neste momento um Top Performer da equipa. Este relatório resume os pontos fortes que te trouxeram até aqui, e como continuar a evoluir.';
+  } else if(threeTier.key === 'average'){
+    intro = 'Olá, '+nome+'! Já tens uma base sólida e boas competências instaladas. Estás perto de Top Performer — com foco nos pontos abaixo, consegues dar esse salto na próxima avaliação.';
+  } else {
+    intro = 'Olá, '+nome+'! Este relatório é o ponto de partida para uma evolução clara. Já tens pontos fortes para construir a partir daí, e um plano de ação concreto para subires de patamar.';
+  }
+
+  const { jsPDF } = jspdfLib;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const pageW = 210, pageH = 297, marginX = 18;
+  let y = 0;
+
+  function ensureSpace(h){
+    if(y + h > pageH - 20){ doc.addPage(); y = 20; }
+  }
+  function heading(text, color){
+    ensureSpace(12);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.setTextColor(color[0],color[1],color[2]);
+    doc.text(text, marginX, y);
+    y += 7;
+    doc.setDrawColor(color[0],color[1],color[2]);
+    doc.setLineWidth(0.4);
+    doc.line(marginX, y-4.5, marginX+8, y-4.5);
+  }
+  function paragraph(text, size, color, lineH){
+    doc.setFont('helvetica','normal'); doc.setFontSize(size||11);
+    doc.setTextColor(color?color[0]:28, color?color[1]:35, color?color[2]:33);
+    const lines = doc.splitTextToSize(text, pageW - marginX*2);
+    lines.forEach(line=>{
+      ensureSpace(lineH||6);
+      doc.text(line, marginX, y);
+      y += (lineH||6);
+    });
+  }
+  function bulletList(items, color){
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    items.forEach(item=>{
+      const lines = doc.splitTextToSize(item, pageW - marginX*2 - 6);
+      lines.forEach((line,idx)=>{
+        ensureSpace(6.2);
+        doc.setTextColor(color[0],color[1],color[2]);
+        if(idx===0) doc.text('•', marginX, y);
+        doc.setTextColor(28,35,33);
+        doc.text(line, marginX+5, y);
+        y += 6.2;
+      });
+    });
+  }
+
+  // Cabeçalho
+  doc.setFillColor(47,111,78);
+  doc.rect(0, 0, pageW, 34, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(19);
+  doc.text('Relatório de Desempenho', marginX, 16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+  doc.text('Turnos de Sala · Equipa de Técnicos de Exercício Físico', marginX, 23);
+  doc.setFontSize(10.5);
+  doc.text(nome+'  ·  '+fmtDatePT(dataIso), marginX, 29.5);
+
+  y = 46;
+
+  // Introdução motivadora
+  paragraph(intro, 11.5, [28,35,33], 6.2);
+  y += 4;
+
+  // Pontuação / classificação
+  const tierColors = {top:[47,111,78], average:[138,99,20], low:[168,50,50]};
+  const tc = tierColors[threeTier.key];
+  ensureSpace(20);
+  doc.setFillColor(tc[0],tc[1],tc[2]);
+  doc.roundedRect(marginX, y, pageW-marginX*2, 16, 2, 2, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Pontuação: '+total+' / 75', marginX+6, y+7);
+  doc.setFontSize(11);
+  doc.text('Patamar atual: '+threeTier.label+'  ·  Classificação: '+fiveTier.label, marginX+6, y+13);
+  y += 24;
+
+  // Pontos fortes
+  heading('Pontos fortes', [47,111,78]);
+  if(top.length>0) bulletList(top.map(l=>l), [47,111,78]);
+  else paragraph('Ainda sem critérios em nível Top nesta avaliação — há um caminho claro a construir.', 10.5, [86,95,92], 5.6);
+  y += 4;
+
+  // Áreas a desenvolver
+  const growth = [].concat(low.map(w=>w.label+': '+(CRITERION_SUGGESTIONS[w.key]||'')), average.map(w=>w.label+': '+(CRITERION_SUGGESTIONS[w.key]||'')));
+  heading('O que fazer para chegares a Top Performer', [168,50,50]);
+  if(growth.length>0) bulletList(growth, [168,50,50]);
+  else paragraph('Já estás em nível Top em todos os critérios — o foco agora é manter a consistência.', 10.5, [86,95,92], 5.6);
+  y += 4;
+
+  // Plano de melhoria (texto livre, se preenchido)
+  const planoLivre = document.getElementById('avalPlano').value.trim();
+  if(planoLivre){
+    heading('Notas do coordenador', [37,80,126]);
+    paragraph(planoLivre, 10.5, [28,35,33], 5.6);
+    y += 4;
+  }
+
+  // Mensagem de fecho
+  ensureSpace(20);
+  doc.setFont('helvetica','italic'); doc.setFontSize(10.5);
+  doc.setTextColor(86,95,92);
+  const closing = 'Este relatório reflete um momento — o teu desenvolvimento continua a cada turno. Conta connosco para te apoiar nesse percurso.';
+  doc.splitTextToSize(closing, pageW - marginX*2).forEach(line=>{ ensureSpace(6); doc.text(line, marginX, y); y+=5.6; });
+
+  doc.save('relatorio_desempenho_'+nome.replace(/\s+/g,'_')+'.pdf');
 });
 
 function renderAvalHistory(){
@@ -3435,7 +3649,7 @@ function renderTierTable(){
   });
 
   if(rows.length===0){
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
   } else {
     rows.forEach(r=>{
       const tr = document.createElement('tr');
@@ -3444,17 +3658,32 @@ function renderTierTable(){
           '<td data-label="Técnico" style="font-weight:700;">'+r.name+'</td>'+
           '<td data-label="Última avaliação">—</td>'+
           '<td data-label="Pontuação" class="hrs">—</td>'+
-          '<td data-label="Patamar"><span style="color:var(--ink-soft);font-style:italic;font-size:12px;">sem avaliação</span></td>';
+          '<td data-label="Patamar"><span style="color:var(--ink-soft);font-style:italic;font-size:12px;">sem avaliação</span></td>'+
+          '<td data-label=""></td>';
       } else {
         tr.innerHTML =
           '<td data-label="Técnico" style="font-weight:700;">'+r.name+'</td>'+
           '<td data-label="Última avaliação">'+fmtDatePT(r.date)+'</td>'+
           '<td data-label="Pontuação" class="hrs">'+r.total+' / 75</td>'+
-          '<td data-label="Patamar"><span class="tier-badge tier-'+r.tier.key+'">'+r.tier.label+'</span></td>';
+          '<td data-label="Patamar"><span class="tier-badge tier-'+r.tier.key+'">'+r.tier.label+'</span></td>'+
+          '<td data-label=""><button type="button" class="btn ghost tier-report-btn" data-name="'+encodeURIComponent(r.name)+'" style="padding:5px 10px;font-size:11.5px;">Ver relatório</button></td>';
       }
       tbody.appendChild(tr);
     });
   }
+  tbody.querySelectorAll('.tier-report-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const latestEval = getLatestEvalPerTecnico()[name];
+      if(!latestEval) return;
+      editingAvalId = latestEval.id;
+      document.getElementById('avalTecnico').value = latestEval.tecnico;
+      document.getElementById('avalData').value = latestEval.date;
+      renderAvalGroups(latestEval.scores);
+      document.getElementById('avalPlano').value = latestEval.plano || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+  });
 
   const counts = {top:0, average:0, low:0, none:0};
   rows.forEach(r=>{ r.tier ? counts[r.tier.key]++ : counts.none++; });
