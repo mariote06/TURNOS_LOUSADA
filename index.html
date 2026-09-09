@@ -1791,14 +1791,24 @@ let finRefDate = new Date();
 if(finRefDate < RANGE_START) finRefDate = new Date(RANGE_START);
 if(finRefDate > RANGE_END) finRefDate = new Date(RANGE_END);
 
+function getYearRange(ref){
+  const start = new Date(ref.getFullYear(), 0, 1);
+  const end = new Date(ref.getFullYear(), 11, 31);
+  return {
+    start: start < RANGE_START ? new Date(RANGE_START) : start,
+    end: end > RANGE_END ? new Date(RANGE_END) : end
+  };
+}
+
 function currentFinRange(){
   if(finScope==='week') return getWeekRange(finRefDate);
   if(finScope==='month') return getMonthRange(finRefDate);
+  if(finScope==='year') return getYearRange(finRefDate);
   return {start: new Date(RANGE_START), end: new Date(RANGE_END)};
 }
 
 function finPeriodLabelText(range){
-  if(finScope==='year') return 'Set 2026 – Dez 2030 (época completa)';
+  if(finScope==='year') return String(finRefDate.getFullYear());
   if(finScope==='month') return MONTH_NAMES[finRefDate.getMonth()]+' '+finRefDate.getFullYear();
   const s=range.start, e=range.end;
   return pad(s.getDate())+'/'+pad(s.getMonth()+1)+' – '+pad(e.getDate())+'/'+pad(e.getMonth()+1)+'/'+e.getFullYear();
@@ -1843,7 +1853,7 @@ function computeFinancePeriod(start, end){
 function renderFinTab(){
   const range = currentFinRange();
   document.getElementById('finPeriodLabel').textContent = finPeriodLabelText(range);
-  document.getElementById('finPeriodNav').style.display = finScope==='year' ? 'none' : '';
+  document.getElementById('finPeriodNav').style.display = '';
 
   renderRateHistory('budget', 'historyBudget');
   document.getElementById('newRateDateBudget').value = isoDate(new Date());
@@ -1892,11 +1902,13 @@ document.querySelectorAll('.fin-scope-btn').forEach(btn=>{
 document.getElementById('finPrev').addEventListener('click', ()=>{
   if(finScope==='week') finRefDate.setDate(finRefDate.getDate()-7);
   else if(finScope==='month') finRefDate.setMonth(finRefDate.getMonth()-1);
+  else if(finScope==='year') finRefDate.setFullYear(finRefDate.getFullYear()-1);
   renderFinTab();
 });
 document.getElementById('finNext').addEventListener('click', ()=>{
   if(finScope==='week') finRefDate.setDate(finRefDate.getDate()+7);
   else if(finScope==='month') finRefDate.setMonth(finRefDate.getMonth()+1);
+  else if(finScope==='year') finRefDate.setFullYear(finRefDate.getFullYear()+1);
   renderFinTab();
 });
 document.getElementById('btnAddRateBudget').addEventListener('click', ()=>{
@@ -4101,6 +4113,13 @@ async function restoreLinkedHandle(){
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible' && linkedFileHandle) syncFromLinkedFile(true);
 });
+
+// Sincronização quase em tempo real: sem servidor próprio não há "instantâneo" verdadeiro,
+// mas verificando o ficheiro ligado a cada poucos segundos (só enquanto a aba está visível),
+// as alterações feitas noutro dispositivo aparecem sozinhas, sem precisares de clicar em nada.
+setInterval(()=>{
+  if(document.visibilityState === 'visible' && linkedFileHandle) syncFromLinkedFile(true);
+}, 15000);
 
 restoreLinkedHandle();
 
