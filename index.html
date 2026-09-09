@@ -3507,7 +3507,7 @@ document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
   // Pontos fortes — em texto corrido, não por tópicos
   heading('Pontos fortes', [47,111,78]);
   if(top.length>0){
-    const strengthsText = 'Os teus pontos fortes atuais incluem '+joinNatural(top)+'. Estas são áreas em que já demonstras um bom domínio, e que valem a pena manteres em foco enquanto trabalhas o resto.';
+    const strengthsText = 'Queremos começar por te dar os parabéns: os teus pontos fortes atuais incluem '+joinNatural(top)+'. Isto mostra um trabalho de grande qualidade nestas áreas — continua assim, faz mesmo a diferença!';
     paragraph(strengthsText, 11, [28,35,33], 6.2);
   } else {
     paragraph('Ainda sem critérios em nível Top nesta avaliação — há um caminho claro a construir a partir daqui.', 11, [28,35,33], 6.2);
@@ -3521,7 +3521,8 @@ document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
     average.map(w => ({label:w.label, text:CRITERION_SUGGESTIONS[w.key]||''}))
   );
   if(growthItems.length>0){
-    const growthText = growthItems.map(g => 'Em '+g.label+', '+lowerFirst(g.text)).join(' ');
+    const growthBody = growthItems.map(g => 'Em '+g.label+', '+lowerFirst(g.text)).join(' ');
+    const growthText = 'Nestes pontos, queremos que saibas que não estás sozinho — a equipa está aqui para te ajudar a evoluir. '+growthBody+' Conta sempre connosco para te apoiarmos neste caminho.';
     paragraph(growthText, 11, [28,35,33], 6.2);
   } else {
     paragraph('Já estás em nível Top em todos os critérios — o foco agora é manter a consistência.', 11, [28,35,33], 6.2);
