@@ -306,6 +306,7 @@
   .disp-slot-btn{width:56px;height:30px;border-radius:6px;border:1px solid var(--line);background:#fbfaf7;cursor:pointer;font:600 11px 'Inter';color:var(--ink-soft);}
   .disp-slot-btn.avail-yes{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
   .disp-slot-btn.avail-no{background:var(--rust-soft);border-color:var(--rust);color:var(--rust);}
+  .disp-slot-btn.avail-turno{background:#dfe9f7;border-color:#25507e;color:#25507e;}
   .disp-slot-empty{width:56px;height:30px;}
   .disp-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);margin-bottom:14px;}
   .disp-legend span{display:inline-flex;align-items:center;gap:5px;}
@@ -698,12 +699,13 @@
   <!-- DISPONIBILIDADE TAB -->
   <div id="tab-disp" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
-      Disponibilidade semanal de cada técnico, para os horários em que o ginásio está aberto (conforme o Horário Base). É só informativo — clica num quadrado para alternar entre disponível/indisponível/por definir; não afeta o calendário nem os turnos.
+      Disponibilidade semanal de cada técnico, para os horários em que o ginásio está aberto (conforme o Horário Base). É só informativo — clica num quadrado para alternar entre disponível/indisponível/turno normal/por definir; não afeta o calendário nem os turnos.
     </p>
     <div class="disp-legend">
       <span><span class="dot" style="background:#fbfaf7;border:1px solid var(--line);"></span>Por definir</span>
       <span><span class="dot" style="background:var(--accent-soft);border:1px solid var(--accent);"></span>Disponível</span>
       <span><span class="dot" style="background:var(--rust-soft);border:1px solid var(--rust);"></span>Indisponível</span>
+      <span><span class="dot" style="background:#dfe9f7;border:1px solid #25507e;"></span>Turno (é o horário normal dele)</span>
     </div>
     <div class="disp-cards" id="dispCards"></div>
 
@@ -3089,8 +3091,8 @@ function renderDispTab(){
         if(dayHasSlot(dayKey, slot.start, slot.end)){
           const key = dayKey+'|'+slot.start+'-'+slot.end;
           const state = data[key] || '';
-          const cls = state==='sim' ? 'avail-yes' : (state==='nao' ? 'avail-no' : '');
-          const label = state==='sim' ? 'Sim' : (state==='nao' ? 'Não' : '—');
+          const cls = state==='sim' ? 'avail-yes' : (state==='nao' ? 'avail-no' : (state==='turno' ? 'avail-turno' : ''));
+          const label = state==='sim' ? 'Sim' : (state==='nao' ? 'Não' : (state==='turno' ? 'Turno' : '—'));
           rowCells += '<td><button type="button" class="disp-slot-btn '+cls+'" data-name="'+encodeURIComponent(name)+'" data-key="'+key+'">'+label+'</button></td>';
         } else {
           rowCells += '<td><div class="disp-slot-empty"></div></td>';
@@ -3109,13 +3111,13 @@ function renderDispTab(){
       const key = e.target.dataset.key;
       if(!AVAILABILITY[name]) AVAILABILITY[name] = {};
       const current = AVAILABILITY[name][key] || '';
-      // ciclo: por definir -> disponível -> indisponível -> por definir
-      const next = current==='' ? 'sim' : (current==='sim' ? 'nao' : '');
+      // ciclo: por definir -> disponível -> indisponível -> turno (normal dele) -> por definir
+      const next = current==='' ? 'sim' : (current==='sim' ? 'nao' : (current==='nao' ? 'turno' : ''));
       if(next) AVAILABILITY[name][key] = next;
       else delete AVAILABILITY[name][key];
       saveAvailability(AVAILABILITY);
-      e.target.className = 'disp-slot-btn ' + (next==='sim' ? 'avail-yes' : (next==='nao' ? 'avail-no' : ''));
-      e.target.textContent = next==='sim' ? 'Sim' : (next==='nao' ? 'Não' : '—');
+      e.target.className = 'disp-slot-btn ' + (next==='sim' ? 'avail-yes' : (next==='nao' ? 'avail-no' : (next==='turno' ? 'avail-turno' : '')));
+      e.target.textContent = next==='sim' ? 'Sim' : (next==='nao' ? 'Não' : (next==='turno' ? 'Turno' : '—'));
       renderDispShiftSummary();
     });
   });
@@ -3137,7 +3139,7 @@ function renderDispShiftSummary(){
       if(!dayHasSlot(dayKey, slot.start, slot.end)) return;
       anyRow = true;
       const key = dayKey+'|'+slot.start+'-'+slot.end;
-      const availableNames = names.filter(n => (AVAILABILITY[n] && AVAILABILITY[n][key]) === 'sim');
+      const availableNames = names.filter(n => ['sim','turno'].includes(AVAILABILITY[n] && AVAILABILITY[n][key]));
       const tr = document.createElement('tr');
       tr.innerHTML =
         '<td data-label="Dia">'+dayKey+'</td>'+
