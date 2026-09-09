@@ -3465,19 +3465,13 @@ document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
       y += (lineH||6);
     });
   }
-  function bulletList(items, color){
-    doc.setFont('helvetica','normal'); doc.setFontSize(11);
-    items.forEach(item=>{
-      const lines = doc.splitTextToSize(item, pageW - marginX*2 - 6);
-      lines.forEach((line,idx)=>{
-        ensureSpace(6.2);
-        doc.setTextColor(color[0],color[1],color[2]);
-        if(idx===0) doc.text('•', marginX, y);
-        doc.setTextColor(28,35,33);
-        doc.text(line, marginX+5, y);
-        y += 6.2;
-      });
-    });
+  function joinNatural(arr){
+    if(arr.length===0) return '';
+    if(arr.length===1) return arr[0];
+    return arr.slice(0,-1).join(', ') + ' e ' + arr[arr.length-1];
+  }
+  function lowerFirst(s){
+    return s ? s.charAt(0).toLowerCase()+s.slice(1) : s;
   }
 
   // Cabeçalho
@@ -3510,17 +3504,28 @@ document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
   doc.text('Patamar atual: '+threeTier.label+'  ·  Classificação: '+fiveTier.label, marginX+6, y+13);
   y += 24;
 
-  // Pontos fortes
+  // Pontos fortes — em texto corrido, não por tópicos
   heading('Pontos fortes', [47,111,78]);
-  if(top.length>0) bulletList(top.map(l=>l), [47,111,78]);
-  else paragraph('Ainda sem critérios em nível Top nesta avaliação — há um caminho claro a construir.', 10.5, [86,95,92], 5.6);
+  if(top.length>0){
+    const strengthsText = 'Os teus pontos fortes atuais incluem '+joinNatural(top)+'. Estas são áreas em que já demonstras um bom domínio, e que valem a pena manteres em foco enquanto trabalhas o resto.';
+    paragraph(strengthsText, 11, [28,35,33], 6.2);
+  } else {
+    paragraph('Ainda sem critérios em nível Top nesta avaliação — há um caminho claro a construir a partir daqui.', 11, [28,35,33], 6.2);
+  }
   y += 4;
 
-  // Áreas a desenvolver
-  const growth = [].concat(low.map(w=>w.label+': '+(CRITERION_SUGGESTIONS[w.key]||'')), average.map(w=>w.label+': '+(CRITERION_SUGGESTIONS[w.key]||'')));
+  // Áreas a desenvolver — também em texto corrido, integrando as sugestões numa narrativa
   heading('O que fazer para chegares a Top Performer', [168,50,50]);
-  if(growth.length>0) bulletList(growth, [168,50,50]);
-  else paragraph('Já estás em nível Top em todos os critérios — o foco agora é manter a consistência.', 10.5, [86,95,92], 5.6);
+  const growthItems = [].concat(
+    low.map(w => ({label:w.label, text:CRITERION_SUGGESTIONS[w.key]||''})),
+    average.map(w => ({label:w.label, text:CRITERION_SUGGESTIONS[w.key]||''}))
+  );
+  if(growthItems.length>0){
+    const growthText = growthItems.map(g => 'Em '+g.label+', '+lowerFirst(g.text)).join(' ');
+    paragraph(growthText, 11, [28,35,33], 6.2);
+  } else {
+    paragraph('Já estás em nível Top em todos os critérios — o foco agora é manter a consistência.', 11, [28,35,33], 6.2);
+  }
   y += 4;
 
   // Plano de melhoria (texto livre, se preenchido)
