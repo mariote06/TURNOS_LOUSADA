@@ -51,6 +51,8 @@
   .brand{font-size:26px;font-weight:700;letter-spacing:-0.01em;margin:0;}
   .brand small{display:block;font-family:'Inter';font-weight:500;font-size:13px;color:var(--ink-soft);letter-spacing:0;margin-top:4px;}
   .tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;}
+  .sub-tabs{margin-bottom:18px;flex-wrap:wrap;border-radius:14px;}
+  .sub-tabs .tab-btn{font-size:13px;padding:7px 15px;}
   .tab-btn{border:none;background:transparent;padding:8px 18px;border-radius:999px;font:600 14px 'Inter';color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;}
   .tab-btn.active{background:var(--accent);color:#fff;}
 
@@ -433,20 +435,27 @@
     <div>
       <h1 class="brand">Turnos de Sala <small>Equipa de Técnicos de Exercício Físico · Set 2026 — Dez 2030</small></h1>
     </div>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="cal">Calendário</button>
-      <button class="tab-btn" data-tab="tpl">Horário Base</button>
-      <button class="tab-btn" data-tab="tec">Técnicos</button>
-      <button class="tab-btn" data-tab="feriados">Feriados</button>
-      <button class="tab-btn" data-tab="fin">Finanças</button>
-      <button class="tab-btn" data-tab="equip">Equipamento</button>
-      <button class="tab-btn" data-tab="disp">Disponibilidade</button>
-      <button class="tab-btn" data-tab="aval">Avaliação</button>
-      <button class="tab-btn" data-tab="recrut">Recrutamento</button>
-      <button class="tab-btn" data-tab="ptcount">Contabilização PT</button>
-      <button class="tab-btn" data-tab="ferias">Férias</button>
+    <div class="tabs" id="groupTabs">
+      <button class="tab-btn active" data-group="sala">Sala</button>
+      <button class="tab-btn" data-group="equipa">Equipa</button>
+      <button class="tab-btn" data-group="gestao">Gestão</button>
     </div>
   </div>
+
+  <div class="tabs sub-tabs" id="subTabs">
+    <button class="tab-btn active" data-tab="cal" data-owner="sala">Calendário</button>
+    <button class="tab-btn" data-tab="feriados" data-owner="sala">Feriados</button>
+    <button class="tab-btn" data-tab="tpl" data-owner="sala">Horário Base</button>
+    <button class="tab-btn" data-tab="ferias" data-owner="sala">Férias</button>
+    <button class="tab-btn" data-tab="tec" data-owner="equipa" style="display:none;">Técnicos</button>
+    <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
+    <button class="tab-btn" data-tab="equip" data-owner="equipa" style="display:none;">Equipamento</button>
+    <button class="tab-btn" data-tab="recrut" data-owner="equipa" style="display:none;">Recrutamento</button>
+    <button class="tab-btn" data-tab="aval" data-owner="gestao" style="display:none;">Avaliação</button>
+    <button class="tab-btn" data-tab="ptcount" data-owner="gestao" style="display:none;">Contabilização PT</button>
+    <button class="tab-btn" data-tab="fin" data-owner="gestao" style="display:none;">Finanças</button>
+  </div>
+
 
   <div class="sync-bar" id="linkSyncSection">
     <div class="sync-row-title">Sincronização entre dispositivos</div>
@@ -3846,9 +3855,9 @@ function renderFeriasTab(){
 /* ---------------------------------------------------------------
    TABS
 --------------------------------------------------------------- */
-document.querySelectorAll('.tab-btn').forEach(btn=>{
+document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#subTabs .tab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     document.getElementById('tab-cal').style.display = tab==='cal' ? '' : 'none';
@@ -3872,6 +3881,19 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
     if(tab==='ferias') renderFeriasTab();
+  });
+});
+
+document.querySelectorAll('#groupTabs .tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#groupTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const group = btn.dataset.group;
+    const subButtons = document.querySelectorAll('#subTabs .tab-btn');
+    subButtons.forEach(b=>{ b.style.display = b.dataset.owner===group ? '' : 'none'; });
+    // ativa automaticamente o primeiro separador desse grupo
+    const firstOfGroup = document.querySelector('#subTabs .tab-btn[data-owner="'+group+'"]');
+    if(firstOfGroup) firstOfGroup.click();
   });
 });
 
