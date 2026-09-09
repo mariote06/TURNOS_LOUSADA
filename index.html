@@ -71,6 +71,8 @@
   .monthbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
   .monthbar-left{display:flex;align-items:center;gap:10px;}
   .nav-btn{border:1px solid var(--line);background:var(--paper);width:36px;height:36px;border-radius:8px;font-size:16px;cursor:pointer;color:var(--ink);}
+  .tec-year-nav{display:flex;align-items:center;gap:12px;margin:18px 0 14px;}
+  .tec-year-nav span{font:700 16px 'Space Grotesk';min-width:50px;text-align:center;}
   .nav-btn:hover{background:var(--accent-soft);border-color:var(--accent);}
   .month-select{font:600 17px 'Space Grotesk';border:none;background:transparent;color:var(--ink);cursor:pointer;}
   .actions{display:flex;gap:8px;flex-wrap:wrap;}
@@ -543,7 +545,7 @@
   <div id="tab-tec" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
       Define o vínculo de cada técnico (dependente ou independente) e o valor/hora de cada tipo de vínculo.
-      As horas são calculadas a partir do calendário Set 2026 – Dez 2030: se um turno foi substituído nesse dia,
+      As horas e o valor estimado abaixo são por ano — usa as setas para mudares de ano. Se um turno foi substituído nesse dia,
       as horas contam para quem substituiu, não para o titular. Quando atualizares um valor/hora, indica a partir
       de que data entra em vigor — os turnos anteriores a essa data mantêm o valor antigo.
     </p>
@@ -574,10 +576,16 @@
       <button class="btn" id="btnAddTec">+ Adicionar</button>
     </div>
 
+    <div class="tec-year-nav">
+      <button class="nav-btn" id="tecYearPrev">‹</button>
+      <span id="tecYearLabel">2026</span>
+      <button class="nav-btn" id="tecYearNext">›</button>
+    </div>
+
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="tecTable">
         <thead>
-          <tr><th>Cor</th><th>Técnico</th><th>Sexo</th><th>Vínculo</th><th>Horas no período</th><th>Valor estimado</th><th></th></tr>
+          <tr><th>Cor</th><th>Técnico</th><th>Sexo</th><th>Vínculo</th><th>Horas no ano</th><th>Valor estimado</th><th></th></tr>
         </thead>
         <tbody id="tecTableBody"></tbody>
       </table>
@@ -2193,13 +2201,14 @@ function hoursBetween(start, end){
   return mins > 0 ? mins/60 : 0;
 }
 
-function computeBudgetPerWorker(){
+function computeBudgetPerWorker(rangeStart, rangeEnd){
   // returns {worker: {hours, value}} — the rate applied to each shift is whichever
   // was in effect on that shift's own date, so past shifts keep their old value
   // even after a rate update.
   const data = {};
-  const d = new Date(RANGE_START);
-  while(d <= RANGE_END){
+  const d = new Date(rangeStart || RANGE_START);
+  const end = rangeEnd || RANGE_END;
+  while(d <= end){
     const iso = isoDate(d);
     const dKey = dayKeyOf(d);
     const shifts = shiftsForDate(iso, dKey);
@@ -2252,6 +2261,8 @@ function renderRateHistory(status, containerId){
   });
 }
 
+let tecYear = RANGE_START.getFullYear();
+
 function renderTecTab(){
   // discover any new names and register them (unclassified, gender guessed) without overwriting existing choices
   const allNames = collectAllWorkerNames();
@@ -2266,7 +2277,11 @@ function renderTecTab(){
   document.getElementById('newRateDateDep').value = isoDate(new Date());
   document.getElementById('newRateDateInd').value = isoDate(new Date());
 
-  const budget = computeBudgetPerWorker();
+  document.getElementById('tecYearLabel').textContent = tecYear;
+  document.getElementById('tecYearPrev').disabled = tecYear <= RANGE_START.getFullYear();
+  document.getElementById('tecYearNext').disabled = tecYear >= RANGE_END.getFullYear();
+  const yearRange = getYearRange(new Date(tecYear, 0, 1));
+  const budget = computeBudgetPerWorker(yearRange.start, yearRange.end);
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
 
   const tbody = document.getElementById('tecTableBody');
@@ -2351,8 +2366,15 @@ function renderTecTab(){
     (totalUnclassifiedHours>0.05 ? '<div><div class="stat-label">Horas por classificar</div><div class="stat-value" style="color:var(--rust)">'+fmtHours(totalUnclassifiedHours)+' h</div></div>' : '') +
     '<div><div class="stat-label">Valor · Dependentes</div><div class="stat-value">'+fmtEUR(totalDepVal)+'</div></div>'+
     '<div><div class="stat-label">Valor · Independentes</div><div class="stat-value">'+fmtEUR(totalIndVal)+'</div></div>'+
-    '<div><div class="stat-label">Orçamento total (Set 2026 – Dez 2030)</div><div class="stat-value total">'+fmtEUR(grandTotal)+'</div></div>';
+    '<div><div class="stat-label">Orçamento total ('+tecYear+')</div><div class="stat-value total">'+fmtEUR(grandTotal)+'</div></div>';
 }
+
+document.getElementById('tecYearPrev').addEventListener('click', ()=>{
+  if(tecYear > RANGE_START.getFullYear()){ tecYear--; renderTecTab(); }
+});
+document.getElementById('tecYearNext').addEventListener('click', ()=>{
+  if(tecYear < RANGE_END.getFullYear()){ tecYear++; renderTecTab(); }
+});
 
 document.getElementById('btnAddRateDep').addEventListener('click', ()=>{
   const from = document.getElementById('newRateDateDep').value;
