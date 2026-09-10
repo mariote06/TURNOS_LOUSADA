@@ -890,8 +890,13 @@
   <!-- CONTABILIZAÇÃO PT TAB -->
   <div id="tab-ptcount" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
-      Contagem de sessões de PT (internos/externos) e das tarefas anexas ao serviço de PT — prescrição de treino, avaliação física e treino de integração. Os valores gravam-se automaticamente ao escreveres.
+      Contagem de sessões de PT (internos/externos) e das tarefas anexas ao serviço de PT — prescrição de treino, avaliação física e treino de integração, por mês. Os valores gravam-se automaticamente ao escreveres.
     </p>
+    <div class="tec-year-nav">
+      <button class="nav-btn" id="ptCountMonthPrev">‹</button>
+      <span id="ptCountMonthLabel">Setembro 2026</span>
+      <button class="nav-btn" id="ptCountMonthNext">›</button>
+    </div>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="ptCountTable">
         <thead>
@@ -3965,13 +3970,34 @@ function renderCandidates(){
 /* ---------------------------------------------------------------
    CONTABILIZAÇÃO PT — sessões internas/externas por técnico
 --------------------------------------------------------------- */
-const STORE_PT_COUNTS = 'tef_turnos_pt_contagem_v1'; // {tecnico: {internos:N, externos:N}}
+const STORE_PT_COUNTS = 'tef_turnos_pt_contagem_v1'; // {"YYYY-MM": {tecnico: {internos:N, externos:N, ...}}}
 function loadPtCounts(){
-  try{ const raw = localStorage.getItem(STORE_PT_COUNTS); if(raw) return JSON.parse(raw); }catch(e){}
-  return {};
+  let data = {};
+  try{ const raw = localStorage.getItem(STORE_PT_COUNTS); if(raw) data = JSON.parse(raw); }catch(e){}
+  // migração: a versão anterior guardava {tecnico: {...}} sem mês — se detetarmos esse
+  // formato antigo (uma chave que não parece "YYYY-MM" e cujo valor tem "internos"),
+  // passamos tudo para o mês atual em vez de perder os dados já inseridos.
+  const keys = Object.keys(data);
+  const looksOld = keys.length>0 && keys.some(k=> !/^\d{4}-\d{2}$/.test(k));
+  if(looksOld){
+    const currentKey = isoDate(new Date()).slice(0,7);
+    data = {[currentKey]: data};
+  }
+  return data;
 }
 function savePtCounts(p){ localStorage.setItem(STORE_PT_COUNTS, JSON.stringify(p)); touchMeta(); }
 let PT_COUNTS = loadPtCounts();
+
+// navegação por mês, alinhada com o mesmo MONTH_LIST do calendário (índice 0 = Set 2026)
+let ptCountMonthIdx = (function(){
+  const now = new Date();
+  const idx = MONTH_LIST.findIndex(m=> m.year===now.getFullYear() && m.month===now.getMonth());
+  return idx>=0 ? idx : 0;
+})();
+function ptCountMonthKey(){
+  const m = MONTH_LIST[ptCountMonthIdx];
+  return m.year+'-'+pad(m.month+1);
+}
 
 const PT_TASK_FIELDS = [
   {key:'prescricao', label:'Prescrição de Treino', rankTarget:'rankPrescricao', totalId:'ptCountTotalPrescricao'},
@@ -3983,6 +4009,12 @@ function renderPtCountTab(){
   const tbody = document.getElementById('ptCountTableBody');
   tbody.innerHTML = '';
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  const monthKey = ptCountMonthKey();
+  const monthData = PT_COUNTS[monthKey] || {};
+  const m = MONTH_LIST[ptCountMonthIdx];
+  document.getElementById('ptCountMonthLabel').textContent = MONTH_NAMES[m.month]+' '+m.year;
+  document.getElementById('ptCountMonthPrev').disabled = ptCountMonthIdx <= 0;
+  document.getElementById('ptCountMonthNext').disabled = ptCountMonthIdx >= MONTH_LIST.length-1;
 
   if(names.length === 0){
     tbody.innerHTML = '<tr><td colspan="7" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
@@ -3991,7 +4023,7 @@ function renderPtCountTab(){
   }
 
   names.forEach(name=>{
-    const entry = PT_COUNTS[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0};
+    const entry = monthData[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0};
     let taskCells = '';
     PT_TASK_FIELDS.forEach(f=>{
       taskCells += '<td data-label="'+f.label+'"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="'+f.key+'" '+
@@ -4014,12 +4046,14 @@ function renderPtCountTab(){
       const name = decodeURIComponent(e.target.dataset.name);
       const field = e.target.dataset.field;
       const val = parseInt(e.target.value, 10) || 0;
-      if(!PT_COUNTS[name]) PT_COUNTS[name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0};
-      PT_COUNTS[name][field] = val;
+      const mKey = ptCountMonthKey();
+      if(!PT_COUNTS[mKey]) PT_COUNTS[mKey] = {};
+      if(!PT_COUNTS[mKey][name]) PT_COUNTS[mKey][name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0};
+      PT_COUNTS[mKey][name][field] = val;
       savePtCounts(PT_COUNTS);
       const row = e.target.closest('tr');
-      const internos = PT_COUNTS[name].internos || 0;
-      const externos = PT_COUNTS[name].externos || 0;
+      const internos = PT_COUNTS[mKey][name].internos || 0;
+      const externos = PT_COUNTS[mKey][name].externos || 0;
       row.querySelector('.pt-row-total').textContent = internos + externos;
       updatePtCountTotals();
     });
@@ -4046,9 +4080,10 @@ function updatePtCountTotals(){
   let totalInternos = 0, totalExternos = 0;
   const taskTotals = {prescricao:0, avaliacao_fisica:0, treino_integracao:0};
   const names = Object.keys(TECH_REGISTRY);
+  const monthData = PT_COUNTS[ptCountMonthKey()] || {};
 
   names.forEach(name=>{
-    const e = PT_COUNTS[name];
+    const e = monthData[name];
     if(!e) return;
     totalInternos += e.internos || 0;
     totalExternos += e.externos || 0;
@@ -4063,16 +4098,23 @@ function updatePtCountTotals(){
   PT_TASK_FIELDS.forEach(f=>{ document.getElementById(f.totalId).textContent = taskTotals[f.key]; });
 
   renderPtRanking('rankTreinosVendidos', names.map(name=>{
-    const e = PT_COUNTS[name] || {};
+    const e = monthData[name] || {};
     return {name, value:(e.internos||0)+(e.externos||0)};
   }));
   PT_TASK_FIELDS.forEach(f=>{
     renderPtRanking(f.rankTarget, names.map(name=>{
-      const e = PT_COUNTS[name] || {};
+      const e = monthData[name] || {};
       return {name, value:e[f.key]||0};
     }));
   });
 }
+
+document.getElementById('ptCountMonthPrev').addEventListener('click', ()=>{
+  if(ptCountMonthIdx > 0){ ptCountMonthIdx--; renderPtCountTab(); }
+});
+document.getElementById('ptCountMonthNext').addEventListener('click', ()=>{
+  if(ptCountMonthIdx < MONTH_LIST.length-1){ ptCountMonthIdx++; renderPtCountTab(); }
+});
 
 /* ---------------------------------------------------------------
    FÉRIAS — saldo de horas dos técnicos Dependentes. Marcar um dia
