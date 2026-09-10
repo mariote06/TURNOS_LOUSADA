@@ -249,6 +249,14 @@
   .tier-badge.tier-top{background:var(--accent-soft);color:var(--accent);}
   .tier-badge.tier-average{background:var(--gold-bg);color:var(--gold-ink);}
   .tier-badge.tier-low{background:var(--rust-soft);color:var(--rust);}
+  .pt-ranking-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .pt-ranking-col{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .pt-ranking-col h4{margin:0 0 10px;font-size:13.5px;}
+  .pt-rank-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+  .pt-rank-row:last-child{border-bottom:none;}
+  .pt-rank-pos{font-weight:700;color:var(--ink-soft);width:22px;flex-shrink:0;}
+  .pt-rank-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pt-rank-val{font-weight:700;color:var(--accent);}
   .recrut-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
   .recrut-form-grid label{display:flex;flex-direction:column;gap:6px;font:600 12px 'Inter';color:var(--ink-soft);}
   .recrut-form-grid input, .recrut-form-grid select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;}
@@ -750,7 +758,7 @@
   <!-- AVALIAÇÃO TAB -->
   <div id="tab-aval" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
-      Grelha de avaliação de desempenho do TEF de sala — 15 critérios em 5 parâmetros, pontuados de 1 a 5. A pontuação total e a classificação calculam-se sozinhas.
+      Grelha de avaliação de desempenho do TEF de sala — 20 critérios em 6 parâmetros, pontuados de 1 a 5 (máximo 100 pontos). A pontuação total e a classificação calculam-se sozinhas.
     </p>
 
     <div class="panel" style="padding:16px 18px;">
@@ -817,7 +825,7 @@
 
     <h3 style="font-size:15px;margin:26px 0 10px;">Distribuição por desempenho</h3>
     <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-      Com base na avaliação mais recente de cada técnico: Top Performer (≥45 pontos) · Average Performer (30–44) · Low Performer (&lt;30).
+      Com base na avaliação mais recente de cada técnico: Top Performer (≥60 pontos) · Average Performer (40–59) · Low Performer (&lt;40).
     </p>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="tierTable">
@@ -882,12 +890,12 @@
   <!-- CONTABILIZAÇÃO PT TAB -->
   <div id="tab-ptcount" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
-      Contagem de sessões de PT por técnico — internos (clientes do ginásio) e externos. Os valores gravam-se automaticamente ao escreveres.
+      Contagem de sessões de PT (internos/externos) e das tarefas anexas ao serviço de PT — prescrição de treino, avaliação física e treino de integração. Os valores gravam-se automaticamente ao escreveres.
     </p>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="ptCountTable">
         <thead>
-          <tr><th>PT</th><th>Internos</th><th>Externos</th><th>Total</th></tr>
+          <tr><th>PT</th><th>Internos</th><th>Externos</th><th>Treinos vendidos</th><th>Prescrição de Treino</th><th>Avaliação Física</th><th>Treino de Integração</th></tr>
         </thead>
         <tbody id="ptCountTableBody"></tbody>
         <tfoot>
@@ -895,10 +903,33 @@
             <td data-label="Total">TOTAL</td>
             <td data-label="Internos" id="ptCountTotalInternos">0</td>
             <td data-label="Externos" id="ptCountTotalExternos">0</td>
-            <td data-label="Total" id="ptCountTotalGeral">0</td>
+            <td data-label="Treinos vendidos" id="ptCountTotalGeral">0</td>
+            <td data-label="Prescrição de Treino" id="ptCountTotalPrescricao">0</td>
+            <td data-label="Avaliação Física" id="ptCountTotalAvaliacao">0</td>
+            <td data-label="Treino de Integração" id="ptCountTotalIntegracao">0</td>
           </tr>
         </tfoot>
       </table>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">Rankings</h3>
+    <div class="pt-ranking-grid">
+      <div class="pt-ranking-col">
+        <h4>🏆 Treinos vendidos</h4>
+        <div id="rankTreinosVendidos"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>📋 Prescrição de Treino</h4>
+        <div id="rankPrescricao"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>🩺 Avaliação Física</h4>
+        <div id="rankAvaliacao"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>🤝 Treino de Integração</h4>
+        <div id="rankIntegracao"></div>
+      </div>
     </div>
   </div>
 
@@ -3230,7 +3261,7 @@ function renderDispShiftSummary(){
 
 /* ---------------------------------------------------------------
    AVALIAÇÃO — grelha de desempenho do TEF de sala
-   15 critérios em 5 parâmetros, pontuados 1-5. Pontuação total
+   20 critérios em 6 parâmetros, pontuados 1-5. Pontuação total
    (soma, 15-75) e classificação calculadas automaticamente.
 --------------------------------------------------------------- */
 const EVAL_GROUPS = [
@@ -3253,18 +3284,25 @@ const EVAL_GROUPS = [
     {key:'presente', label:'Estar "Presente"', desc:'Atenção, concentração e disponibilidade durante todo o turno'},
     {key:'compromisso', label:'Compromisso com os objectivos do cliente', desc:'Alinhamento constante entre o treino e os objectivos do cliente'},
     {key:'observacao_ajuste', label:'Observação e ajuste contínuo', desc:'Monitorização e ajustes frequentes durante os treinos'},
-    {key:'feedback', label:'Feedback e acompanhamento do progresso', desc:'Gestão eficaz de horários e planeamento de treinos a médio/longo prazo'}
+    {key:'feedback', label:'Feedback e acompanhamento do progresso', desc:'Gestão eficaz de horários e planeamento de treinos a médio/longo prazo'},
+    {key:'gestao_multiplos', label:'Gestão de múltiplos clientes em simultâneo', desc:'Distribui a atenção de forma equilibrada e prioriza corretamente quando há vários clientes ao mesmo tempo'}
   ]},
   {name:'Higiene e Segurança', criteria:[
-    {key:'manutencao_espaco', label:'Manutenção do espaço e segurança', desc:'Garantir a limpeza, organização dos equipamentos e a segurança durante os treinos'},
+    {key:'manutencao_espaco', label:'Manutenção do espaço e segurança', desc:'Garantir a limpeza, organização e segurança durante os treinos; identificar e reportar avarias de equipamento; ensinar os clientes a usar corretamente as máquinas'},
     {key:'aparencia', label:'Aparência', desc:'Utiliza sempre uniforme/equipamento adequado'}
+  ]},
+  {name:'Profissionalismo e Compromisso', criteria:[
+    {key:'pontualidade', label:'Pontualidade e Assiduidade', desc:'Chega a horas ao início do turno; avisa com antecedência em caso de falta ou atraso'},
+    {key:'trabalho_equipa', label:'Trabalho em equipa com colegas', desc:'Comunica bem nas passagens de turno e mostra disponibilidade para ajudar colegas ou fazer substituições'},
+    {key:'iniciativa', label:'Iniciativa e resolução de problemas', desc:'Toma decisões perante imprevistos sem esperar por instruções e propõe melhorias ao funcionamento da sala'},
+    {key:'formacao_continua', label:'Atualização profissional contínua', desc:'Procura formação ou informação adicional por iniciativa própria e aplica conhecimentos novos no trabalho diário'}
   ]}
 ];
 const EVAL_CLASS_TABLE = [
-  {min:60, label:'Excelente', desc:'Excede consistentemente as expectativas, demonstrando alto nível de competência em todas as áreas.'},
-  {min:45, label:'Muito bom', desc:'Responde muito bem na maioria dos critérios, com pequenos pontos a melhorar.'},
-  {min:30, label:'Regular', desc:'Cumpre os requisitos básicos, mas existem áreas claras que podem ser melhoradas.'},
-  {min:18, label:'Insatisfatório', desc:'O desempenho é abaixo do esperado em várias áreas, necessitando de intervenção e melhorias.'},
+  {min:80, label:'Excelente', desc:'Excede consistentemente as expectativas, demonstrando alto nível de competência em todas as áreas.'},
+  {min:60, label:'Muito bom', desc:'Responde muito bem na maioria dos critérios, com pequenos pontos a melhorar.'},
+  {min:40, label:'Regular', desc:'Cumpre os requisitos básicos, mas existem áreas claras que podem ser melhoradas.'},
+  {min:24, label:'Insatisfatório', desc:'O desempenho é abaixo do esperado em várias áreas, necessitando de intervenção e melhorias.'},
   {min:-Infinity, label:'Não satisfaz os requisitos', desc:'Apresenta sérias deficiências e não atende às expectativas mínimas para o acompanhamento aos clientes.'}
 ];
 function classifyAvalScore(total){
@@ -3288,7 +3326,12 @@ const CRITERION_SUGGESTIONS = {
   observacao_ajuste: 'Observar com mais frequência a execução dos exercícios e ajustar em tempo real.',
   feedback: 'Dar feedback mais regular sobre o progresso e rever o planeamento a médio/longo prazo.',
   manutencao_espaco: 'Reforçar a organização, limpeza e segurança do espaço de treino.',
-  aparencia: 'Assegurar sempre a utilização do uniforme/equipamento adequado.'
+  aparencia: 'Assegurar sempre a utilização do uniforme/equipamento adequado.',
+  gestao_multiplos: 'Praticar a gestão de vários clientes em simultâneo, distribuindo a atenção de forma mais equilibrada.',
+  pontualidade: 'Reforçar a pontualidade no início do turno e avisar sempre com antecedência em caso de falta ou atraso.',
+  trabalho_equipa: 'Melhorar a comunicação nas passagens de turno e mostrar mais disponibilidade para ajudar colegas.',
+  iniciativa: 'Ganhar mais autonomia a resolver imprevistos e propor ativamente melhorias ao funcionamento da sala.',
+  formacao_continua: 'Procurar formação ou informação adicional por iniciativa própria e aplicá-la no trabalho diário.'
 };
 
 // Analisa as pontuações de uma avaliação: critérios em nível Top (4-5), Low (1-2), e
@@ -3521,7 +3564,7 @@ document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
   doc.roundedRect(marginX, y, pageW-marginX*2, 16, 2, 2, 'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('Pontuação: '+total+' / 75', marginX+6, y+7);
+  doc.text('Pontuação: '+total+' / 100', marginX+6, y+7);
   doc.setFontSize(11);
   doc.text('Patamar atual: '+threeTier.label+'  ·  Classificação: '+fiveTier.label, marginX+6, y+13);
   y += 24;
@@ -3585,7 +3628,7 @@ function renderAvalHistory(){
     tr.innerHTML =
       '<td data-label="Data">'+fmtDatePT(a.date)+'</td>'+
       '<td data-label="Técnico" style="font-weight:700;">'+a.tecnico+'</td>'+
-      '<td data-label="Pontuação" class="hrs">'+total+' / 75</td>'+
+      '<td data-label="Pontuação" class="hrs">'+total+' / 100</td>'+
       '<td data-label="Classificação">'+tier.label+'</td>'+
       '<td data-label=""><button class="rm-tec" title="Editar" data-id="'+a.id+'" data-action="edit" style="color:var(--accent);font-size:13px;">✎</button> '+
         '<button class="rm-tec" title="Remover" data-id="'+a.id+'" data-action="del">×</button></td>';
@@ -3641,8 +3684,8 @@ document.getElementById('btnExportAvalExcel').addEventListener('click', ()=>{
 /* ---------- Distribuição por desempenho: Top / Average / Low Performer ---------- */
 
 function tierFromScore(total){
-  if(total >= 45) return {key:'top', label:'Top Performer'};
-  if(total >= 30) return {key:'average', label:'Average Performer'};
+  if(total >= 60) return {key:'top', label:'Top Performer'};
+  if(total >= 40) return {key:'average', label:'Average Performer'};
   return {key:'low', label:'Low Performer'};
 }
 
@@ -3692,7 +3735,7 @@ function renderTierTable(){
         tr.innerHTML =
           '<td data-label="Técnico" style="font-weight:700;">'+r.name+'</td>'+
           '<td data-label="Última avaliação">'+fmtDatePT(r.date)+'</td>'+
-          '<td data-label="Pontuação" class="hrs">'+r.total+' / 75</td>'+
+          '<td data-label="Pontuação" class="hrs">'+r.total+' / 100</td>'+
           '<td data-label="Patamar"><span class="tier-badge tier-'+r.tier.key+'">'+r.tier.label+'</span></td>'+
           '<td data-label=""><button type="button" class="btn ghost tier-report-btn" data-name="'+encodeURIComponent(r.name)+'" style="padding:5px 10px;font-size:11.5px;">Ver relatório</button></td>';
       }
@@ -3930,19 +3973,30 @@ function loadPtCounts(){
 function savePtCounts(p){ localStorage.setItem(STORE_PT_COUNTS, JSON.stringify(p)); touchMeta(); }
 let PT_COUNTS = loadPtCounts();
 
+const PT_TASK_FIELDS = [
+  {key:'prescricao', label:'Prescrição de Treino', rankTarget:'rankPrescricao', totalId:'ptCountTotalPrescricao'},
+  {key:'avaliacao_fisica', label:'Avaliação Física', rankTarget:'rankAvaliacao', totalId:'ptCountTotalAvaliacao'},
+  {key:'treino_integracao', label:'Treino de Integração', rankTarget:'rankIntegracao', totalId:'ptCountTotalIntegracao'}
+];
+
 function renderPtCountTab(){
   const tbody = document.getElementById('ptCountTableBody');
   tbody.innerHTML = '';
   const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
 
   if(names.length === 0){
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
     updatePtCountTotals();
     return;
   }
 
   names.forEach(name=>{
-    const entry = PT_COUNTS[name] || {internos:0, externos:0};
+    const entry = PT_COUNTS[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0};
+    let taskCells = '';
+    PT_TASK_FIELDS.forEach(f=>{
+      taskCells += '<td data-label="'+f.label+'"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="'+f.key+'" '+
+        'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry[f.key]>0?entry[f.key]:'')+'" placeholder="0"></td>';
+    });
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td data-label="PT" style="font-weight:700;">'+name+'</td>'+
@@ -3950,7 +4004,8 @@ function renderPtCountTab(){
         'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry.internos>0?entry.internos:'')+'" placeholder="0"></td>'+
       '<td data-label="Externos"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="externos" '+
         'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry.externos>0?entry.externos:'')+'" placeholder="0"></td>'+
-      '<td data-label="Total" class="hrs pt-row-total">'+((entry.internos||0)+(entry.externos||0))+'</td>';
+      '<td data-label="Treinos vendidos" class="hrs pt-row-total">'+((entry.internos||0)+(entry.externos||0))+'</td>'+
+      taskCells;
     tbody.appendChild(tr);
   });
 
@@ -3959,7 +4014,7 @@ function renderPtCountTab(){
       const name = decodeURIComponent(e.target.dataset.name);
       const field = e.target.dataset.field;
       const val = parseInt(e.target.value, 10) || 0;
-      if(!PT_COUNTS[name]) PT_COUNTS[name] = {internos:0, externos:0};
+      if(!PT_COUNTS[name]) PT_COUNTS[name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0};
       PT_COUNTS[name][field] = val;
       savePtCounts(PT_COUNTS);
       const row = e.target.closest('tr');
@@ -3973,15 +4028,50 @@ function renderPtCountTab(){
   updatePtCountTotals();
 }
 
+function renderPtRanking(containerId, values){
+  const el = document.getElementById(containerId);
+  const sorted = values.filter(v=>v.value>0).sort((a,b)=> b.value-a.value);
+  if(sorted.length===0){
+    el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;font-size:12px;">Sem valores registados.</div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  el.innerHTML = sorted.map((v,idx)=>
+    '<div class="pt-rank-row"><span class="pt-rank-pos">'+(medals[idx]||(idx+1)+'.')+'</span>'+
+    '<span class="pt-rank-name">'+v.name+'</span><span class="pt-rank-val">'+v.value+'</span></div>'
+  ).join('');
+}
+
 function updatePtCountTotals(){
   let totalInternos = 0, totalExternos = 0;
-  Object.values(PT_COUNTS).forEach(e=>{
+  const taskTotals = {prescricao:0, avaliacao_fisica:0, treino_integracao:0};
+  const names = Object.keys(TECH_REGISTRY);
+
+  names.forEach(name=>{
+    const e = PT_COUNTS[name];
+    if(!e) return;
     totalInternos += e.internos || 0;
     totalExternos += e.externos || 0;
+    taskTotals.prescricao += e.prescricao || 0;
+    taskTotals.avaliacao_fisica += e.avaliacao_fisica || 0;
+    taskTotals.treino_integracao += e.treino_integracao || 0;
   });
+
   document.getElementById('ptCountTotalInternos').textContent = totalInternos;
   document.getElementById('ptCountTotalExternos').textContent = totalExternos;
   document.getElementById('ptCountTotalGeral').textContent = totalInternos + totalExternos;
+  PT_TASK_FIELDS.forEach(f=>{ document.getElementById(f.totalId).textContent = taskTotals[f.key]; });
+
+  renderPtRanking('rankTreinosVendidos', names.map(name=>{
+    const e = PT_COUNTS[name] || {};
+    return {name, value:(e.internos||0)+(e.externos||0)};
+  }));
+  PT_TASK_FIELDS.forEach(f=>{
+    renderPtRanking(f.rankTarget, names.map(name=>{
+      const e = PT_COUNTS[name] || {};
+      return {name, value:e[f.key]||0};
+    }));
+  });
 }
 
 /* ---------------------------------------------------------------
