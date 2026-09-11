@@ -2452,7 +2452,7 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
    Stock do Ginásio --[abater]--> Equipamentos abatidos
 --------------------------------------------------------------- */
 const SIZE_LETTERS = ['XS','S','M','L','XL'];
-const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT','T-shirt Estagiário','T-shirt Estagiária'];
+const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT','T-shirt Estágio'];
 const STORE_EQUIP = 'tef_turnos_equipamento_v1';           // {tecnico: {tipo: {tamanho: qtd}}}      — encomendas pendentes por técnico
 const STORE_TEF_STOCK = 'tef_turnos_stock_tecnico_v1';     // {tecnico: {tipo: {tamanho: qtd}}}      — na posse do técnico
 const STORE_STOCK = 'tef_turnos_stock_v1';                 // {tipo: {F:{XS:qtd,...}, H:{...}}}      — armazém do ginásio
@@ -2493,6 +2493,54 @@ function loadGymOrders(){
 }
 function saveGymOrders(g){ localStorage.setItem(STORE_GYM_ORDERS, JSON.stringify(g)); touchMeta(); }
 let GYM_ORDERS = loadGymOrders();
+
+// Migração: "T-shirt Estagiário"/"T-shirt Estagiária" deixaram de existir como tipos
+// separados — junta o que já estivesse guardado com esses nomes em "T-shirt Estágio",
+// em vez de perder os dados.
+(function migrateEstagiarioTshirt(){
+  const OLD_NAMES = ['T-shirt Estagiário', 'T-shirt Estagiária'];
+  const NEW_NAME = 'T-shirt Estágio';
+
+  function migrateNestedByPerson(store){
+    let changed = false;
+    Object.keys(store).forEach(person=>{
+      OLD_NAMES.forEach(oldName=>{
+        if(store[person][oldName]){
+          if(!store[person][NEW_NAME]) store[person][NEW_NAME] = {};
+          Object.keys(store[person][oldName]).forEach(size=>{
+            store[person][NEW_NAME][size] = (store[person][NEW_NAME][size]||0) + store[person][oldName][size];
+          });
+          delete store[person][oldName];
+          changed = true;
+        }
+      });
+    });
+    return changed;
+  }
+  function migrateFlatByType(store){
+    let changed = false;
+    OLD_NAMES.forEach(oldName=>{
+      if(store[oldName]){
+        if(!store[NEW_NAME]) store[NEW_NAME] = {};
+        Object.keys(store[oldName]).forEach(gender=>{
+          if(!store[NEW_NAME][gender]) store[NEW_NAME][gender] = {};
+          Object.keys(store[oldName][gender]).forEach(size=>{
+            store[NEW_NAME][gender][size] = (store[NEW_NAME][gender][size]||0) + store[oldName][gender][size];
+          });
+        });
+        delete store[oldName];
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  if(migrateNestedByPerson(EQUIPMENT)) saveEquipment(EQUIPMENT);
+  if(migrateNestedByPerson(TEF_STOCK)) saveTefStock(TEF_STOCK);
+  if(migrateFlatByType(STOCK)) saveStock(STOCK);
+  if(migrateFlatByType(WRITTEN_OFF)) saveWrittenOff(WRITTEN_OFF);
+  if(migrateFlatByType(GYM_ORDERS)) saveGymOrders(GYM_ORDERS);
+})();
 
 // Opções fixas dos formulários — só precisam de ser criadas uma vez.
 (function initEquipFormOptions(){
