@@ -2779,6 +2779,12 @@ function computeEquipSummary(){
         if(stockQty>0){ byGender[g].stock += stockQty; byGender[g].stockSizes[sz] = stockQty; }
         const woQty = (WRITTEN_OFF[type] && WRITTEN_OFF[type][g] && WRITTEN_OFF[type][g][sz]) || 0;
         if(woQty>0){ byGender[g].writtenOff += woQty; byGender[g].writtenOffSizes[sz] = woQty; }
+        // encomendas diretas para o ginásio contam para o pendente da mesma forma que os pedidos dos técnicos
+        const gymQty = (GYM_ORDERS[type] && GYM_ORDERS[type][g] && GYM_ORDERS[type][g][sz]) || 0;
+        if(gymQty>0){
+          byGender[g].pending += gymQty;
+          byGender[g].pendingSizes[sz] = (byGender[g].pendingSizes[sz]||0) + gymQty;
+        }
       });
       Object.keys(byGender[g].pendingSizes).forEach(sz=>{
         byGender[g].needed += Math.max(0, byGender[g].pendingSizes[sz] - (byGender[g].stockSizes[sz]||0));
