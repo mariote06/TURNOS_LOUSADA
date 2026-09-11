@@ -3196,6 +3196,18 @@ document.getElementById('btnExportEquipExcel').addEventListener('click', async (
     });
   });
 
+  // encomendas diretas para o ginásio (sem técnico associado) — contam como pendentes, tal como os pedidos dos técnicos
+  const gymGenderLabels = {F:'Mulher', H:'Homem', U:'Unisexo'};
+  EQUIP_TYPES.forEach(type=>{
+    ['F','H','U'].forEach(g=>{
+      const sizes = GYM_ORDERS[type] && GYM_ORDERS[type][g];
+      if(!sizes) return;
+      Object.keys(sizes).forEach(sz=>{
+        if(sizes[sz]>0){ const r = wsByTec.addRow(['Ginásio', gymGenderLabels[g], type, sz, sizes[sz], 'Pendente']); r.getCell(1).font = {bold:true, italic:true}; }
+      });
+    });
+  });
+
   // cor por linha consoante o estado: verde para Entregue, âmbar para Pendente
   wsByTec.eachRow((row, rowNum)=>{
     if(rowNum===1) return; // cabeçalho
