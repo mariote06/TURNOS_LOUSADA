@@ -513,7 +513,8 @@
       <div class="actions">
         <button class="btn" id="btnToday">Mês atual</button>
         <button class="btn" id="btnPrint">Imprimir mês</button>
-        <button class="btn primary" id="btnExport">Exportar ano (CSV)</button>
+        <button class="btn" id="btnExportMonth">Exportar mês (Excel)</button>
+        <button class="btn primary" id="btnExportYear">Exportar ano (Excel)</button>
       </div>
     </div>
 
@@ -4383,10 +4384,24 @@ document.querySelectorAll('#groupTabs .tab-btn').forEach(btn=>{
 /* ---------------------------------------------------------------
    EXPORT CSV
 --------------------------------------------------------------- */
-document.getElementById('btnExport').addEventListener('click', ()=>{
-  const rows = [['Data','Dia da semana','Feriado','Tipo de feriado','Hora início','Hora fim','TEF titular','Substituto','Nota']];
-  const d = new Date(RANGE_START);
-  while(d <= RANGE_END){
+async function exportScheduleExcel(rangeStart, rangeEnd, filename){
+  if(typeof ExcelJS === 'undefined'){
+    alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online da primeira vez que exportas).');
+    return;
+  }
+  const THICK = {style:'medium', color:{argb:'FF404040'}};
+  function addBorders(ws){
+    ws.eachRow({includeEmpty:true}, (row)=>{
+      row.eachCell({includeEmpty:true}, (cell)=>{
+        cell.border = {top:THICK, bottom:THICK, left:THICK, right:THICK};
+      });
+    });
+  }
+
+  const header = ['Data','Dia da semana','Feriado','Tipo de feriado','Hora início','Hora fim','TEF titular','Substituto','Nota'];
+  const allRows = []; // {vals, isSubst}
+  const d = new Date(rangeStart);
+  while(d <= rangeEnd){
     const iso = isoDate(d);
     const dKey = dayKeyOf(d);
     const holiday = HOLIDAY_MAP[iso];
@@ -4394,27 +4409,68 @@ document.getElementById('btnExport').addEventListener('click', ()=>{
     const shifts = shiftsForDate(iso, dKey);
     const weekdayLabel = LONG_WEEKDAY[d.getDay()];
     if(shifts.length === 0){
-      rows.push([iso, weekdayLabel, holiday?holiday.name:'', holiday?holiday.type:'', '', '', '(sem turnos)', '', exc&&exc.note?exc.note:'']);
+      allRows.push({vals:[iso, weekdayLabel, holiday?holiday.name:'', holiday?holiday.type:'', '', '', '(sem turnos)', '', exc&&exc.note?exc.note:''], isSubst:false});
     } else {
       shifts.forEach(s=>{
-        rows.push([iso, weekdayLabel, holiday?holiday.name:'', holiday?holiday.type:'', s.start, s.end, s.name, s.substituteName||'', exc&&exc.note?exc.note:'']);
+        const isSubst = !!(s.substituteName && s.substituteName.trim());
+        allRows.push({vals:[iso, weekdayLabel, holiday?holiday.name:'', holiday?holiday.type:'', s.start, s.end, s.name, s.substituteName||'', exc&&exc.note?exc.note:''], isSubst});
       });
     }
     d.setDate(d.getDate()+1);
   }
-  const csv = rows.map(r => r.map(v=>{
-    const str = (v===undefined||v===null) ? '' : String(v);
-    return /[",;\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str;
-  }).join(';')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+
+  const wb = new ExcelJS.Workbook();
+
+  const wsAll = wb.addWorksheet('Calendário');
+  wsAll.columns = [{width:12},{width:16},{width:22},{width:14},{width:11},{width:11},{width:18},{width:18},{width:24}];
+  const headerRow = wsAll.addRow(header);
+  headerRow.font = {bold:true};
+  allRows.forEach(r=>{
+    const row = wsAll.addRow(r.vals);
+    if(r.isSubst){
+      row.font = {bold:true};
+      row.eachCell({includeEmpty:true}, (cell)=>{ cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFE699'}}; });
+    }
+  });
+  addBorders(wsAll);
+  wsAll.autoFilter = {from:{row:1, column:1}, to:{row:wsAll.rowCount, column:9}};
+
+  const substRows = allRows.filter(r=>r.isSubst);
+  const wsSubst = wb.addWorksheet('Substituições');
+  wsSubst.columns = wsAll.columns;
+  const headerRow2 = wsSubst.addRow(header);
+  headerRow2.font = {bold:true};
+  substRows.forEach(r=>{
+    const row = wsSubst.addRow(r.vals);
+    row.font = {bold:true};
+    row.eachCell({includeEmpty:true}, (cell)=>{ cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFE699'}}; });
+  });
+  if(substRows.length===0){
+    const emptyRow = wsSubst.addRow(['Sem substituições neste período.']);
+    emptyRow.font = {italic:true};
+  }
+  addBorders(wsSubst);
+  wsSubst.autoFilter = {from:{row:1, column:1}, to:{row:wsSubst.rowCount, column:9}};
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'turnos_TEF_set2026_dez2030.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+document.getElementById('btnExportMonth').addEventListener('click', async ()=>{
+  const {year, month} = MONTH_LIST[currentMonthIdx];
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month+1, 0);
+  await exportScheduleExcel(start, end, 'turnos_TEF_'+MONTH_NAMES[month]+'_'+year+'.xlsx');
+});
+document.getElementById('btnExportYear').addEventListener('click', async ()=>{
+  const {year, month} = MONTH_LIST[currentMonthIdx];
+  const range = getYearRange(new Date(year, month, 1));
+  await exportScheduleExcel(range.start, range.end, 'turnos_TEF_'+year+'.xlsx');
 });
 
 /* ---------------------------------------------------------------
