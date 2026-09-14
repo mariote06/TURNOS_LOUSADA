@@ -221,6 +221,15 @@
   .tec-summary .stat-value.total{color:var(--accent);}
 
   .aval-header-row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px;}
+  .aval-weights-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;}
+  .aval-weights-caret{font-size:13px;color:var(--ink-soft);}
+  .aval-weights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+  .aval-weight-item{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fbfaf7;border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .aval-weight-item span{font-size:12.5px;color:var(--ink);}
+  .aval-weight-item input{width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;font:600 13px 'Inter';}
+  .aval-weights-total{margin-top:10px;font:700 13px 'Space Grotesk';}
+  .aval-weights-total.ok{color:var(--accent);}
+  .aval-weights-total.warn{color:var(--gold-ink);}
   .aval-header-row label{display:flex;flex-direction:column;gap:6px;font:600 12px 'Inter';color:var(--ink-soft);}
   .aval-header-row select, .aval-header-row input{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:500 13.5px 'Inter';background:#fff;min-width:220px;}
   .aval-group{margin-bottom:18px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
@@ -764,6 +773,21 @@
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
       Grelha de avaliação de desempenho do TEF de sala — 20 critérios em 6 parâmetros, pontuados de 1 a 5 (máximo 100 pontos). A pontuação total e a classificação calculam-se sozinhas.
     </p>
+
+    <div class="panel" style="padding:14px 18px;margin-bottom:16px;">
+      <div class="aval-weights-head" id="avalWeightsToggle">
+        <h4 style="margin:0;font-size:13.5px;">⚖️ Peso de cada grupo na pontuação final</h4>
+        <span class="aval-weights-caret" id="avalWeightsCaret">▸</span>
+      </div>
+      <div id="avalWeightsBody" style="display:none;">
+        <p style="color:var(--ink-soft);font-size:12px;margin:8px 0 10px;">
+          Define a percentagem de cada grupo. Não precisam de somar exatamente 100% — a app ajusta proporcionalmente na mesma.
+        </p>
+        <div id="avalWeightsGrid" class="aval-weights-grid"></div>
+        <div class="aval-weights-total" id="avalWeightsTotal"></div>
+        <button type="button" class="btn ghost" id="btnResetWeights" style="margin-top:10px;">Repor pesos por omissão</button>
+      </div>
+    </div>
 
     <div class="panel" style="padding:16px 18px;">
       <div class="aval-header-row">
@@ -3410,6 +3434,41 @@ function classifyAvalScore(total){
   return EVAL_CLASS_TABLE[EVAL_CLASS_TABLE.length-1];
 }
 
+// Peso (%) de cada grupo na pontuação final — editável. Por omissão, os pesos
+// refletem o número de critérios de cada grupo (o mesmo que a soma simples já dava),
+// para nada mudar até o coordenador decidir ajustar.
+const STORE_GROUP_WEIGHTS = 'tef_turnos_pesos_avaliacao_v1';
+function defaultGroupWeights(){
+  const totalCriteria = EVAL_GROUPS.reduce((sum,g)=>sum+g.criteria.length, 0);
+  const w = {};
+  EVAL_GROUPS.forEach(g=>{ w[g.name] = Math.round((g.criteria.length/totalCriteria)*1000)/10; });
+  return w;
+}
+function loadGroupWeights(){
+  try{ const raw = localStorage.getItem(STORE_GROUP_WEIGHTS); if(raw) return JSON.parse(raw); }catch(e){}
+  return defaultGroupWeights();
+}
+function saveGroupWeights(w){ localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(w)); touchMeta(); }
+let GROUP_WEIGHTS = loadGroupWeights();
+
+// Pontuação total ponderada (0-100): a média de cada grupo (1-5) converte-se a
+// percentagem, pesa-se pelo peso do grupo, e normaliza-se pela soma dos pesos dos
+// grupos já respondidos — assim um grupo ainda por preencher não desce a nota.
+function computeWeightedTotal(scores){
+  let weightedSum = 0, weightUsed = 0;
+  EVAL_GROUPS.forEach(group=>{
+    const vals = group.criteria.map(c=>scores[c.key]).filter(v=>v!==undefined);
+    if(vals.length===0) return;
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const percent = (avg/5)*100;
+    const weight = GROUP_WEIGHTS[group.name] || 0;
+    weightedSum += percent*weight;
+    weightUsed += weight;
+  });
+  if(weightUsed===0) return 0;
+  return Math.round((weightedSum/weightUsed)*10)/10;
+}
+
 // Sugestão de ação de desenvolvimento para quando um critério fica em nível baixo (1-2).
 const CRITERION_SUGGESTIONS = {
   historico_cliente: 'Reforçar o levantamento e registo do histórico de cada cliente antes da primeira sessão (lesões, objetivos, experiência prévia).',
@@ -3505,7 +3564,7 @@ function updateAvalTotals(){
     const avgEl = document.querySelector('.aval-group-avg[data-group="'+group.name+'"]');
     if(avgEl) avgEl.textContent = vals.length ? ('média: '+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1)) : 'média: —';
   });
-  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  const total = computeWeightedTotal(scores);
   document.getElementById('avalTotalScore').textContent = total;
   const tier = classifyAvalScore(total);
   const hasAny = Object.keys(scores).length>0;
@@ -3518,6 +3577,47 @@ function updateAvalTotals(){
   document.getElementById('avalLowList').textContent = low.length ? low.map(l=>'✕ '+l.label).join('\n') : '';
   document.getElementById('avalPlanSuggestion').textContent = hasAny ? planText : '';
 }
+
+function renderAvalWeightsPanel(){
+  const grid = document.getElementById('avalWeightsGrid');
+  grid.innerHTML = EVAL_GROUPS.map(g=>{
+    const w = GROUP_WEIGHTS[g.name] !== undefined ? GROUP_WEIGHTS[g.name] : 0;
+    return '<div class="aval-weight-item"><span>'+g.name+'</span>'+
+      '<span style="display:flex;align-items:center;gap:4px;"><input type="number" min="0" max="100" step="0.5" class="aval-weight-input" data-group="'+encodeURIComponent(g.name)+'" value="'+w+'">%</span></div>';
+  }).join('');
+  updateAvalWeightsTotal();
+  grid.querySelectorAll('.aval-weight-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const group = decodeURIComponent(e.target.dataset.group);
+      GROUP_WEIGHTS[group] = parseFloat(e.target.value) || 0;
+      saveGroupWeights(GROUP_WEIGHTS);
+      updateAvalWeightsTotal();
+      updateAvalTotals();
+    });
+  });
+}
+function updateAvalWeightsTotal(){
+  const sum = Object.values(GROUP_WEIGHTS).reduce((a,b)=>a+b,0);
+  const el = document.getElementById('avalWeightsTotal');
+  const close100 = Math.abs(sum-100) < 0.05;
+  el.className = 'aval-weights-total ' + (close100 ? 'ok' : 'warn');
+  el.textContent = 'Total: '+sum.toFixed(1)+'%' + (close100 ? '' : ' (a app ajusta na mesma, mas para ficar exato faz somar 100%)');
+}
+document.getElementById('avalWeightsToggle').addEventListener('click', ()=>{
+  const body = document.getElementById('avalWeightsBody');
+  const caret = document.getElementById('avalWeightsCaret');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  caret.textContent = open ? '▸' : '▾';
+});
+document.getElementById('btnResetWeights').addEventListener('click', ()=>{
+  if(!confirm('Repor os pesos por omissão (proporcionais ao número de critérios de cada grupo)?')) return;
+  GROUP_WEIGHTS = defaultGroupWeights();
+  saveGroupWeights(GROUP_WEIGHTS);
+  renderAvalWeightsPanel();
+  updateAvalTotals();
+});
+renderAvalWeightsPanel();
 
 function populateAvalTecnicoSelect(){
   const sel = document.getElementById('avalTecnico');
@@ -3587,7 +3687,7 @@ document.getElementById('btnExportAvalPdf').addEventListener('click', ()=>{
   const scores = getAvalScores();
   if(Object.keys(scores).length === 0){ alert('Ainda não há pontuações para gerar o relatório.'); return; }
 
-  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  const total = computeWeightedTotal(scores);
   const fiveTier = classifyAvalScore(total);
   const threeTier = tierFromScore(total);
   const {top, average, low} = analyzeEvalScores(scores);
@@ -3722,7 +3822,7 @@ function renderAvalHistory(){
     return;
   }
   sorted.forEach(a=>{
-    const total = Object.values(a.scores).reduce((x,y)=>x+y,0);
+    const total = computeWeightedTotal(a.scores);
     const tier = classifyAvalScore(total);
     const tr = document.createElement('tr');
     tr.innerHTML =
@@ -3767,7 +3867,7 @@ document.getElementById('btnExportAvalExcel').addEventListener('click', ()=>{
   header.push('Pontuação Total','Classificação','Plano de melhoria');
   const rows = [header];
   AVALIACOES.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(a=>{
-    const total = Object.values(a.scores).reduce((x,y)=>x+y,0);
+    const total = computeWeightedTotal(a.scores);
     const tier = classifyAvalScore(total);
     const row = [fmtDatePT(a.date), a.tecnico];
     EVAL_GROUPS.forEach(g=> g.criteria.forEach(c=> row.push(a.scores[c.key] ?? '')));
@@ -3808,7 +3908,7 @@ function renderTierTable(){
   const rows = names.map(name=>{
     const a = latest[name];
     if(!a) return {name, date:null, total:null, tier:null};
-    const total = Object.values(a.scores).reduce((x,y)=>x+y,0);
+    const total = computeWeightedTotal(a.scores);
     return {name, date:a.date, total, tier:tierFromScore(total)};
   });
   // avaliados primeiro (maior pontuação primeiro), depois quem ainda não tem avaliação
@@ -4741,6 +4841,7 @@ function buildExportPayload(){
     ptContagem: PT_COUNTS,
     feriasHoras: FERIAS_HORAS,
     feriasDias: FERIAS_DIAS,
+    pesosAvaliacao: GROUP_WEIGHTS,
     exportedAt: nowISO()
   };
 }
@@ -4762,6 +4863,7 @@ function applyImportedData(data){
   if(data.ptContagem){ PT_COUNTS = data.ptContagem; localStorage.setItem(STORE_PT_COUNTS, JSON.stringify(PT_COUNTS)); }
   if(data.feriasHoras){ FERIAS_HORAS = data.feriasHoras; localStorage.setItem(STORE_FERIAS_HORAS, JSON.stringify(FERIAS_HORAS)); }
   if(data.feriasDias){ FERIAS_DIAS = data.feriasDias; localStorage.setItem(STORE_FERIAS_DIAS, JSON.stringify(FERIAS_DIAS)); }
+  if(data.pesosAvaliacao){ GROUP_WEIGHTS = data.pesosAvaliacao; localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(GROUP_WEIGHTS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -4782,7 +4884,7 @@ function applyImportedData(data){
   const feriasTab = document.getElementById('tab-ferias');
   if(feriasTab && feriasTab.style.display !== 'none') renderFeriasTab();
   const avalTab = document.getElementById('tab-aval');
-  if(avalTab && avalTab.style.display !== 'none') renderAvalTab();
+  if(avalTab && avalTab.style.display !== 'none'){ renderAvalTab(); renderAvalWeightsPanel(); }
   updateSyncStatusLabel();
 }
 
