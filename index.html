@@ -313,12 +313,17 @@
   .ferias-day-line{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
   .ferias-day-line:last-child{border-bottom:none;}
   .ferias-day-line button{border:none;background:none;color:#a83232;cursor:pointer;font-size:14px;}
-  .equip-order-row{display:flex;align-items:center;gap:6px;width:100%;margin-bottom:6px;}
+  .equip-order-row{display:flex;align-items:center;gap:6px;width:100%;margin-bottom:6px;flex-wrap:wrap;}
+  .eol-received-check{flex-basis:100%;display:flex;align-items:center;gap:6px;font:600 11.5px 'Inter';color:var(--gold-ink);margin-bottom:2px;}
+  .eol-received-check input{width:15px;height:15px;cursor:pointer;}
   .equip-order-line{display:flex;justify-content:space-between;align-items:center;gap:8px;flex:1;text-align:left;
     padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfaf7;cursor:pointer;font:500 13px 'Inter';color:var(--ink);}
   .equip-order-line:hover{background:var(--accent-soft);border-color:var(--accent);}
   .equip-order-line .eol-hint{font-size:10.5px;color:var(--ink-soft);white-space:nowrap;}
   .equip-order-line:hover .eol-hint{color:var(--accent);}
+  .equip-order-line.not-received{background:#f2f0ec;color:var(--ink-soft);cursor:not-allowed;opacity:.75;}
+  .equip-order-line.not-received:hover{background:#f2f0ec;border-color:var(--line);}
+  .equip-order-line.not-received .eol-hint{color:var(--ink-soft);font-style:italic;}
   .eol-icon-btn{flex-shrink:0;width:30px;height:30px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-size:13px;color:var(--ink-soft);}
   .eol-icon-btn:hover{border-color:var(--accent);color:var(--accent);}
   .eol-icon-btn.eol-remove:hover{border-color:var(--rust);color:var(--rust);}
@@ -352,6 +357,26 @@
     .tabs,.actions,.nav-btn,.legend .hint,body .btn,.panel{display:none !important;}
     .cell{break-inside:avoid;}
   }
+
+  /* Relatório mensal */
+  .rel-input{width:100%;min-width:70px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;font:13px 'Inter';box-sizing:border-box;color:var(--ink);background:var(--paper);}
+  .rel-input.rel-narrow{width:64px;text-align:center;}
+  .rel-task-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);}
+  .rel-task-row:last-child{border-bottom:none;}
+  .rel-task-row .rel-input{flex:1 1 180px;}
+  .rel-task-row .rel-input.rel-date{flex:0 1 140px;}
+  .rel-task-row select.rel-input{flex:0 1 150px;}
+  .rel-task-row .rel-rm{border:none;background:transparent;color:var(--rust);font-size:18px;cursor:pointer;padding:0 6px;line-height:1;}
+  .rel-print-block{padding:12px 0;border-bottom:1px solid var(--line);}
+  .rel-print-block:last-child{border-bottom:none;}
+  .rel-print-head{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .rel-print-head .rel-input{flex:1 1 auto;}
+  .rel-shot-box{border:2px dashed var(--line);border-radius:8px;min-height:160px;display:flex;align-items:center;justify-content:center;background:#fbfaf7;overflow:hidden;position:relative;cursor:pointer;}
+  .rel-shot-box.has-img{border-style:solid;cursor:default;}
+  .rel-shot-box img{max-width:100%;max-height:340px;display:block;margin:0 auto;}
+  .rel-shot-placeholder{color:var(--ink-soft);font-style:italic;font-size:13px;text-align:center;padding:20px;}
+  .rel-print-actions{display:flex;gap:10px;margin-top:6px;}
+  .rel-print-actions .btn{padding:6px 10px;font-size:12px;}
 
   /* Tablets and small laptops */
   @media (max-width:820px){
@@ -483,6 +508,7 @@
     <button class="tab-btn" data-tab="recrut" data-owner="equipa" style="display:none;">Recrutamento</button>
     <button class="tab-btn" data-tab="aval" data-owner="gestao" style="display:none;">Avaliação</button>
     <button class="tab-btn" data-tab="ptcount" data-owner="gestao" style="display:none;">Contabilização PT</button>
+    <button class="tab-btn" data-tab="relatorio" data-owner="gestao" style="display:none;">Relatório</button>
     <button class="tab-btn" data-tab="fin" data-owner="gestao" style="display:none;">Finanças</button>
   </div>
 
@@ -963,6 +989,91 @@
         <h4>🤝 Treino de Integração</h4>
         <div id="rankIntegracao"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- RELATÓRIO MENSAL TAB -->
+  <div id="tab-relatorio" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Relatório mensal de performance da equipa TEF — clientes por turno, tarefas realizadas e pendentes, e avaliação de desempenho. A avaliação vem automaticamente do separador Avaliação; o resto preenche-se aqui e fica guardado por mês.
+    </p>
+
+    <div class="tec-year-nav">
+      <button class="nav-btn" id="relMonthPrev">‹</button>
+      <span id="relMonthLabel">Setembro 2026</span>
+      <button class="nav-btn" id="relMonthNext">›</button>
+    </div>
+
+    <div class="panel" style="padding:16px 18px;margin-bottom:20px;">
+      <div class="aval-header-row">
+        <label>Instalação
+          <select id="relInstalacao">
+            <option value="LSD">Lousada (LSD)</option>
+            <option value="PNF">Penafiel (PNF)</option>
+          </select>
+        </label>
+        <label>Coordenador
+          <input type="text" id="relCoordenador" value="Mário">
+        </label>
+        <label>Data do relatório
+          <input type="date" id="relData">
+        </label>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:22px 0 10px;">1. Clientes por Turno / Ocupação de Sala</h3>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="relClientesTable">
+        <thead>
+          <tr><th>TEF</th><th>Turno(s)</th><th>Dias/sem.</th><th>Clientes atendidos</th><th>Nº aulas/turno</th><th>Observações</th></tr>
+        </thead>
+        <tbody id="relClientesBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">2. Tarefas Realizadas</h3>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="relTarefasTable">
+        <thead>
+          <tr><th>TEF</th><th>1ªs Avaliações Físicas</th><th>Reavaliações</th><th>Treinos de Integração</th><th>Prescrições de Treino</th></tr>
+        </thead>
+        <tbody id="relTarefasBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">3. Tarefas Abertas / Pendentes</h3>
+    <div class="panel" style="padding:14px 18px;">
+      <div id="relAbertasList"></div>
+      <button type="button" class="btn ghost" id="relAddAberta" style="margin-top:10px;">+ Adicionar tarefa aberta</button>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">4. Anexos — Prints das Tarefas</h3>
+    <div class="panel" style="padding:14px 18px;">
+      <p style="color:var(--ink-soft);font-size:12.5px;margin-top:0;">Carrega prints (ex. do OnVirtualGym) que documentem tarefas realizadas ou pendentes.</p>
+      <div id="relPrintsList"></div>
+      <button type="button" class="btn ghost" id="relAddPrint" style="margin-top:10px;">+ Adicionar print</button>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">5. Avaliação de Performance</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Dados automáticos, a partir da avaliação mais recente de cada técnico no separador Avaliação. Atualiza a avaliação lá — reflete-se aqui sozinho.
+    </p>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="relAvalTable">
+        <thead>
+          <tr><th>TEF</th><th>Última avaliação</th><th>Pontuação</th><th>Classificação</th><th>Plano de melhoria</th></tr>
+        </thead>
+        <tbody id="relAvalBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">6. Observações Gerais e Plano de Ação</h3>
+    <div class="panel" style="padding:14px 18px;">
+      <textarea id="relObservacoes" placeholder="Notas gerais do mês, decisões tomadas, pontos a acompanhar..." style="width:100%;min-height:110px;font:14px 'Inter';border:1px solid var(--line);border-radius:8px;padding:10px;box-sizing:border-box;"></textarea>
+    </div>
+
+    <div class="modal-actions" style="justify-content:flex-start;margin-top:18px;">
+      <button class="btn primary" id="btnExportRelatorioPdf">📄 Exportar relatório em PDF</button>
     </div>
   </div>
 
@@ -2474,7 +2585,8 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
 
 /* ---------------------------------------------------------------
    EQUIPAMENTO — ciclo de vida completo:
-   Encomenda por técnico --[clicar para confirmar entrega]--> Stock do TEF
+   Encomenda por técnico --[marcar "Recebido do fornecedor"]--> pronta a entregar
+                          --[clicar para confirmar entrega]--> Stock do TEF
    Encomenda para o Ginásio --[clicar para confirmar receção]--> Stock do Ginásio
    Stock do TEF --[devolver]--> Stock do Ginásio
    Stock do Ginásio --[abater]--> Equipamentos abatidos
@@ -2482,10 +2594,21 @@ document.getElementById('btnAddTec').addEventListener('click', ()=>{
 const SIZE_LETTERS = ['XS','S','M','L','XL'];
 const EQUIP_TYPES = ['Polo Sala','Polo PT','Casaco de Sala','Casaco PT','T-shirt Estágio'];
 const STORE_EQUIP = 'tef_turnos_equipamento_v1';           // {tecnico: {tipo: {tamanho: qtd}}}      — encomendas pendentes por técnico
+const STORE_EQUIP_RECEIVED = 'tef_turnos_equip_recebido_v1'; // {tecnico: {tipo: {tamanho: true}}}  — já chegou do fornecedor, pronto a entregar
 const STORE_TEF_STOCK = 'tef_turnos_stock_tecnico_v1';     // {tecnico: {tipo: {tamanho: qtd}}}      — na posse do técnico
 const STORE_STOCK = 'tef_turnos_stock_v1';                 // {tipo: {F:{XS:qtd,...}, H:{...}}}      — armazém do ginásio
 const STORE_WRITTEN_OFF = 'tef_turnos_abatidos_v1';        // {tipo: {F:{XS:qtd,...}, H:{...}}}      — abatidos
 const STORE_GYM_ORDERS = 'tef_turnos_encomendas_ginasio_v1'; // {tipo: {F:{XS:qtd,...}, H:{...}}}    — encomendas diretas para o armazém
+
+function loadEquipReceived(){
+  try{ const raw = localStorage.getItem(STORE_EQUIP_RECEIVED); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveEquipReceived(r){ localStorage.setItem(STORE_EQUIP_RECEIVED, JSON.stringify(r)); touchMeta(); }
+let EQUIP_RECEIVED = loadEquipReceived();
+function isEquipReceived(name, type, size){
+  return !!(EQUIP_RECEIVED[name] && EQUIP_RECEIVED[name][type] && EQUIP_RECEIVED[name][type][size]);
+}
 
 function loadEquipment(){
   try{ const raw = localStorage.getItem(STORE_EQUIP); if(raw) return JSON.parse(raw); }catch(e){}
@@ -2597,6 +2720,26 @@ function addToEquipmentOrder(name, type, size, qty){
   renderEquipTab();
 }
 
+function clearEquipReceivedFlag(name, type, size){
+  if(EQUIP_RECEIVED[name] && EQUIP_RECEIVED[name][type]){
+    delete EQUIP_RECEIVED[name][type][size];
+    if(Object.keys(EQUIP_RECEIVED[name][type]).length === 0) delete EQUIP_RECEIVED[name][type];
+    saveEquipReceived(EQUIP_RECEIVED);
+  }
+}
+
+function toggleEquipReceived(name, type, size, checked){
+  if(checked){
+    if(!EQUIP_RECEIVED[name]) EQUIP_RECEIVED[name] = {};
+    if(!EQUIP_RECEIVED[name][type]) EQUIP_RECEIVED[name][type] = {};
+    EQUIP_RECEIVED[name][type][size] = true;
+    saveEquipReceived(EQUIP_RECEIVED);
+  } else {
+    clearEquipReceivedFlag(name, type, size);
+  }
+  renderEquipTab();
+}
+
 function editOrderLine(name, type, size){
   const current = (EQUIPMENT[name] && EQUIPMENT[name][type] && EQUIPMENT[name][type][size]) || 0;
   const input = prompt('Nova quantidade para '+type+' ('+size+', '+name+'):', current);
@@ -2606,6 +2749,7 @@ function editOrderLine(name, type, size){
   if(isNaN(qty) || qty <= 0){
     delete EQUIPMENT[name][type][size];
     if(Object.keys(EQUIPMENT[name][type]).length === 0) delete EQUIPMENT[name][type];
+    clearEquipReceivedFlag(name, type, size);
   } else {
     EQUIPMENT[name][type][size] = qty;
   }
@@ -2619,12 +2763,17 @@ function removeOrderLine(name, type, size){
   delete EQUIPMENT[name][type][size];
   if(Object.keys(EQUIPMENT[name][type]).length === 0) delete EQUIPMENT[name][type];
   saveEquipment(EQUIPMENT);
+  clearEquipReceivedFlag(name, type, size);
   renderEquipTab();
 }
 
 function confirmDeliveryLine(name, type, size){
   const qty = (EQUIPMENT[name] && EQUIPMENT[name][type] && EQUIPMENT[name][type][size]) || 0;
   if(qty <= 0) return;
+  if(!isEquipReceived(name, type, size)){
+    alert('Ainda não marcaste este equipamento como "Recebido do fornecedor" — marca a checkbox primeiro.');
+    return;
+  }
   if(!confirm('Confirmar entrega de '+qty+'x '+type+' (tamanho '+size+') a '+name+'?')) return;
 
   const gender = (TECH_REGISTRY[name] && TECH_REGISTRY[name].gender==='F') ? 'F' : 'H';
@@ -2644,6 +2793,7 @@ function confirmDeliveryLine(name, type, size){
 
   delete EQUIPMENT[name][type][size];
   if(Object.keys(EQUIPMENT[name][type]).length === 0) delete EQUIPMENT[name][type];
+  clearEquipReceivedFlag(name, type, size);
 
   saveEquipment(EQUIPMENT);
   saveStock(STOCK);
@@ -2908,9 +3058,11 @@ function renderEquipTab(){
       html += '<div class="equip-empty" style="grid-column:unset;padding:6px 0;">Sem encomendas pendentes.</div>';
     } else {
       lines.forEach(l=>{
+        const received = isEquipReceived(name, l.type, l.size);
         html += '<div class="equip-order-row">'+
-          '<button type="button" class="equip-order-line" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">'+
-            '<span>'+l.type+' — '+l.size+' × '+l.qty+'</span><span class="eol-hint">clica para confirmar entrega</span>'+
+          '<label class="eol-received-check"><input type="checkbox" class="equip-received-check" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'" '+(received?'checked':'')+'> Recebido do fornecedor</label>'+
+          '<button type="button" class="equip-order-line'+(received?'':' not-received')+'" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">'+
+            '<span>'+l.type+' — '+l.size+' × '+l.qty+'</span><span class="eol-hint">'+(received?'clica para confirmar entrega':'aguarda receção do fornecedor')+'</span>'+
           '</button>'+
           '<button type="button" class="eol-icon-btn eol-edit" title="Editar quantidade" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">✎</button>'+
           '<button type="button" class="eol-icon-btn eol-remove" title="Remover" data-name="'+encodeURIComponent(name)+'" data-type="'+encodeURIComponent(l.type)+'" data-size="'+l.size+'">×</button>'+
@@ -2958,6 +3110,14 @@ function renderEquipTab(){
       const type = decodeURIComponent(e.target.dataset.type);
       const size = e.target.dataset.size;
       removeOrderLine(name, type, size);
+    });
+  });
+  container.querySelectorAll('.equip-received-check').forEach(chk=>{
+    chk.addEventListener('change', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const type = decodeURIComponent(e.target.dataset.type);
+      const size = e.target.dataset.size;
+      toggleEquipReceived(name, type, size, e.target.checked);
     });
   });
   container.querySelectorAll('.eo-add-btn').forEach(btn=>{
@@ -4312,6 +4472,442 @@ document.getElementById('ptCountMonthNext').addEventListener('click', ()=>{
 });
 
 /* ---------------------------------------------------------------
+   RELATÓRIO MENSAL — clientes por turno, tarefas realizadas e
+   pendentes, prints anexados, e avaliação de performance ligada
+   automaticamente aos dados do separador Avaliação.
+--------------------------------------------------------------- */
+const STORE_RELATORIO = 'tef_turnos_relatorio_v1';
+// { "YYYY-MM": { instalacao, coordenador, data,
+//                clientes:{nome:{turnos,dias,clientes,aulas,obs}},
+//                tarefas:{nome:{avaliacoes_fisicas,reavaliacoes,integracao,prescricoes}},
+//                abertas:[{tarefa,responsavel,prazo,estado}],
+//                observacoes, prints:[{label,dataUrl}] } }
+function loadRelatorios(){
+  try{ const raw = localStorage.getItem(STORE_RELATORIO); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveRelatorios(r){ localStorage.setItem(STORE_RELATORIO, JSON.stringify(r)); touchMeta(); }
+let RELATORIOS = loadRelatorios();
+
+let relMonthIdx = (function(){
+  const now = new Date();
+  const idx = MONTH_LIST.findIndex(m=> m.year===now.getFullYear() && m.month===now.getMonth());
+  return idx>=0 ? idx : 0;
+})();
+function relMonthKey(){
+  const m = MONTH_LIST[relMonthIdx];
+  return m.year+'-'+pad(m.month+1);
+}
+function getRelatorioAtual(){
+  const key = relMonthKey();
+  if(!RELATORIOS[key]){
+    RELATORIOS[key] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], observacoes:'', prints:[]};
+  }
+  return RELATORIOS[key];
+}
+function saveRelatorioAtual(){ saveRelatorios(RELATORIOS); }
+function relTecNames(){
+  return Object.keys(TECH_REGISTRY)
+    .filter(n => (TECH_REGISTRY[n].status||'') !== 'estagiario')
+    .sort((a,b)=>a.localeCompare(b,'pt'));
+}
+function escapeAttr(v){
+  return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderRelatorioTab(){
+  const rel = getRelatorioAtual();
+  const m = MONTH_LIST[relMonthIdx];
+  document.getElementById('relMonthLabel').textContent = MONTH_NAMES[m.month]+' '+m.year;
+  document.getElementById('relMonthPrev').disabled = relMonthIdx <= 0;
+  document.getElementById('relMonthNext').disabled = relMonthIdx >= MONTH_LIST.length-1;
+
+  document.getElementById('relInstalacao').value = rel.instalacao || 'LSD';
+  document.getElementById('relCoordenador').value = rel.coordenador || 'Mário';
+  document.getElementById('relData').value = rel.data || '';
+  document.getElementById('relObservacoes').value = rel.observacoes || '';
+
+  renderRelClientesTable(rel);
+  renderRelTarefasTable(rel);
+  renderRelAbertasList(rel);
+  renderRelPrintsList(rel);
+  renderRelAvalTable();
+}
+
+function renderRelClientesTable(rel){
+  const tbody = document.getElementById('relClientesBody');
+  tbody.innerHTML = '';
+  const names = relTecNames();
+  if(names.length===0){
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
+    return;
+  }
+  names.forEach(name=>{
+    const e = rel.clientes[name] || {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
+      '<td data-label="Turno(s)"><input type="text" class="rel-input" data-name="'+encodeURIComponent(name)+'" data-field="turnos" value="'+escapeAttr(e.turnos)+'"></td>'+
+      '<td data-label="Dias/sem."><input type="text" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="dias" value="'+escapeAttr(e.dias)+'"></td>'+
+      '<td data-label="Clientes atendidos"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="clientes" value="'+escapeAttr(e.clientes)+'"></td>'+
+      '<td data-label="Nº aulas/turno"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="aulas" value="'+escapeAttr(e.aulas)+'"></td>'+
+      '<td data-label="Observações"><input type="text" class="rel-input" data-name="'+encodeURIComponent(name)+'" data-field="obs" value="'+escapeAttr(e.obs)+'"></td>';
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.rel-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const field = e.target.dataset.field;
+      const rel2 = getRelatorioAtual();
+      if(!rel2.clientes[name]) rel2.clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+      rel2.clientes[name][field] = e.target.value;
+      saveRelatorioAtual();
+    });
+  });
+}
+
+function renderRelTarefasTable(rel){
+  const tbody = document.getElementById('relTarefasBody');
+  tbody.innerHTML = '';
+  const names = relTecNames();
+  if(names.length===0){
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
+    return;
+  }
+  names.forEach(name=>{
+    const e = rel.tarefas[name] || {avaliacoes_fisicas:'', reavaliacoes:'', integracao:'', prescricoes:''};
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
+      '<td data-label="1ªs Avaliações Físicas"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="avaliacoes_fisicas" value="'+escapeAttr(e.avaliacoes_fisicas)+'"></td>'+
+      '<td data-label="Reavaliações"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="reavaliacoes" value="'+escapeAttr(e.reavaliacoes)+'"></td>'+
+      '<td data-label="Treinos de Integração"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="integracao" value="'+escapeAttr(e.integracao)+'"></td>'+
+      '<td data-label="Prescrições de Treino"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="prescricoes" value="'+escapeAttr(e.prescricoes)+'"></td>';
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.rel-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const field = e.target.dataset.field;
+      const rel2 = getRelatorioAtual();
+      if(!rel2.tarefas[name]) rel2.tarefas[name] = {avaliacoes_fisicas:'', reavaliacoes:'', integracao:'', prescricoes:''};
+      rel2.tarefas[name][field] = e.target.value;
+      saveRelatorioAtual();
+    });
+  });
+}
+
+function renderRelAbertasList(rel){
+  const container = document.getElementById('relAbertasList');
+  container.innerHTML = '';
+  if(rel.abertas.length===0){
+    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem tarefas abertas registadas.</p>';
+  }
+  rel.abertas.forEach((t, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'rel-task-row';
+    row.innerHTML =
+      '<input type="text" class="rel-input" data-idx="'+idx+'" data-field="tarefa" placeholder="Tarefa" value="'+escapeAttr(t.tarefa)+'">'+
+      '<input type="text" class="rel-input" data-idx="'+idx+'" data-field="responsavel" placeholder="TEF responsável" value="'+escapeAttr(t.responsavel)+'">'+
+      '<input type="date" class="rel-input rel-date" data-idx="'+idx+'" data-field="prazo" value="'+escapeAttr(t.prazo)+'">'+
+      '<select class="rel-input" data-idx="'+idx+'" data-field="estado">'+
+        '<option value="em_curso"'+(t.estado==='em_curso'?' selected':'')+'>Em curso</option>'+
+        '<option value="atrasada"'+(t.estado==='atrasada'?' selected':'')+'>Atrasada</option>'+
+        '<option value="concluida"'+(t.estado==='concluida'?' selected':'')+'>Concluída</option>'+
+      '</select>'+
+      '<button type="button" class="rel-rm" data-idx="'+idx+'" title="Remover">×</button>';
+    container.appendChild(row);
+  });
+  function persistField(idx, field, value){
+    const rel2 = getRelatorioAtual();
+    if(!rel2.abertas[idx]) return;
+    rel2.abertas[idx][field] = value;
+    saveRelatorioAtual();
+  }
+  container.querySelectorAll('input.rel-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=> persistField(parseInt(e.target.dataset.idx,10), e.target.dataset.field, e.target.value));
+  });
+  container.querySelectorAll('select.rel-input').forEach(sel=>{
+    sel.addEventListener('change', (e)=> persistField(parseInt(e.target.dataset.idx,10), 'estado', e.target.value));
+  });
+  container.querySelectorAll('.rel-rm').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      const rel2 = getRelatorioAtual();
+      rel2.abertas.splice(idx,1);
+      saveRelatorioAtual();
+      renderRelAbertasList(rel2);
+    });
+  });
+}
+document.getElementById('relAddAberta').addEventListener('click', ()=>{
+  const rel = getRelatorioAtual();
+  rel.abertas.push({tarefa:'', responsavel:'', prazo:'', estado:'em_curso'});
+  saveRelatorioAtual();
+  renderRelAbertasList(rel);
+});
+
+function renderRelPrintsList(rel){
+  const container = document.getElementById('relPrintsList');
+  container.innerHTML = '';
+  if(rel.prints.length===0){
+    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem prints adicionados.</p>';
+  }
+  rel.prints.forEach((p, idx)=>{
+    const block = document.createElement('div');
+    block.className = 'rel-print-block';
+    block.innerHTML =
+      '<div class="rel-print-head">'+
+        '<input type="text" class="rel-input" data-idx="'+idx+'" placeholder="Legenda (ex.: Reavaliação — Ana Costa)" value="'+escapeAttr(p.label)+'">'+
+        '<button type="button" class="rel-rm" data-idx="'+idx+'" title="Remover print">×</button>'+
+      '</div>'+
+      '<div class="rel-shot-box'+(p.dataUrl?' has-img':'')+'" data-idx="'+idx+'">'+
+        (p.dataUrl ? '<img src="'+p.dataUrl+'" alt="print">' : '<span class="rel-shot-placeholder">📎 Clica para carregar o print</span>')+
+      '</div>'+
+      (p.dataUrl ? '<div class="rel-print-actions"><button type="button" class="btn ghost rel-replace" data-idx="'+idx+'">Substituir imagem</button></div>' : '');
+    container.appendChild(block);
+  });
+  container.querySelectorAll('.rel-print-head input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      const rel2 = getRelatorioAtual();
+      rel2.prints[idx].label = e.target.value;
+      saveRelatorioAtual();
+    });
+  });
+  container.querySelectorAll('.rel-rm').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      const rel2 = getRelatorioAtual();
+      rel2.prints.splice(idx,1);
+      saveRelatorioAtual();
+      renderRelPrintsList(rel2);
+    });
+  });
+  function triggerUpload(idx){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const rel2 = getRelatorioAtual();
+        rel2.prints[idx].dataUrl = reader.result;
+        saveRelatorioAtual();
+        renderRelPrintsList(rel2);
+      };
+      reader.readAsDataURL(file);
+    });
+    input.click();
+  }
+  container.querySelectorAll('.rel-shot-box:not(.has-img)').forEach(box=>{
+    box.addEventListener('click', ()=> triggerUpload(parseInt(box.dataset.idx,10)));
+  });
+  container.querySelectorAll('.rel-replace').forEach(btn=>{
+    btn.addEventListener('click', (e)=> triggerUpload(parseInt(e.target.dataset.idx,10)));
+  });
+}
+document.getElementById('relAddPrint').addEventListener('click', ()=>{
+  const rel = getRelatorioAtual();
+  rel.prints.push({label:'', dataUrl:''});
+  saveRelatorioAtual();
+  renderRelPrintsList(rel);
+});
+
+// Avaliação de Performance — auto, a partir da avaliação mais recente de
+// cada técnico (mesma fonte de dados do separador Avaliação).
+function renderRelAvalTable(){
+  const tbody = document.getElementById('relAvalBody');
+  tbody.innerHTML = '';
+  const names = relTecNames();
+  if(names.length===0){
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
+    return;
+  }
+  const latest = getLatestEvalPerTecnico();
+  names.forEach(name=>{
+    const a = latest[name];
+    const tr = document.createElement('tr');
+    if(!a){
+      tr.innerHTML =
+        '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
+        '<td data-label="Última avaliação">—</td>'+
+        '<td data-label="Pontuação" class="hrs">—</td>'+
+        '<td data-label="Classificação"><span style="color:var(--ink-soft);font-style:italic;font-size:12px;">sem avaliação</span></td>'+
+        '<td data-label="Plano de melhoria">—</td>';
+    } else {
+      const total = computeWeightedTotal(a.scores);
+      const cls = classifyAvalScore(total);
+      tr.innerHTML =
+        '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
+        '<td data-label="Última avaliação">'+fmtDatePT(a.date)+'</td>'+
+        '<td data-label="Pontuação" class="hrs">'+total+' / 100</td>'+
+        '<td data-label="Classificação">'+cls.label+'</td>'+
+        '<td data-label="Plano de melhoria">'+(a.plano ? escapeAttr(a.plano) : '—')+'</td>';
+    }
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('relMonthPrev').addEventListener('click', ()=>{
+  if(relMonthIdx > 0){ relMonthIdx--; renderRelatorioTab(); }
+});
+document.getElementById('relMonthNext').addEventListener('click', ()=>{
+  if(relMonthIdx < MONTH_LIST.length-1){ relMonthIdx++; renderRelatorioTab(); }
+});
+document.getElementById('relInstalacao').addEventListener('change', (e)=>{
+  const rel = getRelatorioAtual(); rel.instalacao = e.target.value; saveRelatorioAtual();
+});
+document.getElementById('relCoordenador').addEventListener('input', (e)=>{
+  const rel = getRelatorioAtual(); rel.coordenador = e.target.value; saveRelatorioAtual();
+});
+document.getElementById('relData').addEventListener('input', (e)=>{
+  const rel = getRelatorioAtual(); rel.data = e.target.value; saveRelatorioAtual();
+});
+document.getElementById('relObservacoes').addEventListener('input', (e)=>{
+  const rel = getRelatorioAtual(); rel.observacoes = e.target.value; saveRelatorioAtual();
+});
+
+function drawSimpleTable(doc, x, y, colWidths, header, rows){
+  const rowH = 7, headerH = 7, tableW = colWidths.reduce((a,b)=>a+b,0);
+  function drawHeader(curY){
+    doc.setFillColor(31,56,100);
+    doc.rect(x, curY, tableW, headerH, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    let cx = x;
+    header.forEach((h,i)=>{ doc.text(String(h), cx+2, curY+headerH/2+2.2, {maxWidth: colWidths[i]-4}); cx += colWidths[i]; });
+    return curY + headerH;
+  }
+  let curY = drawHeader(y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  rows.forEach((r,ri)=>{
+    if(curY + rowH > 283){ doc.addPage(); curY = drawHeader(18); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); }
+    if(ri%2===1){ doc.setFillColor(242,242,242); doc.rect(x, curY, tableW, rowH, 'F'); }
+    doc.setTextColor(28,35,33);
+    let cx = x;
+    r.forEach((val,i)=>{
+      doc.text(String(val==null||val===''?'—':val), cx+2, curY+rowH/2+2, {maxWidth: colWidths[i]-4});
+      cx += colWidths[i];
+    });
+    doc.setDrawColor(200,200,200);
+    doc.rect(x, curY, tableW, rowH);
+    curY += rowH;
+  });
+  return curY;
+}
+
+document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
+  const jspdfLib = window.jspdf;
+  if(!jspdfLib){ alert('Não foi possível carregar a biblioteca de PDF (precisas de estar online da primeira vez que exportas).'); return; }
+  const { jsPDF } = jspdfLib;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const pageW = 210, pageH = 297, marginX = 14;
+  let y = 0;
+
+  const rel = getRelatorioAtual();
+  const m = MONTH_LIST[relMonthIdx];
+  const monthLabel = MONTH_NAMES[m.month]+' '+m.year;
+  const instalacaoLabel = rel.instalacao==='PNF' ? 'Penafiel (PNF)' : 'Lousada (LSD)';
+  const names = relTecNames();
+
+  function ensureSpace(h){ if(y + h > pageH - 16){ doc.addPage(); y = 16; } }
+  function heading(text){
+    ensureSpace(10);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12.5);
+    doc.setTextColor(31,56,100);
+    doc.text(text, marginX, y);
+    y += 5;
+    doc.setDrawColor(31,56,100); doc.setLineWidth(0.4);
+    doc.line(marginX, y-3, pageW-marginX, y-3);
+    y += 3;
+  }
+  function paragraph(text){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.setTextColor(28,35,33);
+    const lines = doc.splitTextToSize(text, pageW - marginX*2);
+    lines.forEach(line=>{ ensureSpace(5.5); doc.text(line, marginX, y); y += 5.5; });
+  }
+  function table(header, rowsData, colWidths){
+    ensureSpace(14);
+    y = drawSimpleTable(doc, marginX, y, colWidths, header, rowsData);
+  }
+
+  doc.setFillColor(31,56,100);
+  doc.rect(0,0,pageW,28,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Relatório Mensal de Performance — Equipa TEF', marginX, 14);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(monthLabel+' · '+instalacaoLabel+' · Coordenador: '+(rel.coordenador||'—'), marginX, 21);
+  y = 38;
+
+  const tW = pageW - marginX*2;
+
+  heading('1. Clientes por Turno / Ocupação de Sala');
+  table(['TEF','Turno(s)','Dias/sem.','Clientes','Nº aulas','Observações'],
+    names.map(n=>{ const e = rel.clientes[n]||{}; return [n, e.turnos||'—', e.dias||'—', e.clientes||'—', e.aulas||'—', e.obs||'—']; }),
+    [28,32,18,18,18,tW-28-32-18-18-18]);
+  y += 6;
+
+  heading('2. Tarefas Realizadas');
+  table(['TEF','1ªs Aval. Físicas','Reavaliações','Treinos Integr.','Prescrições'],
+    names.map(n=>{ const e = rel.tarefas[n]||{}; return [n, e.avaliacoes_fisicas||0, e.reavaliacoes||0, e.integracao||0, e.prescricoes||0]; }),
+    [40,38,38,38,tW-40-38-38-38]);
+  y += 6;
+
+  heading('3. Tarefas Abertas / Pendentes');
+  if(rel.abertas.length===0){
+    paragraph('Sem tarefas abertas registadas.');
+  } else {
+    const estadoLabel = {em_curso:'Em curso', atrasada:'Atrasada', concluida:'Concluída'};
+    table(['Tarefa','Responsável','Prazo','Estado'],
+      rel.abertas.map(t=>[t.tarefa||'—', t.responsavel||'—', t.prazo?fmtDatePT(t.prazo):'—', estadoLabel[t.estado]||'—']),
+      [70,40,30,tW-70-40-30]);
+  }
+  y += 6;
+
+  heading('4. Avaliação de Performance');
+  const latest = getLatestEvalPerTecnico();
+  const avalRows = names.map(n=>{
+    const a = latest[n];
+    if(!a) return [n,'—','—','sem avaliação','—'];
+    const total = computeWeightedTotal(a.scores);
+    const cls = classifyAvalScore(total);
+    return [n, fmtDatePT(a.date), total+'/100', cls.label, a.plano||'—'];
+  });
+  table(['TEF','Última avaliação','Pontuação','Classificação','Plano de melhoria'],
+    avalRows, [26,28,20,26,tW-26-28-20-26]);
+  y += 6;
+
+  heading('5. Observações Gerais e Plano de Ação');
+  paragraph(rel.observacoes || 'Sem observações registadas.');
+
+  rel.prints.forEach(p=>{
+    if(!p.dataUrl) return;
+    doc.addPage();
+    y = 18;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.setTextColor(31,56,100);
+    doc.text(p.label || 'Print', marginX, y);
+    y += 6;
+    try{
+      const fmt = p.dataUrl.indexOf('image/jpeg')!==-1 || p.dataUrl.indexOf('image/jpg')!==-1 ? 'JPEG' : 'PNG';
+      const imgProps = doc.getImageProperties(p.dataUrl);
+      const maxW = pageW - marginX*2;
+      const maxH = pageH - y - 16;
+      let w = maxW, h = (imgProps.height/imgProps.width)*w;
+      if(h > maxH){ h = maxH; w = (imgProps.width/imgProps.height)*h; }
+      doc.addImage(p.dataUrl, fmt, marginX, y, w, h);
+    }catch(err){}
+  });
+
+  doc.save('Relatorio_TEF_'+relMonthKey()+'.pdf');
+});
+
+/* ---------------------------------------------------------------
    FÉRIAS — saldo de horas dos técnicos Dependentes. Marcar um dia
    como férias desconta automaticamente as horas do turno base desse
    técnico nesse dia (não conta substituições, só o horário normal
@@ -4454,6 +5050,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-aval').style.display = tab==='aval' ? '' : 'none';
     document.getElementById('tab-recrut').style.display = tab==='recrut' ? '' : 'none';
     document.getElementById('tab-ptcount').style.display = tab==='ptcount' ? '' : 'none';
+    document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? '' : 'none';
     document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
@@ -4464,6 +5061,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='aval') renderAvalTab();
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
+    if(tab==='relatorio') renderRelatorioTab();
     if(tab==='ferias') renderFeriasTab();
   });
 });
@@ -4831,6 +5429,7 @@ function buildExportPayload(){
     rates: RATES,
     feriados: HOLIDAY_ASSIGNMENTS,
     equipamento: EQUIPMENT,
+    equipRecebido: EQUIP_RECEIVED,
     stock: STOCK,
     tefStock: TEF_STOCK,
     abatidos: WRITTEN_OFF,
@@ -4842,6 +5441,7 @@ function buildExportPayload(){
     feriasHoras: FERIAS_HORAS,
     feriasDias: FERIAS_DIAS,
     pesosAvaliacao: GROUP_WEIGHTS,
+    relatorios: RELATORIOS,
     exportedAt: nowISO()
   };
 }
@@ -4853,6 +5453,7 @@ function applyImportedData(data){
   if(data.rates){ RATES = data.rates; localStorage.setItem(STORE_RATES, JSON.stringify(RATES)); }
   if(data.feriados){ HOLIDAY_ASSIGNMENTS = data.feriados; localStorage.setItem(STORE_HOLIDAY_ASSIGN, JSON.stringify(HOLIDAY_ASSIGNMENTS)); }
   if(data.equipamento){ EQUIPMENT = data.equipamento; localStorage.setItem(STORE_EQUIP, JSON.stringify(EQUIPMENT)); }
+  if(data.equipRecebido){ EQUIP_RECEIVED = data.equipRecebido; localStorage.setItem(STORE_EQUIP_RECEIVED, JSON.stringify(EQUIP_RECEIVED)); }
   if(data.stock){ STOCK = data.stock; localStorage.setItem(STORE_STOCK, JSON.stringify(STOCK)); }
   if(data.tefStock){ TEF_STOCK = data.tefStock; localStorage.setItem(STORE_TEF_STOCK, JSON.stringify(TEF_STOCK)); }
   if(data.abatidos){ WRITTEN_OFF = data.abatidos; localStorage.setItem(STORE_WRITTEN_OFF, JSON.stringify(WRITTEN_OFF)); }
@@ -4864,6 +5465,7 @@ function applyImportedData(data){
   if(data.feriasHoras){ FERIAS_HORAS = data.feriasHoras; localStorage.setItem(STORE_FERIAS_HORAS, JSON.stringify(FERIAS_HORAS)); }
   if(data.feriasDias){ FERIAS_DIAS = data.feriasDias; localStorage.setItem(STORE_FERIAS_DIAS, JSON.stringify(FERIAS_DIAS)); }
   if(data.pesosAvaliacao){ GROUP_WEIGHTS = data.pesosAvaliacao; localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(GROUP_WEIGHTS)); }
+  if(data.relatorios){ RELATORIOS = data.relatorios; localStorage.setItem(STORE_RELATORIO, JSON.stringify(RELATORIOS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -4885,6 +5487,8 @@ function applyImportedData(data){
   if(feriasTab && feriasTab.style.display !== 'none') renderFeriasTab();
   const avalTab = document.getElementById('tab-aval');
   if(avalTab && avalTab.style.display !== 'none'){ renderAvalTab(); renderAvalWeightsPanel(); }
+  const relTab = document.getElementById('tab-relatorio');
+  if(relTab && relTab.style.display !== 'none') renderRelatorioTab();
   updateSyncStatusLabel();
 }
 
