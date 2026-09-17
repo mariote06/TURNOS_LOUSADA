@@ -1491,10 +1491,10 @@ function dayHasPontualStuff(iso){
          (exc.note && exc.note.trim().length>0);
 }
 
-// month index 0 = Setembro 2026 ... 51 = Dezembro 2030
+// month index 0 = Agosto 2026 ... 51 = Novembro 2030
 const MONTH_LIST = [];
 (function buildMonthList(){
-  let y = 2026, m = 8; // Sept = index 8
+  let y = 2026, m = 7; // Ago = index 7
   for(let i=0;i<52;i++){
     MONTH_LIST.push({year:y, month:m});
     m++; if(m>11){ m=0; y++; }
