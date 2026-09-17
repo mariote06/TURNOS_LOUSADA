@@ -1042,6 +1042,9 @@
     </div>
 
     <h3 style="font-size:15px;margin:22px 0 10px;">1. Clientes por Turno / Ocupação de Sala</h3>
+    <div class="modal-actions" style="justify-content:flex-start;margin:0 0 10px;">
+      <button type="button" class="btn ghost" id="relFillTurnos">🔄 Preencher Turno(s) e Dias/sem. a partir do Calendário</button>
+    </div>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="relClientesTable">
         <thead>
@@ -4587,6 +4590,18 @@ function timeToMinutes(hhmm){
   return parseInt(parts[0],10)*60 + parseInt(parts[1],10);
 }
 
+// Datas anteriores ao início do calendário (ex.: Agosto/2026, antes de haver
+// registo eletrónico dos turnos) não têm nenhuma versão de template aplicável
+// e devolveriam sempre 0 turnos. Nesses casos, usa o padrão semanal em vigor
+// em Setembro/2026 (a versão mais antiga do template) como aproximação —
+// atribui os turnos de Setembro a Agosto, mantendo o dia da semana.
+function shiftsForReportDate(iso, dayKey){
+  if(iso < RANGE_START_ISO){
+    return templateSlotsForDate(dayKey, RANGE_START_ISO);
+  }
+  return shiftsForDate(iso, dayKey);
+}
+
 // Para um conjunto de visitas do mesmo mês: cruza cada visita com os turnos
 // do dia (mesma fonte de dados do Calendário) e devolve, por TEF, o conjunto
 // de códigos de cliente distintos cujo período [entrada,saída] atravessou
@@ -4600,7 +4615,7 @@ function computeAcessos(visits){
     const parts = iso.split('-').map(Number);
     const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
     const dKey = dayKeyOf(dateObj);
-    const shifts = shiftsForDate(iso, dKey);
+    const shifts = shiftsForReportDate(iso, dKey);
     const shiftIntervals = shifts.map(s=>({
       name: (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name,
       startMin: timeToMinutes(s.start),
@@ -4773,6 +4788,57 @@ function relTecNames(){
 }
 function escapeAttr(v){
   return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Comprime uma lista de dias da semana em intervalos legíveis: ['Seg','Ter',
+// 'Qua'] -> "Seg-Qua"; ['Seg','Qua'] -> "Seg, Qua".
+function compressDayList(days){
+  const idxs = days.map(d=>WEEK_ORDER.indexOf(d)).filter(i=>i>=0).sort((a,b)=>a-b);
+  if(idxs.length===0) return '';
+  const runs = [];
+  let start = idxs[0], prev = idxs[0];
+  for(let i=1;i<idxs.length;i++){
+    if(idxs[i] === prev+1){ prev = idxs[i]; continue; }
+    runs.push([start,prev]); start = idxs[i]; prev = idxs[i];
+  }
+  runs.push([start,prev]);
+  return runs.map(r=> r[0]===r[1] ? WEEK_ORDER[r[0]] : WEEK_ORDER[r[0]]+'-'+WEEK_ORDER[r[1]]).join(', ');
+}
+
+// Lê os turnos atribuídos a cada TEF no Calendário ao longo de um mês inteiro
+// e devolve, por TEF, um resumo de "Turno(s)" (dias + horário) e "Dias/sem."
+// (nº de dias da semana distintos em que trabalha).
+function computeTurnosPorTef(monthKey){
+  const my = monthKey.split('-').map(Number);
+  const y = my[0], mo = my[1];
+  const daysInMonth = new Date(y, mo, 0).getDate();
+  const perTef = {};
+  for(let d=1; d<=daysInMonth; d++){
+    const dateObj = new Date(y, mo-1, d);
+    const iso = isoDate(dateObj);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForReportDate(iso, dKey);
+    shifts.forEach(s=>{
+      const name = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name;
+      if(!name) return;
+      if(!perTef[name]) perTef[name] = {days:new Set(), ranges:{}};
+      perTef[name].days.add(dKey);
+      const key = s.start+'–'+s.end;
+      if(!perTef[name].ranges[key]) perTef[name].ranges[key] = new Set();
+      perTef[name].ranges[key].add(dKey);
+    });
+  }
+  const result = {};
+  Object.keys(perTef).forEach(name=>{
+    const info = perTef[name];
+    const rangeKeys = Object.keys(info.ranges).sort();
+    const parts = rangeKeys.map(rk=>{
+      const days = Array.from(info.ranges[rk]);
+      return compressDayList(days)+' '+rk;
+    });
+    result[name] = { turnos: parts.join('; '), dias: info.days.size };
+  });
+  return result;
 }
 
 function renderRelatorioTab(){
@@ -5028,6 +5094,22 @@ document.getElementById('relData').addEventListener('input', (e)=>{
 });
 document.getElementById('relObservacoes').addEventListener('input', (e)=>{
   const rel = getRelatorioAtual(); rel.observacoes = e.target.value; saveRelatorioAtual();
+});
+document.getElementById('relFillTurnos').addEventListener('click', ()=>{
+  const monthKey = relMonthKey();
+  const computed = computeTurnosPorTef(monthKey);
+  const rel = getRelatorioAtual();
+  if(Object.keys(computed).length===0){
+    alert('Não há turnos atribuídos no Calendário para este mês.');
+    return;
+  }
+  Object.keys(computed).forEach(name=>{
+    if(!rel.clientes[name]) rel.clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+    rel.clientes[name].turnos = computed[name].turnos;
+    rel.clientes[name].dias = String(computed[name].dias);
+  });
+  saveRelatorioAtual();
+  renderRelClientesTable(rel);
 });
 
 function drawSimpleTable(doc, x, y, colWidths, header, rows){
