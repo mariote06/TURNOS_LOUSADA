@@ -481,6 +481,12 @@
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if(window['pdfjsLib']){
+    window['pdfjsLib'].GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 </head>
 <body>
@@ -508,6 +514,7 @@
     <button class="tab-btn" data-tab="recrut" data-owner="equipa" style="display:none;">Recrutamento</button>
     <button class="tab-btn" data-tab="aval" data-owner="gestao" style="display:none;">Avaliação</button>
     <button class="tab-btn" data-tab="ptcount" data-owner="gestao" style="display:none;">Contabilização PT</button>
+    <button class="tab-btn" data-tab="acessos" data-owner="gestao" style="display:none;">Entradas/Saídas</button>
     <button class="tab-btn" data-tab="relatorio" data-owner="gestao" style="display:none;">Relatório</button>
     <button class="tab-btn" data-tab="fin" data-owner="gestao" style="display:none;">Finanças</button>
   </div>
@@ -990,6 +997,19 @@
         <div id="rankIntegracao"></div>
       </div>
     </div>
+  </div>
+
+  <!-- ENTRADAS/SAÍDAS TAB -->
+  <div id="tab-acessos" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Carrega o PDF de "Visitas Diárias" (entradas/saídas) exportado do sistema do ginásio. Cada visita é cruzada com os turnos desse dia e contam-se os clientes distintos por TEF — se uma visita atravessar dois turnos, conta para os dois técnicos.
+    </p>
+    <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+      <input type="file" id="acessosFileInput" accept="application/pdf" style="display:none;">
+      <button class="btn primary" id="acessosUploadBtn">📄 Carregar PDF de Visitas Diárias</button>
+      <span id="acessosFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
+    </div>
+    <div id="acessosResults"></div>
   </div>
 
   <!-- RELATÓRIO MENSAL TAB -->
@@ -4472,6 +4492,246 @@ document.getElementById('ptCountMonthNext').addEventListener('click', ()=>{
 });
 
 /* ---------------------------------------------------------------
+   ENTRADAS/SAÍDAS — importa o PDF de Visitas Diárias do ginásio,
+   cruza cada visita com os turnos desse dia e conta clientes
+   distintos por TEF (uma visita que atravesse dois turnos conta
+   para os dois). O resultado alimenta o Relatório Mensal.
+--------------------------------------------------------------- */
+const STORE_ACESSOS = 'tef_turnos_acessos_v1';
+// { "YYYY-MM": { fileName, importedAt, totalVisits, totalDates, unmatched,
+//                perTef: { nome: {count, codes:[...]} } } }
+function loadAcessos(){
+  try{ const raw = localStorage.getItem(STORE_ACESSOS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveAcessos(a){ localStorage.setItem(STORE_ACESSOS, JSON.stringify(a)); touchMeta(); }
+let ACESSOS = loadAcessos();
+
+const MONTHS_PT_NUM = {janeiro:1,fevereiro:2,'março':3,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+const ACESSOS_DIVIDER_RE = /^([a-zà-úç-]+),\s*(\d{1,2})\s+([a-zà-úç]+),\s*(\d{4})/i;
+const ACESSOS_ROW_RE = /^\s*(\d+)\s+(.+?)\s+(\d+)\s+(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})\s+(\d+)\s*$/;
+
+// Reconstrói linhas de texto a partir das posições dos itens do PDF (pdf.js),
+// aproximando o comportamento de "pdftotext -layout": um espaço largo entre
+// itens torna-se uma fronteira de coluna (3 espaços), o resto é 1 espaço.
+async function extractPdfLines(arrayBuffer){
+  if(!window['pdfjsLib']) throw new Error('Biblioteca de leitura de PDF não carregou — precisas de estar online da primeira vez que importas.');
+  const pdf = await window['pdfjsLib'].getDocument({data: arrayBuffer}).promise;
+  const lines = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items.filter(it=> it.str && it.str.trim());
+    items.sort((a,b)=> b.transform[5]-a.transform[5] || a.transform[4]-b.transform[4]);
+    let currentY = null, currentLineItems = [];
+    const flush = ()=>{
+      if(currentLineItems.length===0) return;
+      currentLineItems.sort((a,b)=>a.transform[4]-b.transform[4]);
+      let line = '', lastEnd = null;
+      currentLineItems.forEach(it=>{
+        const x = it.transform[4];
+        const w = it.width || (it.str.length*4);
+        if(lastEnd!==null){ line += (x-lastEnd) > 8 ? '   ' : ' '; }
+        line += it.str;
+        lastEnd = x + w;
+      });
+      lines.push(line);
+      currentLineItems = [];
+    };
+    items.forEach(it=>{
+      const y = it.transform[5];
+      if(currentY===null || Math.abs(y-currentY) < 2){
+        currentLineItems.push(it);
+        if(currentY===null) currentY = y;
+      } else {
+        flush();
+        currentLineItems = [it];
+        currentY = y;
+      }
+    });
+    flush();
+  }
+  return lines;
+}
+
+// Interpreta as linhas reconstruídas: divisores de dia ("sábado, 1 agosto,
+// 2026") e linhas de visita (código, nome, plano, cacifo, entrada, saída, min).
+function parseVisitLines(lines){
+  let currentDate = null;
+  let dividerCount = 0;
+  const visits = [];
+  lines.forEach(raw=>{
+    const t = raw.trim();
+    if(!t) return;
+    const dm = t.match(ACESSOS_DIVIDER_RE);
+    if(dm){
+      const monthNum = MONTHS_PT_NUM[dm[3].toLowerCase()];
+      if(monthNum){
+        dividerCount++;
+        currentDate = parseInt(dm[4],10)+'-'+pad(monthNum)+'-'+pad(parseInt(dm[2],10));
+        return;
+      }
+    }
+    const rm = t.match(ACESSOS_ROW_RE);
+    if(rm && currentDate){
+      const parts = rm[2].split(/ {2,}/);
+      const name = (parts[0]||'').trim();
+      visits.push({date: currentDate, code: rm[1], name, in: rm[4], out: rm[5]});
+    }
+  });
+  return {visits, dividerCount};
+}
+
+function timeToMinutes(hhmm){
+  const parts = hhmm.split(':');
+  return parseInt(parts[0],10)*60 + parseInt(parts[1],10);
+}
+
+// Para um conjunto de visitas do mesmo mês: cruza cada visita com os turnos
+// do dia (mesma fonte de dados do Calendário) e devolve, por TEF, o conjunto
+// de códigos de cliente distintos cujo período [entrada,saída] atravessou
+// esse turno. Uma visita que atravesse 2 turnos entra nos 2 conjuntos.
+function computeAcessos(visits){
+  const perTef = {};
+  let unmatched = 0;
+  const byDate = {};
+  visits.forEach(v=>{ (byDate[v.date] = byDate[v.date]||[]).push(v); });
+  Object.keys(byDate).forEach(iso=>{
+    const parts = iso.split('-').map(Number);
+    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForDate(iso, dKey);
+    const shiftIntervals = shifts.map(s=>({
+      name: (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name,
+      startMin: timeToMinutes(s.start),
+      endMin: timeToMinutes(s.end)
+    })).filter(s=>s.name);
+    byDate[iso].forEach(v=>{
+      const inMin = timeToMinutes(v.in);
+      let outMin = timeToMinutes(v.out);
+      if(outMin < inMin) outMin += 24*60;
+      let matched = false;
+      shiftIntervals.forEach(s=>{
+        if(inMin < s.endMin && outMin > s.startMin){
+          matched = true;
+          if(!perTef[s.name]) perTef[s.name] = new Set();
+          perTef[s.name].add(v.code);
+        }
+      });
+      if(!matched) unmatched++;
+    });
+  });
+  return {perTef, unmatched};
+}
+
+function applyAcessosToRelatorio(monthKey, perTef){
+  if(!RELATORIOS[monthKey]){
+    RELATORIOS[monthKey] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], observacoes:'', prints:[]};
+  }
+  Object.keys(perTef).forEach(name=>{
+    if(!RELATORIOS[monthKey].clientes[name]) RELATORIOS[monthKey].clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+    RELATORIOS[monthKey].clientes[name].clientes = perTef[name].count;
+  });
+  saveRelatorios(RELATORIOS);
+  if(relMonthKey()===monthKey) renderRelatorioTab();
+}
+
+function renderAcessosResults(){
+  const container = document.getElementById('acessosResults');
+  container.innerHTML = '';
+  const keys = Object.keys(ACESSOS).sort().reverse();
+  if(keys.length===0){
+    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;">Ainda não carregaste nenhum ficheiro de visitas.</p>';
+    return;
+  }
+  keys.forEach(monthKey=>{
+    const data = ACESSOS[monthKey];
+    const my = monthKey.split('-').map(Number);
+    const label = MONTH_NAMES[my[1]-1]+' '+my[0];
+    const names = Object.keys(data.perTef).sort((a,b)=>a.localeCompare(b,'pt'));
+    const rowsHtml = names.map(n=>'<tr><td data-label="TEF" style="font-weight:700;">'+n+'</td><td data-label="Clientes distintos" class="hrs">'+data.perTef[n].count+'</td></tr>').join('');
+    const block = document.createElement('div');
+    block.className = 'panel';
+    block.style.padding = '14px 18px';
+    block.style.marginBottom = '16px';
+    block.innerHTML =
+      '<h4 style="margin:0 0 8px;">'+label+'</h4>'+
+      '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">'+data.totalVisits+' visitas processadas em '+data.totalDates+' dias'+
+        (data.unmatched>0 ? ' · '+data.unmatched+' visitas sem turno correspondente nesse horário' : '')+'.</p>'+
+      '<div style="overflow-x:auto;"><table class="tec-table"><thead><tr><th>TEF</th><th>Clientes distintos (mês)</th></tr></thead><tbody>'+
+        (rowsHtml || '<tr><td colspan="2" style="color:var(--ink-soft);font-style:italic;">Sem correspondências.</td></tr>')+
+      '</tbody></table></div>'+
+      '<div class="modal-actions" style="justify-content:flex-start;margin-top:12px;">'+
+        '<button type="button" class="btn primary rel-apply-btn" data-month="'+monthKey+'">Aplicar ao Relatório de '+label+'</button>'+
+        '<button type="button" class="btn ghost rel-remove-btn" data-month="'+monthKey+'">Remover</button>'+
+      '</div>';
+    container.appendChild(block);
+  });
+  container.querySelectorAll('.rel-apply-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const monthKey = e.target.dataset.month;
+      applyAcessosToRelatorio(monthKey, ACESSOS[monthKey].perTef);
+      alert('Contagens aplicadas ao separador Relatório.');
+    });
+  });
+  container.querySelectorAll('.rel-remove-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const monthKey = e.target.dataset.month;
+      if(!confirm('Remover os dados de acessos deste mês?')) return;
+      delete ACESSOS[monthKey];
+      saveAcessos(ACESSOS);
+      renderAcessosResults();
+    });
+  });
+}
+
+document.getElementById('acessosUploadBtn').addEventListener('click', ()=>{
+  document.getElementById('acessosFileInput').click();
+});
+document.getElementById('acessosFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('acessosFileStatus');
+  statusEl.textContent = 'A processar '+file.name+'…';
+  try{
+    const buffer = await file.arrayBuffer();
+    const lines = await extractPdfLines(buffer);
+    const parsed = parseVisitLines(lines);
+    if(parsed.visits.length===0){
+      statusEl.textContent = 'Não foi possível reconhecer linhas de visitas neste PDF.';
+      e.target.value = '';
+      return;
+    }
+    const byMonth = {};
+    parsed.visits.forEach(v=>{ const mk = v.date.slice(0,7); (byMonth[mk] = byMonth[mk]||[]).push(v); });
+    Object.keys(byMonth).forEach(monthKey=>{
+      const monthVisits = byMonth[monthKey];
+      const result = computeAcessos(monthVisits);
+      const perTefSerializable = {};
+      Object.keys(result.perTef).forEach(name=>{
+        const codes = Array.from(result.perTef[name]);
+        perTefSerializable[name] = {count: codes.length, codes};
+      });
+      ACESSOS[monthKey] = {
+        fileName: file.name,
+        importedAt: nowISO(),
+        totalVisits: monthVisits.length,
+        totalDates: new Set(monthVisits.map(v=>v.date)).size,
+        unmatched: result.unmatched,
+        perTef: perTefSerializable
+      };
+    });
+    saveAcessos(ACESSOS);
+    statusEl.textContent = file.name+' processado com sucesso.';
+    renderAcessosResults();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'Erro ao processar o PDF: '+(err && err.message ? err.message : err);
+  }
+  e.target.value = '';
+});
+
+/* ---------------------------------------------------------------
    RELATÓRIO MENSAL — clientes por turno, tarefas realizadas e
    pendentes, prints anexados, e avaliação de performance ligada
    automaticamente aos dados do separador Avaliação.
@@ -5050,6 +5310,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-aval').style.display = tab==='aval' ? '' : 'none';
     document.getElementById('tab-recrut').style.display = tab==='recrut' ? '' : 'none';
     document.getElementById('tab-ptcount').style.display = tab==='ptcount' ? '' : 'none';
+    document.getElementById('tab-acessos').style.display = tab==='acessos' ? '' : 'none';
     document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? '' : 'none';
     document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
     if(tab==='tpl') renderTplGrid();
@@ -5061,6 +5322,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='aval') renderAvalTab();
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
+    if(tab==='acessos') renderAcessosResults();
     if(tab==='relatorio') renderRelatorioTab();
     if(tab==='ferias') renderFeriasTab();
   });
@@ -5442,6 +5704,7 @@ function buildExportPayload(){
     feriasDias: FERIAS_DIAS,
     pesosAvaliacao: GROUP_WEIGHTS,
     relatorios: RELATORIOS,
+    acessos: ACESSOS,
     exportedAt: nowISO()
   };
 }
@@ -5466,6 +5729,7 @@ function applyImportedData(data){
   if(data.feriasDias){ FERIAS_DIAS = data.feriasDias; localStorage.setItem(STORE_FERIAS_DIAS, JSON.stringify(FERIAS_DIAS)); }
   if(data.pesosAvaliacao){ GROUP_WEIGHTS = data.pesosAvaliacao; localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(GROUP_WEIGHTS)); }
   if(data.relatorios){ RELATORIOS = data.relatorios; localStorage.setItem(STORE_RELATORIO, JSON.stringify(RELATORIOS)); }
+  if(data.acessos){ ACESSOS = data.acessos; localStorage.setItem(STORE_ACESSOS, JSON.stringify(ACESSOS)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
@@ -5489,6 +5753,8 @@ function applyImportedData(data){
   if(avalTab && avalTab.style.display !== 'none'){ renderAvalTab(); renderAvalWeightsPanel(); }
   const relTab = document.getElementById('tab-relatorio');
   if(relTab && relTab.style.display !== 'none') renderRelatorioTab();
+  const acessosTab = document.getElementById('tab-acessos');
+  if(acessosTab && acessosTab.style.display !== 'none') renderAcessosResults();
   updateSyncStatusLabel();
 }
 
