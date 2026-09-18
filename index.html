@@ -508,6 +508,7 @@
     <button class="tab-btn" data-tab="feriados" data-owner="sala">Feriados</button>
     <button class="tab-btn" data-tab="tpl" data-owner="sala">Horário Base</button>
     <button class="tab-btn" data-tab="ferias" data-owner="sala">Férias</button>
+    <button class="tab-btn" data-tab="substituicoes" data-owner="sala">Substituições</button>
     <button class="tab-btn" data-tab="tec" data-owner="equipa" style="display:none;">Técnicos</button>
     <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
     <button class="tab-btn" data-tab="equip" data-owner="equipa" style="display:none;">Equipamento</button>
@@ -996,6 +997,24 @@
         <h4>🤝 Treino de Integração</h4>
         <div id="rankIntegracao"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- SUBSTITUIÇÕES TAB -->
+  <div id="tab-substituicoes" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Todas as substituições registadas no Calendário, com indicação de quem pagou o substituto — o ginásio diretamente, ou o próprio titular do turno (que recebeu o pagamento e paga por fora).
+    </p>
+    <div class="modal-actions" style="justify-content:flex-start;margin-bottom:14px;">
+      <button class="btn primary" id="btnExportSubstExcel">📊 Exportar para Excel</button>
+    </div>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="substTecTable">
+        <thead>
+          <tr><th>Data</th><th>Dia</th><th>Turno</th><th>Titular</th><th>Substituto</th><th>Pago por</th><th>Nota</th></tr>
+        </thead>
+        <tbody id="substTecBody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -4508,6 +4527,97 @@ document.getElementById('ptCountMonthNext').addEventListener('click', ()=>{
 });
 
 /* ---------------------------------------------------------------
+   SUBSTITUIÇÕES — lista e exporta para Excel todas as substituições
+   registadas no Calendário, identificando quais foram pagas
+   diretamente pelo ginásio e quais foram pagas pelo TEF titular
+   (que recebeu o pagamento e paga por fora ao substituto).
+--------------------------------------------------------------- */
+function collectAllSubstitutions(){
+  const rows = [];
+  const d = new Date(RANGE_START);
+  while(d <= RANGE_END){
+    const iso = isoDate(d);
+    const dKey = dayKeyOf(d);
+    const shifts = shiftsForDate(iso, dKey);
+    shifts.forEach(s=>{
+      if(s._subst && !s._adhoc && s.substituteName && s.substituteName.trim()){
+        const exc = exceptions[iso];
+        rows.push({
+          iso,
+          weekday: LONG_WEEKDAY[d.getDay()],
+          start: s.start, end: s.end,
+          titular: s.name || '—',
+          substituto: s.substituteName.trim(),
+          payTitular: !!s.payTitular,
+          nota: (exc && exc.note) ? exc.note : ''
+        });
+      }
+    });
+    d.setDate(d.getDate()+1);
+  }
+  return rows;
+}
+
+function renderSubstTecTab(){
+  const tbody = document.getElementById('substTecBody');
+  const rows = collectAllSubstitutions();
+  if(rows.length===0){
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--ink-soft);font-style:italic;padding:14px;">Sem substituições registadas.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r=>
+    '<tr'+(r.payTitular?' style="background:var(--rust-soft);"':'')+'>'+
+    '<td data-label="Data">'+fmtDatePT(r.iso)+'</td>'+
+    '<td data-label="Dia">'+r.weekday+'</td>'+
+    '<td data-label="Turno">'+r.start+'–'+r.end+'</td>'+
+    '<td data-label="Titular" style="font-weight:700;">'+r.titular+'</td>'+
+    '<td data-label="Substituto">'+r.substituto+'</td>'+
+    '<td data-label="Pago por">'+(r.payTitular ? '<strong style="color:var(--rust);">Titular</strong>' : 'Ginásio')+'</td>'+
+    '<td data-label="Nota">'+(r.nota ? escapeAttr(r.nota) : '—')+'</td></tr>'
+  ).join('');
+}
+
+document.getElementById('btnExportSubstExcel').addEventListener('click', async ()=>{
+  if(typeof ExcelJS === 'undefined'){
+    alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online da primeira vez que exportas).');
+    return;
+  }
+  const rows = collectAllSubstitutions();
+  const THICK = {style:'medium', color:{argb:'FF404040'}};
+  function addBorders(ws){
+    ws.eachRow({includeEmpty:true}, (row)=>{
+      row.eachCell({includeEmpty:true}, (cell)=>{ cell.border = {top:THICK, bottom:THICK, left:THICK, right:THICK}; });
+    });
+  }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Substituições');
+  ws.columns = [{width:12},{width:16},{width:11},{width:11},{width:18},{width:18},{width:14},{width:26}];
+  const headerRow = ws.addRow(['Data','Dia da semana','Hora início','Hora fim','TEF titular','Substituto','Pago por','Nota']);
+  headerRow.font = {bold:true};
+  if(rows.length===0){
+    const emptyRow = ws.addRow(['Sem substituições registadas.']);
+    emptyRow.font = {italic:true};
+  } else {
+    rows.forEach(r=>{
+      const row = ws.addRow([r.iso, r.weekday, r.start, r.end, r.titular, r.substituto, r.payTitular?'Titular':'Ginásio', r.nota]);
+      row.font = {bold: r.payTitular};
+      row.eachCell({includeEmpty:true}, (cell)=>{
+        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: r.payTitular ? 'FFF4B6A6' : 'FFFFE699'}};
+      });
+    });
+  }
+  addBorders(ws);
+  ws.autoFilter = {from:{row:1, column:1}, to:{row:ws.rowCount, column:8}};
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'substituicoes_tef.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+/* ---------------------------------------------------------------
    ENTRADAS/SAÍDAS — importa o PDF de Visitas Diárias do ginásio,
    cruza cada visita com os turnos desse dia e conta clientes
    distintos por TEF (uma visita que atravesse dois turnos conta
@@ -5450,6 +5560,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-aval').style.display = tab==='aval' ? '' : 'none';
     document.getElementById('tab-recrut').style.display = tab==='recrut' ? '' : 'none';
     document.getElementById('tab-ptcount').style.display = tab==='ptcount' ? '' : 'none';
+    document.getElementById('tab-substituicoes').style.display = tab==='substituicoes' ? '' : 'none';
     document.getElementById('tab-acessos').style.display = tab==='acessos' ? '' : 'none';
     document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? '' : 'none';
     document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
@@ -5462,6 +5573,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='aval') renderAvalTab();
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
+    if(tab==='substituicoes') renderSubstTecTab();
     if(tab==='acessos') renderAcessosResults();
     if(tab==='relatorio') renderRelatorioTab();
     if(tab==='ferias') renderFeriasTab();
