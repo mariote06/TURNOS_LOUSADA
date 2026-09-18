@@ -1051,6 +1051,8 @@
       </div>
     </div>
 
+    <div id="aulasResults"></div>
+
     <div id="acessosResults"></div>
   </div>
 
@@ -4827,7 +4829,8 @@ function parseAulasWorkbook(arrayBuffer){
     classDate: header.indexOf('Data da Aula'),
     code: header.indexOf('Nº Sócio'),
     name: header.indexOf('Nome do Cliente'),
-    status: header.indexOf('Confirmação')
+    status: header.indexOf('Confirmação'),
+    responsavel: header.indexOf('Responsável Realizou')
   };
   if(idx.classDate<0 || idx.code<0) return [];
   const bookings = [];
@@ -4845,6 +4848,7 @@ function parseAulasWorkbook(arrayBuffer){
       name: idx.name>=0 ? String(r[idx.name]||'').trim() : '',
       activity: idx.activity>=0 ? String(r[idx.activity]||'').trim() : '',
       status: idx.status>=0 ? String(r[idx.status]||'').trim() : '',
+      responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
       startHHMM: pad(dt.getUTCHours())+':'+pad(dt.getUTCMinutes())
     });
   }
@@ -5206,6 +5210,93 @@ document.getElementById('acessosFileInput').addEventListener('change', async (e)
   e.target.value = '';
 });
 
+// Resumo, rankings e filtros das reservas de aulas importadas, por mês —
+// independente de já haver ou não um PDF de Entradas/Saídas desse mês.
+function renderAulasResults(){
+  const container = document.getElementById('aulasResults');
+  if(!container) return;
+  container.innerHTML = '';
+  const keys = Object.keys(AULAS).sort().reverse();
+  if(keys.length===0) return;
+  keys.forEach(monthKey=>{
+    const data = AULAS[monthKey];
+    const bookings = data.bookings || [];
+    const my = monthKey.split('-').map(Number);
+    const label = MONTH_NAMES[my[1]-1]+' '+my[0];
+    const presentes = bookings.filter(b=>b.status==='Presente');
+    const porAtividade = {}, porResponsavel = {};
+    presentes.forEach(b=>{
+      if(b.activity){ (porAtividade[b.activity] = porAtividade[b.activity] || new Set()).add(b.code); }
+      if(b.responsavel){ (porResponsavel[b.responsavel] = porResponsavel[b.responsavel] || new Set()).add(b.code); }
+    });
+    const atividadeRanking = Object.keys(porAtividade).map(a=>({label:a, value:porAtividade[a].size+' clientes'}))
+      .sort((a,b)=> parseInt(b.value)-parseInt(a.value));
+    const responsavelRanking = Object.keys(porResponsavel).map(r=>({label:r, value:porResponsavel[r].size+' clientes'}))
+      .sort((a,b)=> parseInt(b.value)-parseInt(a.value));
+    const activities = Array.from(new Set(bookings.map(b=>b.activity).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt'));
+    const responsaveis = Array.from(new Set(bookings.map(b=>b.responsavel).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt'));
+    const linkStatus = ACESSOS[monthKey]
+      ? '✅ Este mês já tem dados de Entradas/Saídas — usa "Reprocessar excluindo tempo de aulas" no bloco abaixo para aplicar.'
+      : '⚠️ Ainda não carregaste o PDF de Entradas/Saídas deste mês — carrega-o para poderes ligar as aulas às contagens por TEF.';
+
+    const block = document.createElement('div');
+    block.className = 'panel';
+    block.style.padding = '14px 18px';
+    block.style.marginBottom = '16px';
+    block.innerHTML =
+      '<h4 style="margin:0 0 8px;">Aulas — '+label+'</h4>'+
+      '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">'+bookings.length+' reservas ('+presentes.length+' presentes, '+(bookings.length-presentes.length)+' ausentes).</p>'+
+      '<p style="font-size:12px;margin:0 0 12px;">'+linkStatus+'</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:22px;margin-bottom:14px;">'+
+        '<div style="flex:1 1 240px;"><h5 style="margin:0 0 6px;font-size:13px;">🏆 Atividade com mais clientes</h5>'+renderRankingListHtml(atividadeRanking)+'</div>'+
+        '<div style="flex:1 1 220px;"><h5 style="margin:0 0 6px;font-size:13px;">🏆 Instrutor com mais clientes</h5>'+renderRankingListHtml(responsavelRanking)+'</div>'+
+      '</div>'+
+      '<div>'+
+        '<h5 style="margin:0 0 8px;font-size:13px;">🔍 Filtrar reservas</h5>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'+
+          '<select class="rel-input aulas-filter-atividade" data-month="'+monthKey+'" style="max-width:220px;"><option value="">Todas as atividades</option>'+
+            activities.map(a=>'<option value="'+escapeAttr(a)+'">'+escapeAttr(a)+'</option>').join('')+
+          '</select>'+
+          '<select class="rel-input aulas-filter-responsavel" data-month="'+monthKey+'" style="max-width:200px;"><option value="">Todos os instrutores</option>'+
+            responsaveis.map(r=>'<option value="'+escapeAttr(r)+'">'+escapeAttr(r)+'</option>').join('')+
+          '</select>'+
+          '<select class="rel-input aulas-filter-estado" data-month="'+monthKey+'" style="max-width:160px;">'+
+            '<option value="">Presentes e ausentes</option><option value="Presente">Só presentes</option><option value="Ausente">Só ausentes</option>'+
+          '</select>'+
+          '<button type="button" class="btn ghost aulas-filter-btn" data-month="'+monthKey+'">Filtrar</button>'+
+        '</div>'+
+        '<div id="aulasFilterResults-'+monthKey+'" style="margin-top:10px;"></div>'+
+      '</div>';
+    container.appendChild(block);
+  });
+  container.querySelectorAll('.aulas-filter-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const monthKey = e.target.dataset.month;
+      const atividade = container.querySelector('.aulas-filter-atividade[data-month="'+monthKey+'"]').value;
+      const responsavel = container.querySelector('.aulas-filter-responsavel[data-month="'+monthKey+'"]').value;
+      const estado = container.querySelector('.aulas-filter-estado[data-month="'+monthKey+'"]').value;
+      const bookings = (AULAS[monthKey] && AULAS[monthKey].bookings) || [];
+      const filtered = bookings.filter(b=>
+        (!atividade || b.activity===atividade) &&
+        (!responsavel || b.responsavel===responsavel) &&
+        (!estado || b.status===estado)
+      );
+      const distinctClients = new Set(filtered.filter(b=>b.status==='Presente').map(b=>b.code));
+      const resultsEl = document.getElementById('aulasFilterResults-'+monthKey);
+      if(filtered.length===0){
+        resultsEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Sem reservas com estes filtros.</p>';
+        return;
+      }
+      const rows = filtered.slice().sort((a,b)=> a.date.localeCompare(b.date) || a.startHHMM.localeCompare(b.startHHMM));
+      resultsEl.innerHTML =
+        '<p style="font-size:12.5px;margin:0 0 8px;"><strong>'+filtered.length+'</strong> reserva(s) — <strong>'+distinctClients.size+'</strong> cliente(s) distintos presentes.</p>'+
+        '<div style="overflow-x:auto;max-height:340px;overflow-y:auto;"><table class="tec-table"><thead><tr><th>Data</th><th>Hora</th><th>Atividade</th><th>Instrutor</th><th>Cliente</th><th>Estado</th></tr></thead><tbody>'+
+        rows.map(b=> '<tr><td data-label="Data">'+fmtDatePT(b.date)+'</td><td data-label="Hora">'+b.startHHMM+'</td><td data-label="Atividade">'+escapeAttr(b.activity)+'</td><td data-label="Instrutor">'+escapeAttr(b.responsavel)+'</td><td data-label="Cliente">'+escapeAttr(b.name)+'</td><td data-label="Estado">'+(b.status==='Presente'?'Presente':'<span style="color:var(--ink-soft);">Ausente</span>')+'</td></tr>').join('')+
+        '</tbody></table></div>';
+    });
+  });
+}
+
 function renderAulaDuracoesPanel(){
   const el = document.getElementById('aulaDuracoesPanel');
   if(!el) return;
@@ -5279,6 +5370,7 @@ document.getElementById('aulasFileInput').addEventListener('change', async (e)=>
     saveAulaDuracoes(AULA_DURACOES);
     statusEl.textContent = file.name+' processado — '+bookings.length+' reservas.';
     renderAulaDuracoesPanel();
+    renderAulasResults();
     renderAcessosResults();
   }catch(err){
     console.error(err);
@@ -5992,7 +6084,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
     if(tab==='substituicoes') renderSubstTecTab();
-    if(tab==='acessos'){ renderAcessosResults(); renderAulaDuracoesPanel(); fillAulaBufferInputs(); }
+    if(tab==='acessos'){ renderAcessosResults(); renderAulaDuracoesPanel(); fillAulaBufferInputs(); renderAulasResults(); }
     if(tab==='relatorio') renderRelatorioTab();
     if(tab==='ferias') renderFeriasTab();
   });
