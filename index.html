@@ -1123,7 +1123,19 @@
 
     <h3 style="font-size:15px;margin:26px 0 10px;">4. Tarefas Abertas / Pendentes</h3>
     <div class="panel" style="padding:14px 18px;">
-      <div id="relAbertasList"></div>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+        Podes carregar um Excel com as tarefas (colunas: Tarefa, Responsável, Prazo, Estado) — a app separa automaticamente as que já passaram do prazo das restantes.
+      </p>
+      <input type="file" id="relTarefasFileInput" accept=".xlsx,.xls" style="display:none;">
+      <button type="button" class="btn primary" id="relTarefasUploadBtn">📥 Carregar Excel de Tarefas</button>
+      <span id="relTarefasFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
+
+      <h4 style="font-size:13.5px;margin:18px 0 8px;color:var(--rust);">⏰ Com prazo excedido</h4>
+      <div id="relAbertasOverdue"></div>
+
+      <h4 style="font-size:13.5px;margin:18px 0 8px;">📋 Restantes tarefas</h4>
+      <div id="relAbertasRemaining"></div>
+
       <button type="button" class="btn ghost" id="relAddAberta" style="margin-top:10px;">+ Adicionar tarefa aberta</button>
     </div>
 
@@ -5590,46 +5602,71 @@ function renderRelTarefasTable(rel){
   });
 }
 
+function isTaskOverdue(t){
+  return t.estado !== 'concluida' && !!t.prazo && t.prazo < isoDate(new Date());
+}
+
+function renderTaskRow(t, idx){
+  const row = document.createElement('div');
+  row.className = 'rel-task-row';
+  row.innerHTML =
+    '<input type="text" class="rel-input" data-idx="'+idx+'" data-field="tarefa" placeholder="Tarefa" value="'+escapeAttr(t.tarefa)+'">'+
+    '<input type="text" class="rel-input" data-idx="'+idx+'" data-field="responsavel" placeholder="TEF responsável" value="'+escapeAttr(t.responsavel)+'">'+
+    '<input type="date" class="rel-input rel-date" data-idx="'+idx+'" data-field="prazo" value="'+escapeAttr(t.prazo)+'">'+
+    '<select class="rel-input" data-idx="'+idx+'" data-field="estado">'+
+      '<option value="em_curso"'+(t.estado!=='concluida'?' selected':'')+'>Em curso</option>'+
+      '<option value="concluida"'+(t.estado==='concluida'?' selected':'')+'>Concluída</option>'+
+    '</select>'+
+    '<button type="button" class="rel-rm" data-idx="'+idx+'" title="Remover">×</button>';
+  return row;
+}
+
 function renderRelAbertasList(rel){
-  const container = document.getElementById('relAbertasList');
-  container.innerHTML = '';
-  if(rel.abertas.length===0){
-    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem tarefas abertas registadas.</p>';
+  const overdueEl = document.getElementById('relAbertasOverdue');
+  const remainingEl = document.getElementById('relAbertasRemaining');
+  overdueEl.innerHTML = '';
+  remainingEl.innerHTML = '';
+  const overdueIdx = [], remainingIdx = [];
+  rel.abertas.forEach((t, idx)=> (isTaskOverdue(t) ? overdueIdx : remainingIdx).push(idx));
+  if(overdueIdx.length===0){
+    overdueEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem tarefas com prazo excedido.</p>';
+  } else {
+    overdueIdx.forEach(idx=> overdueEl.appendChild(renderTaskRow(rel.abertas[idx], idx)));
   }
-  rel.abertas.forEach((t, idx)=>{
-    const row = document.createElement('div');
-    row.className = 'rel-task-row';
-    row.innerHTML =
-      '<input type="text" class="rel-input" data-idx="'+idx+'" data-field="tarefa" placeholder="Tarefa" value="'+escapeAttr(t.tarefa)+'">'+
-      '<input type="text" class="rel-input" data-idx="'+idx+'" data-field="responsavel" placeholder="TEF responsável" value="'+escapeAttr(t.responsavel)+'">'+
-      '<input type="date" class="rel-input rel-date" data-idx="'+idx+'" data-field="prazo" value="'+escapeAttr(t.prazo)+'">'+
-      '<select class="rel-input" data-idx="'+idx+'" data-field="estado">'+
-        '<option value="em_curso"'+(t.estado==='em_curso'?' selected':'')+'>Em curso</option>'+
-        '<option value="atrasada"'+(t.estado==='atrasada'?' selected':'')+'>Atrasada</option>'+
-        '<option value="concluida"'+(t.estado==='concluida'?' selected':'')+'>Concluída</option>'+
-      '</select>'+
-      '<button type="button" class="rel-rm" data-idx="'+idx+'" title="Remover">×</button>';
-    container.appendChild(row);
-  });
+  if(remainingIdx.length===0){
+    remainingEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem outras tarefas pendentes.</p>';
+  } else {
+    remainingIdx.forEach(idx=> remainingEl.appendChild(renderTaskRow(rel.abertas[idx], idx)));
+  }
   function persistField(idx, field, value){
     const rel2 = getRelatorioAtual();
     if(!rel2.abertas[idx]) return;
     rel2.abertas[idx][field] = value;
     saveRelatorioAtual();
+    renderRelAbertasList(rel2);
   }
-  container.querySelectorAll('input.rel-input').forEach(inp=>{
-    inp.addEventListener('input', (e)=> persistField(parseInt(e.target.dataset.idx,10), e.target.dataset.field, e.target.value));
-  });
-  container.querySelectorAll('select.rel-input').forEach(sel=>{
-    sel.addEventListener('change', (e)=> persistField(parseInt(e.target.dataset.idx,10), 'estado', e.target.value));
-  });
-  container.querySelectorAll('.rel-rm').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
-      const idx = parseInt(e.target.dataset.idx,10);
-      const rel2 = getRelatorioAtual();
-      rel2.abertas.splice(idx,1);
-      saveRelatorioAtual();
-      renderRelAbertasList(rel2);
+  [overdueEl, remainingEl].forEach(container=>{
+    container.querySelectorAll('input.rel-input').forEach(inp=>{
+      inp.addEventListener('input', (e)=>{
+        const rel2 = getRelatorioAtual();
+        const idx = parseInt(e.target.dataset.idx,10);
+        if(rel2.abertas[idx]) rel2.abertas[idx][e.target.dataset.field] = e.target.value;
+        saveRelatorioAtual();
+        // só re-renderiza ao mudar o prazo (pode mudar de grupo); texto livre mantém o foco
+        if(e.target.dataset.field==='prazo') renderRelAbertasList(rel2);
+      });
+    });
+    container.querySelectorAll('select.rel-input').forEach(sel=>{
+      sel.addEventListener('change', (e)=> persistField(parseInt(e.target.dataset.idx,10), 'estado', e.target.value));
+    });
+    container.querySelectorAll('.rel-rm').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const idx = parseInt(e.target.dataset.idx,10);
+        const rel2 = getRelatorioAtual();
+        rel2.abertas.splice(idx,1);
+        saveRelatorioAtual();
+        renderRelAbertasList(rel2);
+      });
     });
   });
 }
@@ -5638,6 +5675,90 @@ document.getElementById('relAddAberta').addEventListener('click', ()=>{
   rel.abertas.push({tarefa:'', responsavel:'', prazo:'', estado:'em_curso'});
   saveRelatorioAtual();
   renderRelAbertasList(rel);
+});
+
+// Lê um Excel de tarefas com cabeçalhos flexíveis (Tarefa/Descrição,
+// Responsável/TEF, Prazo/Data Limite, Estado) e devolve uma lista de
+// {tarefa, responsavel, prazo, estado}. As datas aceitam célula-data do
+// Excel ou texto dd/mm/aaaa ou aaaa-mm-dd.
+function normalizeHeader(h){
+  return String(h||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function parseTarefasWorkbook(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, {type:'array', cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  if(rows.length < 2) return [];
+  const header = rows[0].map(normalizeHeader);
+  function findCol(candidates){
+    for(let i=0;i<header.length;i++){ if(candidates.includes(header[i])) return i; }
+    return -1;
+  }
+  const idx = {
+    tarefa: findCol(['tarefa','descricao','descrição','assunto','titulo','título']),
+    responsavel: findCol(['responsavel','responsável','tef','atribuido a','atribuído a','colaborador']),
+    prazo: findCol(['prazo','data limite','data-limite','deadline','data']),
+    estado: findCol(['estado','status'])
+  };
+  if(idx.tarefa<0) return [];
+  const out = [];
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || r.length===0) continue;
+    const tarefa = String(r[idx.tarefa]||'').trim();
+    if(!tarefa) continue;
+    let prazo = '';
+    if(idx.prazo>=0){
+      const raw = r[idx.prazo];
+      if(raw instanceof Date){
+        prazo = raw.getUTCFullYear()+'-'+pad(raw.getUTCMonth()+1)+'-'+pad(raw.getUTCDate());
+      } else if(raw){
+        const s = String(raw).trim();
+        const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if(dmy) prazo = dmy[3]+'-'+pad(parseInt(dmy[2],10))+'-'+pad(parseInt(dmy[1],10));
+        else if(ymd) prazo = ymd[1]+'-'+pad(parseInt(ymd[2],10))+'-'+pad(parseInt(ymd[3],10));
+      }
+    }
+    const estadoRaw = idx.estado>=0 ? normalizeHeader(r[idx.estado]) : '';
+    const estado = /conclu|feito|done|resolvid/.test(estadoRaw) ? 'concluida' : 'em_curso';
+    out.push({
+      tarefa,
+      responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
+      prazo,
+      estado
+    });
+  }
+  return out;
+}
+
+document.getElementById('relTarefasUploadBtn').addEventListener('click', ()=>{
+  document.getElementById('relTarefasFileInput').click();
+});
+document.getElementById('relTarefasFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('relTarefasFileStatus');
+  statusEl.textContent = 'A processar '+file.name+'…';
+  try{
+    const buffer = await file.arrayBuffer();
+    const tarefas = parseTarefasWorkbook(buffer);
+    if(tarefas.length===0){
+      statusEl.textContent = 'Não foi possível reconhecer tarefas neste ficheiro (confirma as colunas Tarefa/Responsável/Prazo).';
+      e.target.value = '';
+      return;
+    }
+    const rel = getRelatorioAtual();
+    rel.abertas = rel.abertas.concat(tarefas);
+    saveRelatorioAtual();
+    statusEl.textContent = tarefas.length+' tarefa(s) importada(s) de '+file.name+'.';
+    renderRelAbertasList(rel);
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
+  }
+  e.target.value = '';
 });
 
 function renderRelPrintsList(rel){
@@ -5882,10 +6003,19 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
   if(rel.abertas.length===0){
     paragraph('Sem tarefas abertas registadas.');
   } else {
-    const estadoLabel = {em_curso:'Em curso', atrasada:'Atrasada', concluida:'Concluída'};
-    table(['Tarefa','Responsável','Prazo','Estado'],
-      rel.abertas.map(t=>[t.tarefa||'—', t.responsavel||'—', t.prazo?fmtDatePT(t.prazo):'—', estadoLabel[t.estado]||'—']),
-      [70,40,30,tW-70-40-30]);
+    const overdue = rel.abertas.filter(isTaskOverdue);
+    const remaining = rel.abertas.filter(t=>!isTaskOverdue(t));
+    const estadoLabel = {em_curso:'Em curso', concluida:'Concluída'};
+    const cols = [70,40,30,tW-70-40-30];
+    paragraph('⏰ Com prazo excedido:');
+    if(overdue.length===0) paragraph('Sem tarefas com prazo excedido.');
+    else table(['Tarefa','Responsável','Prazo','Estado'],
+      overdue.map(t=>[t.tarefa||'—', t.responsavel||'—', t.prazo?fmtDatePT(t.prazo):'—', estadoLabel[t.estado]||'—']), cols);
+    y += 4;
+    paragraph('📋 Restantes tarefas:');
+    if(remaining.length===0) paragraph('Sem outras tarefas pendentes.');
+    else table(['Tarefa','Responsável','Prazo','Estado'],
+      remaining.map(t=>[t.tarefa||'—', t.responsavel||'—', t.prazo?fmtDatePT(t.prazo):'—', estadoLabel[t.estado]||'—']), cols);
   }
   y += 6;
 
