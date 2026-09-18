@@ -1054,7 +1054,20 @@
       </table>
     </div>
 
-    <h3 style="font-size:15px;margin:26px 0 10px;">2. Tarefas Realizadas</h3>
+    <h3 style="font-size:15px;margin:26px 0 10px;">2. Substituições Pagas pelo Titular</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+      Turnos em que o titular recebeu o pagamento do ginásio e paga diretamente ao substituto (fora do sistema). Vem automaticamente do Calendário — marca "O titular recebe e paga ao substituto" na substituição para aparecer aqui.
+    </p>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="relSubstTable">
+        <thead>
+          <tr><th>Data</th><th>Turno</th><th>Titular (recebe e paga)</th><th>Substituto (efetua o turno)</th></tr>
+        </thead>
+        <tbody id="relSubstBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">3. Tarefas Realizadas</h3>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="relTarefasTable">
         <thead>
@@ -1064,20 +1077,20 @@
       </table>
     </div>
 
-    <h3 style="font-size:15px;margin:26px 0 10px;">3. Tarefas Abertas / Pendentes</h3>
+    <h3 style="font-size:15px;margin:26px 0 10px;">4. Tarefas Abertas / Pendentes</h3>
     <div class="panel" style="padding:14px 18px;">
       <div id="relAbertasList"></div>
       <button type="button" class="btn ghost" id="relAddAberta" style="margin-top:10px;">+ Adicionar tarefa aberta</button>
     </div>
 
-    <h3 style="font-size:15px;margin:26px 0 10px;">4. Anexos — Prints das Tarefas</h3>
+    <h3 style="font-size:15px;margin:26px 0 10px;">5. Anexos — Prints das Tarefas</h3>
     <div class="panel" style="padding:14px 18px;">
       <p style="color:var(--ink-soft);font-size:12.5px;margin-top:0;">Carrega prints (ex. do OnVirtualGym) que documentem tarefas realizadas ou pendentes.</p>
       <div id="relPrintsList"></div>
       <button type="button" class="btn ghost" id="relAddPrint" style="margin-top:10px;">+ Adicionar print</button>
     </div>
 
-    <h3 style="font-size:15px;margin:26px 0 10px;">5. Avaliação de Performance</h3>
+    <h3 style="font-size:15px;margin:26px 0 10px;">6. Avaliação de Performance</h3>
     <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
       Dados automáticos, a partir da avaliação mais recente de cada técnico no separador Avaliação. Atualiza a avaliação lá — reflete-se aqui sozinho.
     </p>
@@ -1090,7 +1103,7 @@
       </table>
     </div>
 
-    <h3 style="font-size:15px;margin:26px 0 10px;">6. Observações Gerais e Plano de Ação</h3>
+    <h3 style="font-size:15px;margin:26px 0 10px;">7. Observações Gerais e Plano de Ação</h3>
     <div class="panel" style="padding:14px 18px;">
       <textarea id="relObservacoes" placeholder="Notas gerais do mês, decisões tomadas, pontos a acompanhar..." style="width:100%;min-height:110px;font:14px 'Inter';border:1px solid var(--line);border-radius:8px;padding:10px;box-sizing:border-box;"></textarea>
     </div>
@@ -4841,6 +4854,39 @@ function computeTurnosPorTef(monthKey){
   return result;
 }
 
+// Turnos substituídos em que o titular recebe o pagamento do ginásio e paga
+// diretamente ao substituto (arranjo informal entre TEFs, fora do sistema).
+function computeSubstituicoesPagasPeloTitular(monthKey){
+  const my = monthKey.split('-').map(Number);
+  const y = my[0], mo = my[1];
+  const daysInMonth = new Date(y, mo, 0).getDate();
+  const rows = [];
+  for(let d=1; d<=daysInMonth; d++){
+    const dateObj = new Date(y, mo-1, d);
+    const iso = isoDate(dateObj);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForReportDate(iso, dKey);
+    shifts.forEach(s=>{
+      if(s._subst && !s._adhoc && s.substituteName && s.substituteName.trim() && s.payTitular){
+        rows.push({iso, start:s.start, end:s.end, titular:s.name||'—', substituto:s.substituteName.trim()});
+      }
+    });
+  }
+  rows.sort((a,b)=> a.iso.localeCompare(b.iso) || a.start.localeCompare(b.start));
+  return rows;
+}
+function renderRelSubstTable(monthKey){
+  const tbody = document.getElementById('relSubstBody');
+  const rows = computeSubstituicoesPagasPeloTitular(monthKey);
+  tbody.innerHTML = rows.length===0
+    ? '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Sem substituições deste tipo neste mês.</td></tr>'
+    : rows.map(r=>
+        '<tr><td data-label="Data">'+fmtDatePT(r.iso)+'</td><td data-label="Turno">'+r.start+'–'+r.end+'</td>'+
+        '<td data-label="Titular (recebe e paga)" style="font-weight:700;">'+r.titular+'</td>'+
+        '<td data-label="Substituto (efetua o turno)">'+r.substituto+'</td></tr>'
+      ).join('');
+}
+
 function renderRelatorioTab(){
   const rel = getRelatorioAtual();
   const m = MONTH_LIST[relMonthIdx];
@@ -4854,6 +4900,7 @@ function renderRelatorioTab(){
   document.getElementById('relObservacoes').value = rel.observacoes || '';
 
   renderRelClientesTable(rel);
+  renderRelSubstTable(relMonthKey());
   renderRelTarefasTable(rel);
   renderRelAbertasList(rel);
   renderRelPrintsList(rel);
@@ -5194,13 +5241,24 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
     [28,32,18,18,18,tW-28-32-18-18-18]);
   y += 6;
 
-  heading('2. Tarefas Realizadas');
+  heading('2. Substituições Pagas pelo Titular');
+  const substRows = computeSubstituicoesPagasPeloTitular(relMonthKey());
+  if(substRows.length===0){
+    paragraph('Sem substituições deste tipo neste mês.');
+  } else {
+    table(['Data','Turno','Titular (recebe e paga)','Substituto (efetua o turno)'],
+      substRows.map(r=>[fmtDatePT(r.iso), r.start+'–'+r.end, r.titular, r.substituto]),
+      [26,26,tW*0.45,tW-26-26-tW*0.45]);
+  }
+  y += 6;
+
+  heading('3. Tarefas Realizadas');
   table(['TEF','1ªs Aval. Físicas','Reavaliações','Treinos Integr.','Prescrições'],
     names.map(n=>{ const e = rel.tarefas[n]||{}; return [n, e.avaliacoes_fisicas||0, e.reavaliacoes||0, e.integracao||0, e.prescricoes||0]; }),
     [40,38,38,38,tW-40-38-38-38]);
   y += 6;
 
-  heading('3. Tarefas Abertas / Pendentes');
+  heading('4. Tarefas Abertas / Pendentes');
   if(rel.abertas.length===0){
     paragraph('Sem tarefas abertas registadas.');
   } else {
@@ -5211,7 +5269,7 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
   }
   y += 6;
 
-  heading('4. Avaliação de Performance');
+  heading('5. Avaliação de Performance');
   const latest = getLatestEvalPerTecnico();
   const avalRows = names.map(n=>{
     const a = latest[n];
@@ -5224,7 +5282,7 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
     avalRows, [26,28,20,26,tW-26-28-20-26]);
   y += 6;
 
-  heading('5. Observações Gerais e Plano de Ação');
+  heading('6. Observações Gerais e Plano de Ação');
   paragraph(rel.observacoes || 'Sem observações registadas.');
 
   rel.prints.forEach(p=>{
