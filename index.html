@@ -505,10 +505,10 @@
 
   <div class="tabs sub-tabs" id="subTabs">
     <button class="tab-btn active" data-tab="cal" data-owner="sala">Calendário</button>
+    <button class="tab-btn" data-tab="substituicoes" data-owner="sala">Substituições</button>
     <button class="tab-btn" data-tab="feriados" data-owner="sala">Feriados</button>
     <button class="tab-btn" data-tab="tpl" data-owner="sala">Horário Base</button>
     <button class="tab-btn" data-tab="ferias" data-owner="sala">Férias</button>
-    <button class="tab-btn" data-tab="substituicoes" data-owner="sala">Substituições</button>
     <button class="tab-btn" data-tab="tec" data-owner="equipa" style="display:none;">Técnicos</button>
     <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
     <button class="tab-btn" data-tab="equip" data-owner="equipa" style="display:none;">Equipamento</button>
@@ -573,11 +573,6 @@
       <div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div><div>Dom</div>
     </div>
     <div class="grid" id="calGrid"></div>
-
-    <div class="panel">
-      <h3>Substituições registadas</h3>
-      <div id="substList"></div>
-    </div>
 
     <footer class="note">Os dados ficam guardados apenas neste browser (localStorage). Usa "Exportar ano" regularmente para teres uma cópia de segurança em Excel/CSV.</footer>
   </div>
@@ -1028,6 +1023,34 @@
       <button class="btn primary" id="acessosUploadBtn">📄 Carregar PDF de Visitas Diárias</button>
       <span id="acessosFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
     </div>
+
+    <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+      <h4 style="margin:0 0 8px;">Reservas de Aulas (Excel)</h4>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+        Carrega o Excel de reservas de aulas para excluir, das contagens por TEF, o tempo exato em que cada cliente esteve numa aula (só linhas "Presente"). Se o cliente entrar entre <strong id="aulaBufPreLabel">30–60</strong> min antes da aula, ou sair entre <strong id="aulaBufPostLabel">45–60</strong> min depois, esse troço continua a contar para o turno de sala antes/depois.
+      </p>
+      <input type="file" id="aulasFileInput" accept=".xlsx,.xls" style="display:none;">
+      <button class="btn primary" id="aulasUploadBtn">📅 Carregar Reservas de Aulas</button>
+      <span id="aulasFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
+
+      <div id="aulaDuracoesPanel" style="margin-top:14px;"></div>
+
+      <div style="margin-top:14px;display:flex;gap:22px;flex-wrap:wrap;">
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">Incluir antes da aula entre
+          <input type="number" min="0" max="180" id="aulaBufPreMin" class="rel-input" style="width:60px;">
+          e
+          <input type="number" min="0" max="180" id="aulaBufPreMax" class="rel-input" style="width:60px;">
+          min antes
+        </label>
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">Incluir depois da aula entre
+          <input type="number" min="0" max="180" id="aulaBufPostMin" class="rel-input" style="width:60px;">
+          e
+          <input type="number" min="0" max="180" id="aulaBufPostMax" class="rel-input" style="width:60px;">
+          min depois
+        </label>
+      </div>
+    </div>
+
     <div id="acessosResults"></div>
   </div>
 
@@ -1965,33 +1988,8 @@ function fmtDatePTLong(iso){
 }
 
 function renderSubstitutionsList(){
-  const el = document.getElementById('substList');
-  el.innerHTML = '';
-  const rows = [];
-  const d = new Date(RANGE_START);
-  while(d <= RANGE_END){
-    const iso = isoDate(d);
-    const dKey = dayKeyOf(d);
-    const shifts = shiftsForDate(iso, dKey);
-    shifts.forEach(s=>{
-      if(s._subst && !s._adhoc && s.substituteName){
-        rows.push({iso, s});
-      }
-    });
-    d.setDate(d.getDate()+1);
-  }
-  if(rows.length === 0){
-    el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;padding:6px 0;">Sem substituições registadas.</div>';
-    return;
-  }
-  rows.forEach(r=>{
-    const exc = exceptions[r.iso];
-    const note = exc && exc.note ? ' — '+exc.note : '';
-    const row = document.createElement('div');
-    row.className = 'hol-item';
-    row.innerHTML = '<span>'+r.s.start+'–'+r.s.end+' · <strong>'+(r.s.name||'')+'</strong> substituído por <strong>'+r.s.substituteName+'</strong>'+note+'</span><span class="hol-date">'+fmtDatePTLong(r.iso)+'</span>';
-    el.appendChild(row);
-  });
+  const tab = document.getElementById('tab-substituicoes');
+  if(tab && tab.style.display !== 'none') renderSubstTecTab();
 }
 
 let feriadosExpandedYears = new Set();
@@ -4630,8 +4628,55 @@ function loadAcessos(){
   try{ const raw = localStorage.getItem(STORE_ACESSOS); if(raw) return JSON.parse(raw); }catch(e){}
   return {};
 }
-function saveAcessos(a){ localStorage.setItem(STORE_ACESSOS, JSON.stringify(a)); touchMeta(); }
+function saveAcessos(a){
+  try{
+    localStorage.setItem(STORE_ACESSOS, JSON.stringify(a));
+    touchMeta();
+  }catch(err){
+    console.error(err);
+    alert('Não foi possível guardar os dados de acessos (armazenamento cheio). Considera remover meses mais antigos no separador Entradas/Saídas.');
+  }
+}
 let ACESSOS = loadAcessos();
+
+// Reservas de aulas (Excel), para excluir o tempo de aula das contagens de
+// sala por TEF — ver adjustVisitsWithAulas().
+const STORE_AULAS = 'tef_turnos_aulas_v1';
+// { "YYYY-MM": { fileName, importedAt, bookings:[{date,code,name,activity,status,startHHMM}] } }
+function loadAulas(){
+  try{ const raw = localStorage.getItem(STORE_AULAS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveAulas(a){
+  try{ localStorage.setItem(STORE_AULAS, JSON.stringify(a)); touchMeta(); }
+  catch(err){ console.error(err); alert('Não foi possível guardar as reservas de aulas (armazenamento cheio).'); }
+}
+let AULAS = loadAulas();
+
+const STORE_AULA_DURACOES = 'tef_turnos_aula_duracoes_v1';
+// { "NOME DA ATIVIDADE": minutos }
+function loadAulaDuracoes(){
+  try{ const raw = localStorage.getItem(STORE_AULA_DURACOES); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveAulaDuracoes(d){ localStorage.setItem(STORE_AULA_DURACOES, JSON.stringify(d)); touchMeta(); }
+let AULA_DURACOES = loadAulaDuracoes();
+// Estimativas iniciais para as atividades mais comuns (a partir das
+// estatísticas do próprio ficheiro) — o Mário deve confirmar/ajustar.
+const DEFAULT_AULA_DURACOES = {
+  'SCHWINN CYCLING': 50,
+  'HYROX': 60,
+  'CROSSTRAINING': 30,
+  'HIIT': 90
+};
+
+const STORE_AULA_BUFFERS = 'tef_turnos_aula_buffers_v1';
+function loadAulaBuffers(){
+  try{ const raw = localStorage.getItem(STORE_AULA_BUFFERS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {preMin:30, preMax:60, postMin:45, postMax:60};
+}
+function saveAulaBuffers(b){ localStorage.setItem(STORE_AULA_BUFFERS, JSON.stringify(b)); touchMeta(); }
+let AULA_BUFFERS = loadAulaBuffers();
 
 const MONTHS_PT_NUM = {janeiro:1,fevereiro:2,'março':3,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
 const ACESSOS_DIVIDER_RE = /^([a-zà-úç-]+),\s*(\d{1,2})\s+([a-zà-úç]+),\s*(\d{4})/i;
@@ -4762,6 +4807,134 @@ function computeAcessos(visits){
   return {perTef, unmatched};
 }
 
+function minutesToTime(min){
+  const m2 = ((min % (24*60)) + 24*60) % (24*60);
+  return pad(Math.floor(m2/60))+':'+pad(m2%60);
+}
+
+// Lê o Excel de reservas de aulas (colunas "Nome da Atividade", "Data da
+// Aula", "Nº Sócio", "Nome do Cliente", "Confirmação") e devolve uma reserva
+// por linha válida.
+function parseAulasWorkbook(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, {type:'array', cellDates:true});
+  const sheetName = wb.SheetNames.find(n=> /worksheet|reservas/i.test(n)) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  if(rows.length < 2) return [];
+  const header = rows[0].map(h=>String(h||'').trim());
+  const idx = {
+    activity: header.indexOf('Nome da Atividade'),
+    classDate: header.indexOf('Data da Aula'),
+    code: header.indexOf('Nº Sócio'),
+    name: header.indexOf('Nome do Cliente'),
+    status: header.indexOf('Confirmação')
+  };
+  if(idx.classDate<0 || idx.code<0) return [];
+  const bookings = [];
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || r.length===0) continue;
+    const code = String(r[idx.code]!==undefined ? r[idx.code] : '').trim();
+    if(!/^\d+$/.test(code)) continue;
+    const raw = r[idx.classDate];
+    const dt = raw instanceof Date ? raw : new Date(raw);
+    if(isNaN(dt.getTime())) continue;
+    bookings.push({
+      date: dt.getUTCFullYear()+'-'+pad(dt.getUTCMonth()+1)+'-'+pad(dt.getUTCDate()),
+      code,
+      name: idx.name>=0 ? String(r[idx.name]||'').trim() : '',
+      activity: idx.activity>=0 ? String(r[idx.activity]||'').trim() : '',
+      status: idx.status>=0 ? String(r[idx.status]||'').trim() : '',
+      startHHMM: pad(dt.getUTCHours())+':'+pad(dt.getUTCMinutes())
+    });
+  }
+  return bookings;
+}
+
+function mergeMinuteIntervals(blocks){
+  if(blocks.length===0) return [];
+  const sorted = blocks.slice().sort((a,b)=>a.start-b.start);
+  const merged = [{start:sorted[0].start, end:sorted[0].end}];
+  for(let i=1;i<sorted.length;i++){
+    const last = merged[merged.length-1];
+    if(sorted[i].start <= last.end) last.end = Math.max(last.end, sorted[i].end);
+    else merged.push({start:sorted[i].start, end:sorted[i].end});
+  }
+  return merged;
+}
+
+// Recorta o tempo exato de cada aula confirmada ("Presente") das visitas do
+// mesmo cliente/dia. O troço antes da 1ª aula só se mantém se a entrada real
+// ficar entre preMin–preMax minutos antes do início da aula; o troço depois
+// da última aula só se mantém se a saída real ficar entre postMin–postMax
+// minutos depois do fim da aula. Troços entre duas aulas contam sempre.
+function adjustVisitsWithAulas(visits, bookings){
+  const byKey = {};
+  bookings.forEach(b=>{
+    if(b.status !== 'Presente') return;
+    const dur = AULA_DURACOES[b.activity];
+    if(!dur) return;
+    const [hh,mm] = b.startHHMM.split(':').map(Number);
+    const start = hh*60+mm;
+    const key = b.date+'|'+b.code;
+    (byKey[key] = byKey[key]||[]).push({start, end:start+dur});
+  });
+  const buf = AULA_BUFFERS;
+  const result = [];
+  visits.forEach(v=>{
+    const classBlocksRaw = byKey[v.date+'|'+v.code];
+    if(!classBlocksRaw || classBlocksRaw.length===0){ result.push(v); return; }
+    const inMin = timeToMinutes(v.in);
+    let outMin = timeToMinutes(v.out);
+    if(outMin < inMin) outMin += 24*60;
+    const overlapping = classBlocksRaw.filter(b=> inMin < b.end && outMin > b.start);
+    if(overlapping.length===0){ result.push(v); return; }
+    const merged = mergeMinuteIntervals(overlapping);
+    let cursor = inMin;
+    const segs = [];
+    merged.forEach(b=>{
+      if(b.start > cursor) segs.push({start:cursor, end:b.start, leading:(cursor===inMin)});
+      cursor = Math.max(cursor, b.end);
+    });
+    if(cursor < outMin) segs.push({start:cursor, end:outMin, trailing:true});
+    const firstStart = merged[0].start, lastEnd = merged[merged.length-1].end;
+    segs.forEach(seg=>{
+      let keep = true;
+      if(seg.leading && seg.end===firstStart){
+        const gap = firstStart - inMin;
+        keep = gap >= buf.preMin && gap <= buf.preMax;
+      }
+      if(seg.trailing && seg.start===lastEnd){
+        const gap = outMin - lastEnd;
+        keep = gap >= buf.postMin && gap <= buf.postMax;
+      }
+      if(keep && seg.end > seg.start){
+        result.push({date:v.date, code:v.code, name:v.name, in:minutesToTime(seg.start), out:minutesToTime(seg.end)});
+      }
+    });
+  });
+  return result;
+}
+
+// Recalcula perTef/unmatched de um mês já importado, agora excluindo o tempo
+// de aulas (se houver reservas carregadas para esse mês).
+function reprocessAcessosComAulas(monthKey){
+  const data = ACESSOS[monthKey];
+  if(!data || !data.visits) return;
+  const bookings = (AULAS[monthKey] && AULAS[monthKey].bookings) || [];
+  const adjusted = bookings.length>0 ? adjustVisitsWithAulas(data.visits, bookings) : data.visits;
+  const result = computeAcessos(adjusted);
+  const perTefSerializable = {};
+  Object.keys(result.perTef).forEach(name=>{
+    perTefSerializable[name] = {count: result.perTef[name].size, codes: Array.from(result.perTef[name])};
+  });
+  data.perTef = perTefSerializable;
+  data.unmatched = result.unmatched;
+  data.aulasAplicadas = bookings.length>0;
+  saveAcessos(ACESSOS);
+  renderAcessosResults();
+}
+
 function applyAcessosToRelatorio(monthKey, perTef){
   if(!RELATORIOS[monthKey]){
     RELATORIOS[monthKey] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], observacoes:'', prints:[]};
@@ -4788,6 +4961,10 @@ function renderAcessosResults(){
     const label = MONTH_NAMES[my[1]-1]+' '+my[0];
     const names = Object.keys(data.perTef).sort((a,b)=>a.localeCompare(b,'pt'));
     const rowsHtml = names.map(n=>'<tr><td data-label="TEF" style="font-weight:700;">'+n+'</td><td data-label="Clientes distintos" class="hrs">'+data.perTef[n].count+'</td></tr>').join('');
+    const tefRanking = names.slice().sort((a,b)=> data.perTef[b].count - data.perTef[a].count)
+      .map(n=>({label:n, value:data.perTef[n].count+' clientes'}));
+    const turnoRanking = computeTurnoLotacao(data.visits||[])
+      .map(t=>({label:t.turno, value:t.clientes+' clientes ('+t.visits+' visitas)'}));
     const block = document.createElement('div');
     block.className = 'panel';
     block.style.padding = '14px 18px';
@@ -4795,13 +4972,45 @@ function renderAcessosResults(){
     block.innerHTML =
       '<h4 style="margin:0 0 8px;">'+label+'</h4>'+
       '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">'+data.totalVisits+' visitas processadas em '+data.totalDates+' dias'+
-        (data.unmatched>0 ? ' · '+data.unmatched+' visitas sem turno correspondente nesse horário' : '')+'.</p>'+
+        (data.unmatched>0 ? ' · '+data.unmatched+' visitas sem turno correspondente nesse horário' : '')+
+        (data.aulasAplicadas ? ' · ✅ contagens já excluem tempo de aulas' : '')+'.</p>'+
       '<div style="overflow-x:auto;"><table class="tec-table"><thead><tr><th>TEF</th><th>Clientes distintos (mês)</th></tr></thead><tbody>'+
         (rowsHtml || '<tr><td colspan="2" style="color:var(--ink-soft);font-style:italic;">Sem correspondências.</td></tr>')+
       '</tbody></table></div>'+
       '<div class="modal-actions" style="justify-content:flex-start;margin-top:12px;">'+
         '<button type="button" class="btn primary rel-apply-btn" data-month="'+monthKey+'">Aplicar ao Relatório de '+label+'</button>'+
+        (AULAS[monthKey] ? '<button type="button" class="btn ghost aulas-apply-btn" data-month="'+monthKey+'">🔄 Reprocessar excluindo tempo de aulas</button>' : '')+
         '<button type="button" class="btn ghost rel-remove-btn" data-month="'+monthKey+'">Remover</button>'+
+      '</div>'+
+
+      '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:22px;">'+
+        '<div style="flex:1 1 260px;">'+
+          '<h5 style="margin:0 0 6px;font-size:13px;">🏆 Turno com maior lotação</h5>'+
+          renderRankingListHtml(turnoRanking)+
+        '</div>'+
+        '<div style="flex:1 1 220px;">'+
+          '<h5 style="margin:0 0 6px;font-size:13px;">🏆 TEF com mais clientes</h5>'+
+          renderRankingListHtml(tefRanking)+
+        '</div>'+
+      '</div>'+
+
+      '<div style="margin-top:16px;">'+
+        '<h5 style="margin:0 0 6px;font-size:13px;">🔍 Pesquisar cliente</h5>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+          '<input type="text" class="rel-input acessos-client-input" data-month="'+monthKey+'" placeholder="Nome ou código do cliente" style="max-width:260px;">'+
+          '<button type="button" class="btn ghost acessos-client-btn" data-month="'+monthKey+'">Procurar</button>'+
+        '</div>'+
+        '<div id="acessosClientResults-'+monthKey+'" style="margin-top:8px;"></div>'+
+      '</div>'+
+
+      '<div style="margin-top:16px;">'+
+        '<h5 style="margin:0 0 6px;font-size:13px;">⏱️ Clientes presentes num intervalo de horas</h5>'+
+        '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">'+
+          '<label style="font-size:12.5px;display:flex;gap:5px;align-items:center;">De <input type="time" class="rel-input acessos-time-from" data-month="'+monthKey+'" style="width:auto;"></label>'+
+          '<label style="font-size:12.5px;display:flex;gap:5px;align-items:center;">Até <input type="time" class="rel-input acessos-time-to" data-month="'+monthKey+'" style="width:auto;"></label>'+
+          '<button type="button" class="btn ghost acessos-time-btn" data-month="'+monthKey+'">Filtrar</button>'+
+        '</div>'+
+        '<div id="acessosTimeResults-'+monthKey+'" style="margin-top:8px;"></div>'+
       '</div>';
     container.appendChild(block);
   });
@@ -4812,6 +5021,9 @@ function renderAcessosResults(){
       alert('Contagens aplicadas ao separador Relatório.');
     });
   });
+  container.querySelectorAll('.aulas-apply-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=> reprocessAcessosComAulas(e.target.dataset.month));
+  });
   container.querySelectorAll('.rel-remove-btn').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       const monthKey = e.target.dataset.month;
@@ -4821,6 +5033,130 @@ function renderAcessosResults(){
       renderAcessosResults();
     });
   });
+  container.querySelectorAll('.acessos-client-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const monthKey = e.target.dataset.month;
+      const input = container.querySelector('.acessos-client-input[data-month="'+monthKey+'"]');
+      const query = input ? input.value.trim() : '';
+      const resultsEl = document.getElementById('acessosClientResults-'+monthKey);
+      if(!query){ resultsEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Escreve um nome ou código de cliente.</p>'; return; }
+      const rows = searchClientInVisits((ACESSOS[monthKey].visits||[]), query);
+      if(rows.length===0){
+        resultsEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Sem visitas encontradas para "'+escapeAttr(query)+'".</p>';
+        return;
+      }
+      resultsEl.innerHTML =
+        '<div style="overflow-x:auto;"><table class="tec-table"><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>TEF(s) no turno</th></tr></thead><tbody>'+
+        rows.map(r=> '<tr><td data-label="Data">'+fmtDatePT(r.date)+'</td><td data-label="Entrada">'+r.in+'</td><td data-label="Saída">'+r.out+'</td><td data-label="TEF(s)">'+(r.tefs.length ? r.tefs.join(', ') : '<span style="color:var(--ink-soft);font-style:italic;">sem turno correspondente</span>')+'</td></tr>').join('')+
+        '</tbody></table></div>'+
+        '<p style="color:var(--ink-soft);font-size:12px;margin:6px 0 0;">'+rows[0].name+' ('+rows[0].code+') — '+rows.length+' visita(s) neste mês.</p>';
+    });
+  });
+  container.querySelectorAll('.acessos-time-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const monthKey = e.target.dataset.month;
+      const fromEl = container.querySelector('.acessos-time-from[data-month="'+monthKey+'"]');
+      const toEl = container.querySelector('.acessos-time-to[data-month="'+monthKey+'"]');
+      const from = fromEl ? fromEl.value : '';
+      const to = toEl ? toEl.value : '';
+      const resultsEl = document.getElementById('acessosTimeResults-'+monthKey);
+      if(!from || !to){ resultsEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Preenche as duas horas.</p>'; return; }
+      const clients = clientsInTimeWindow((ACESSOS[monthKey].visits||[]), from, to);
+      if(clients.length===0){
+        resultsEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Nenhum cliente presente entre '+from+' e '+to+' neste mês.</p>';
+        return;
+      }
+      resultsEl.innerHTML =
+        '<p style="font-size:12.5px;margin:0 0 6px;"><strong>'+clients.length+'</strong> cliente(s) distintos presentes entre '+from+' e '+to+' (nalgum dia do mês):</p>'+
+        '<div style="overflow-x:auto;"><table class="tec-table"><thead><tr><th>Cliente</th><th>Código</th><th>Nº de vezes</th></tr></thead><tbody>'+
+        clients.map(c=> '<tr><td data-label="Cliente">'+escapeAttr(c.name)+'</td><td data-label="Código">'+c.code+'</td><td data-label="Nº de vezes" class="hrs">'+c.count+'</td></tr>').join('')+
+        '</tbody></table></div>';
+    });
+  });
+}
+
+function renderRankingListHtml(items){
+  if(!items || items.length===0) return '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:0;">Sem dados.</p>';
+  const top = items.slice(0,8);
+  const rest = items.length - top.length;
+  return '<ol style="margin:0;padding-left:20px;font-size:13px;">'+
+    top.map((it,i)=> '<li'+(i===0?' style="font-weight:700;color:var(--rust);"':'')+'>'+escapeAttr(it.label)+' — '+it.value+'</li>').join('')+
+    '</ol>'+(rest>0 ? '<p style="color:var(--ink-soft);font-size:11.5px;margin:4px 0 0;">(+'+rest+' outro(s))</p>' : '');
+}
+
+// Agrupa as visitas por turno (intervalo horário do turno, independentemente
+// do dia da semana) e conta clientes distintos e nº de visitas em cada um —
+// usado para identificar o turno com maior lotação no mês.
+function computeTurnoLotacao(visits){
+  const byDate = {};
+  visits.forEach(v=>{ (byDate[v.date] = byDate[v.date]||[]).push(v); });
+  const perTurno = {};
+  Object.keys(byDate).forEach(iso=>{
+    const parts = iso.split('-').map(Number);
+    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForReportDate(iso, dKey);
+    const shiftIntervals = shifts.map(s=>({
+      key: s.start+'–'+s.end,
+      startMin: timeToMinutes(s.start), endMin: timeToMinutes(s.end)
+    }));
+    byDate[iso].forEach(v=>{
+      const inMin = timeToMinutes(v.in);
+      let outMin = timeToMinutes(v.out);
+      if(outMin < inMin) outMin += 24*60;
+      shiftIntervals.forEach(si=>{
+        if(inMin < si.endMin && outMin > si.startMin){
+          if(!perTurno[si.key]) perTurno[si.key] = {visits:0, clients:new Set()};
+          perTurno[si.key].visits++;
+          perTurno[si.key].clients.add(v.code);
+        }
+      });
+    });
+  });
+  return Object.keys(perTurno).map(key=>({turno:key, visits:perTurno[key].visits, clientes:perTurno[key].clients.size}))
+    .sort((a,b)=> b.clientes - a.clientes);
+}
+
+// Todas as visitas de um cliente (por nome ou código) no mês, com o(s) TEF(s)
+// cujo turno coincidiu com cada visita.
+function searchClientInVisits(visits, query){
+  const q = query.trim().toLowerCase();
+  if(!q) return [];
+  const matches = visits.filter(v=> v.code===query.trim() || v.name.toLowerCase().includes(q));
+  matches.sort((a,b)=> a.date.localeCompare(b.date) || a.in.localeCompare(b.in));
+  return matches.map(v=>{
+    const parts = v.date.split('-').map(Number);
+    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForReportDate(v.date, dKey);
+    const inMin = timeToMinutes(v.in);
+    let outMin = timeToMinutes(v.out);
+    if(outMin < inMin) outMin += 24*60;
+    const tefs = shifts.filter(s=>{
+      const sInMin = timeToMinutes(s.start), sOutMin = timeToMinutes(s.end);
+      return inMin < sOutMin && outMin > sInMin;
+    }).map(s=> (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name).filter(Boolean);
+    return {date:v.date, in:v.in, out:v.out, name:v.name, code:v.code, tefs};
+  });
+}
+
+// Clientes distintos cuja visita atravessou um intervalo horário escolhido
+// (ex.: 10:00–12:00), nalgum dia do mês.
+function clientsInTimeWindow(visits, fromHHMM, toHHMM){
+  const fromMin = timeToMinutes(fromHHMM);
+  let toMin = timeToMinutes(toHHMM);
+  if(toMin <= fromMin) toMin += 24*60;
+  const byClient = {};
+  visits.forEach(v=>{
+    const inMin = timeToMinutes(v.in);
+    let outMin = timeToMinutes(v.out);
+    if(outMin < inMin) outMin += 24*60;
+    if(inMin < toMin && outMin > fromMin){
+      if(!byClient[v.code]) byClient[v.code] = {name:v.name, code:v.code, count:0};
+      byClient[v.code].count++;
+    }
+  });
+  return Object.values(byClient).sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name,'pt'));
 }
 
 document.getElementById('acessosUploadBtn').addEventListener('click', ()=>{
@@ -4856,7 +5192,8 @@ document.getElementById('acessosFileInput').addEventListener('change', async (e)
         totalVisits: monthVisits.length,
         totalDates: new Set(monthVisits.map(v=>v.date)).size,
         unmatched: result.unmatched,
-        perTef: perTefSerializable
+        perTef: perTefSerializable,
+        visits: monthVisits
       };
     });
     saveAcessos(ACESSOS);
@@ -4865,6 +5202,87 @@ document.getElementById('acessosFileInput').addEventListener('change', async (e)
   }catch(err){
     console.error(err);
     statusEl.textContent = 'Erro ao processar o PDF: '+(err && err.message ? err.message : err);
+  }
+  e.target.value = '';
+});
+
+function renderAulaDuracoesPanel(){
+  const el = document.getElementById('aulaDuracoesPanel');
+  if(!el) return;
+  const activities = new Set();
+  Object.values(AULAS).forEach(m=> (m.bookings||[]).forEach(b=> b.activity && activities.add(b.activity)));
+  if(activities.size===0){ el.innerHTML=''; return; }
+  const list = Array.from(activities).sort((a,b)=>a.localeCompare(b,'pt'));
+  el.innerHTML = '<p style="font-size:12.5px;margin:0 0 6px;color:var(--ink-soft);">Duração de cada atividade em minutos (confirma/ajusta — as 4 mais comuns já vêm com uma estimativa):</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;">'+
+    list.map(a=> '<label style="font-size:12.5px;display:flex;flex-direction:column;gap:3px;">'+escapeAttr(a)+
+      '<input type="number" min="0" max="240" class="rel-input aula-duracao-input" data-activity="'+encodeURIComponent(a)+'" value="'+(AULA_DURACOES[a]||'')+'" placeholder="min" style="width:90px;">'+
+    '</label>').join('')+
+    '</div>';
+  el.querySelectorAll('.aula-duracao-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const activity = decodeURIComponent(e.target.dataset.activity);
+      const val = parseInt(e.target.value,10);
+      if(val>0) AULA_DURACOES[activity] = val; else delete AULA_DURACOES[activity];
+      saveAulaDuracoes(AULA_DURACOES);
+    });
+  });
+}
+
+function fillAulaBufferInputs(){
+  document.getElementById('aulaBufPreMin').value = AULA_BUFFERS.preMin;
+  document.getElementById('aulaBufPreMax').value = AULA_BUFFERS.preMax;
+  document.getElementById('aulaBufPostMin').value = AULA_BUFFERS.postMin;
+  document.getElementById('aulaBufPostMax').value = AULA_BUFFERS.postMax;
+  document.getElementById('aulaBufPreLabel').textContent = AULA_BUFFERS.preMin+'–'+AULA_BUFFERS.preMax;
+  document.getElementById('aulaBufPostLabel').textContent = AULA_BUFFERS.postMin+'–'+AULA_BUFFERS.postMax;
+}
+(function wireAulaBufferInputs(){
+  const map = {aulaBufPreMin:'preMin', aulaBufPreMax:'preMax', aulaBufPostMin:'postMin', aulaBufPostMax:'postMax'};
+  Object.keys(map).forEach(id=>{
+    document.getElementById(id).addEventListener('input', (e)=>{
+      const val = parseInt(e.target.value,10);
+      AULA_BUFFERS[map[id]] = isNaN(val) ? 0 : val;
+      saveAulaBuffers(AULA_BUFFERS);
+      fillAulaBufferInputs();
+    });
+  });
+})();
+
+document.getElementById('aulasUploadBtn').addEventListener('click', ()=>{
+  document.getElementById('aulasFileInput').click();
+});
+document.getElementById('aulasFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('aulasFileStatus');
+  statusEl.textContent = 'A processar '+file.name+'…';
+  try{
+    const buffer = await file.arrayBuffer();
+    const bookings = parseAulasWorkbook(buffer);
+    if(bookings.length===0){
+      statusEl.textContent = 'Não foi possível reconhecer reservas neste ficheiro.';
+      e.target.value = '';
+      return;
+    }
+    const byMonth = {};
+    bookings.forEach(b=>{ const mk = b.date.slice(0,7); (byMonth[mk] = byMonth[mk]||[]).push(b); });
+    Object.keys(byMonth).forEach(mk=>{
+      AULAS[mk] = {fileName: file.name, importedAt: nowISO(), bookings: byMonth[mk]};
+      byMonth[mk].forEach(b=>{
+        if(b.activity && !(b.activity in AULA_DURACOES) && DEFAULT_AULA_DURACOES[b.activity]){
+          AULA_DURACOES[b.activity] = DEFAULT_AULA_DURACOES[b.activity];
+        }
+      });
+    });
+    saveAulas(AULAS);
+    saveAulaDuracoes(AULA_DURACOES);
+    statusEl.textContent = file.name+' processado — '+bookings.length+' reservas.';
+    renderAulaDuracoesPanel();
+    renderAcessosResults();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
   }
   e.target.value = '';
 });
@@ -5574,7 +5992,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
     if(tab==='substituicoes') renderSubstTecTab();
-    if(tab==='acessos') renderAcessosResults();
+    if(tab==='acessos'){ renderAcessosResults(); renderAulaDuracoesPanel(); fillAulaBufferInputs(); }
     if(tab==='relatorio') renderRelatorioTab();
     if(tab==='ferias') renderFeriasTab();
   });
