@@ -505,19 +505,19 @@
 
   <div class="tabs sub-tabs" id="subTabs">
     <button class="tab-btn active" data-tab="cal" data-owner="sala">Calendário</button>
-    <button class="tab-btn" data-tab="substituicoes" data-owner="sala">Substituições</button>
     <button class="tab-btn" data-tab="feriados" data-owner="sala">Feriados</button>
-    <button class="tab-btn" data-tab="tpl" data-owner="sala">Horário Base</button>
+    <button class="tab-btn" data-tab="substituicoes" data-owner="sala">Substituições</button>
     <button class="tab-btn" data-tab="ferias" data-owner="sala">Férias</button>
+    <button class="tab-btn" data-tab="tpl" data-owner="sala">Horário Base</button>
+    <button class="tab-btn" data-tab="fin" data-owner="sala" style="display:none;">Finanças</button>
     <button class="tab-btn" data-tab="tec" data-owner="equipa" style="display:none;">Técnicos</button>
     <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
-    <button class="tab-btn" data-tab="equip" data-owner="equipa" style="display:none;">Equipamento</button>
-    <button class="tab-btn" data-tab="recrut" data-owner="equipa" style="display:none;">Recrutamento</button>
-    <button class="tab-btn" data-tab="aval" data-owner="gestao" style="display:none;">Avaliação</button>
-    <button class="tab-btn" data-tab="ptcount" data-owner="gestao" style="display:none;">Contabilização PT</button>
+    <button class="tab-btn" data-tab="ptcount" data-owner="equipa" style="display:none;">Treinos PT</button>
+    <button class="tab-btn" data-tab="aval" data-owner="equipa" style="display:none;">Avaliação</button>
+    <button class="tab-btn" data-tab="relatorio" data-owner="equipa" style="display:none;">Relatório</button>
     <button class="tab-btn" data-tab="acessos" data-owner="gestao" style="display:none;">Entradas/Saídas</button>
-    <button class="tab-btn" data-tab="relatorio" data-owner="gestao" style="display:none;">Relatório</button>
-    <button class="tab-btn" data-tab="fin" data-owner="gestao" style="display:none;">Finanças</button>
+    <button class="tab-btn" data-tab="equip" data-owner="gestao" style="display:none;">Equipamento</button>
+    <button class="tab-btn" data-tab="recrut" data-owner="gestao" style="display:none;">Recrutamento</button>
   </div>
 
 
@@ -1137,6 +1137,9 @@
       <div id="relAbertasRemaining"></div>
 
       <button type="button" class="btn ghost" id="relAddAberta" style="margin-top:10px;">+ Adicionar tarefa aberta</button>
+
+      <h4 style="font-size:13px;margin:20px 0 8px;color:var(--ink-soft);">🗑️ Canceladas / Adormecidas (informativo — não contam para nada)</h4>
+      <div id="relCanceladasList"></div>
     </div>
 
     <h3 style="font-size:15px;margin:26px 0 10px;">5. Anexos — Prints das Tarefas</h3>
@@ -1946,6 +1949,12 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
       const hasSubstitute = row.substituteName && row.substituteName.trim().length>0;
       if(timeChanged || hasSubstitute){
         newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : '', payTitular: hasSubstitute ? !!row.payTitular : false};
+      }
+      // Substituição de um Dependente sem a caixa "recebe e paga" marcada:
+      // o ginásio paga diretamente ao substituto, o que na prática significa
+      // que o titular está de férias nesse dia — regista-o automaticamente.
+      if(hasSubstitute && row.name && TECH_REGISTRY[row.name] && TECH_REGISTRY[row.name].status === 'dependente' && !row.payTitular){
+        addFeriasDay(row.name.trim(), editingIso);
       }
     } else {
       // permanent: only add a new version if it actually differs from what's active today
@@ -4953,7 +4962,7 @@ function reprocessAcessosComAulas(monthKey){
 
 function applyAcessosToRelatorio(monthKey, perTef){
   if(!RELATORIOS[monthKey]){
-    RELATORIOS[monthKey] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], observacoes:'', prints:[]};
+    RELATORIOS[monthKey] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], canceladas:[], observacoes:'', prints:[]};
   }
   Object.keys(perTef).forEach(name=>{
     if(!RELATORIOS[monthKey].clientes[name]) RELATORIOS[monthKey].clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
@@ -5421,8 +5430,9 @@ function relMonthKey(){
 function getRelatorioAtual(){
   const key = relMonthKey();
   if(!RELATORIOS[key]){
-    RELATORIOS[key] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], observacoes:'', prints:[]};
+    RELATORIOS[key] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], canceladas:[], observacoes:'', prints:[]};
   }
+  if(!RELATORIOS[key].canceladas) RELATORIOS[key].canceladas = [];
   return RELATORIOS[key];
 }
 function saveRelatorioAtual(){ saveRelatorios(RELATORIOS); }
@@ -5535,6 +5545,7 @@ function renderRelatorioTab(){
   renderRelSubstTable(relMonthKey());
   renderRelTarefasTable(rel);
   renderRelAbertasList(rel);
+  renderRelCanceladasList(rel);
   renderRelPrintsList(rel);
   renderRelAvalTable();
 }
@@ -5574,7 +5585,7 @@ function renderRelClientesTable(rel){
 function renderRelTarefasTable(rel){
   const tbody = document.getElementById('relTarefasBody');
   tbody.innerHTML = '';
-  const names = relTecNames();
+  const names = Array.from(new Set(relTecNames().concat(Object.keys(rel.tarefas)))).sort((a,b)=>a.localeCompare(b,'pt'));
   if(names.length===0){
     tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
     return;
@@ -5702,6 +5713,24 @@ function dateCellToISO(raw){
 // "Nome do Cliente"). "Prazo Excedido" fica em aberto; "Finalizada com
 // Sucesso/Atraso" conta como concluída; "Canceladas"/"Adormecidas" não são
 // importadas (já não são tarefas pendentes).
+// Mapeia o "Tipo de Tarefa" para uma das 4 colunas de Tarefas Realizadas.
+// Verifica "reavaliação" antes de "avaliação" porque o texto de reavaliação
+// também contém "avaliação física". Devolve null se não corresponder a
+// nenhuma das 4 categorias (ex.: Sessão PT, Avaliação Nutricional...).
+function categorizeTipoTarefa(tipoRaw){
+  const t = normalizeHeader(tipoRaw);
+  if(/reavaliação física|reavaliacao fisica/.test(t)) return 'reavaliacoes';
+  if(/avaliação física|avaliacao fisica/.test(t)) return 'avaliacoes_fisicas';
+  if(/treino de integração|treino de integracao/.test(t)) return 'integracao';
+  if(/prescrição|prescricao/.test(t)) return 'prescricoes';
+  return null;
+}
+
+// Layout conhecido: export de "Tarefas" do sistema do ginásio. Classifica
+// cada linha num de 3 destinos: 'pendente' (prazo excedido ou outro estado
+// em aberto), 'concluida' (Finalizada com Sucesso/Atraso — conta para as
+// Tarefas Realizadas) ou 'cancelada' (Canceladas/Adormecidas — não entram
+// em nenhuma contagem, só ficam visíveis num cartão à parte).
 function parseKnownTarefasLayout(rows, idx){
   const out = [];
   for(let i=1;i<rows.length;i++){
@@ -5710,14 +5739,17 @@ function parseKnownTarefasLayout(rows, idx){
     const tipo = String(r[idx.tipoTarefa]||'').trim();
     if(!tipo) continue;
     const estadoTarefa = normalizeHeader(r[idx.estadoTarefa]);
-    if(/cancelad|adormecid/.test(estadoTarefa)) continue;
-    const estado = /finalizad/.test(estadoTarefa) ? 'concluida' : 'em_curso';
+    let bucket;
+    if(/cancelad|adormecid/.test(estadoTarefa)) bucket = 'cancelada';
+    else if(/finalizad/.test(estadoTarefa)) bucket = 'concluida';
+    else bucket = 'pendente';
     const cliente = idx.nomeCliente>=0 ? String(r[idx.nomeCliente]||'').trim() : '';
     out.push({
       tarefa: cliente ? (tipo+' — '+cliente) : tipo,
       responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
       prazo: idx.dataTarefa>=0 ? dateCellToISO(r[idx.dataTarefa]) : '',
-      estado
+      bucket,
+      categoria: categorizeTipoTarefa(tipo)
     });
   }
   return out;
@@ -5744,12 +5776,16 @@ function parseGenericTarefasLayout(rows, normHeader){
     const tarefa = String(r[idx.tarefa]||'').trim();
     if(!tarefa) continue;
     const estadoRaw = idx.estado>=0 ? normalizeHeader(r[idx.estado]) : '';
-    const estado = /conclu|feito|done|resolvid|finalizad/.test(estadoRaw) ? 'concluida' : 'em_curso';
+    let bucket;
+    if(/cancelad|adormecid/.test(estadoRaw)) bucket = 'cancelada';
+    else if(/conclu|feito|done|resolvid|finalizad/.test(estadoRaw)) bucket = 'concluida';
+    else bucket = 'pendente';
     out.push({
       tarefa,
       responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
       prazo: idx.prazo>=0 ? dateCellToISO(r[idx.prazo]) : '',
-      estado
+      bucket,
+      categoria: categorizeTipoTarefa(tarefa)
     });
   }
   return out;
@@ -5776,6 +5812,19 @@ function parseTarefasWorkbook(arrayBuffer){
   return parseGenericTarefasLayout(rows, normHeader);
 }
 
+function renderRelCanceladasList(rel){
+  const el = document.getElementById('relCanceladasList');
+  if(!el) return;
+  const lista = rel.canceladas || [];
+  if(lista.length===0){
+    el.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Sem tarefas canceladas/adormecidas importadas.</p>';
+    return;
+  }
+  el.innerHTML = '<div style="overflow-x:auto;max-height:260px;overflow-y:auto;"><table class="tec-table"><thead><tr><th>Tarefa</th><th>Responsável</th><th>Data</th></tr></thead><tbody>'+
+    lista.map(t=>'<tr><td data-label="Tarefa">'+escapeAttr(t.tarefa)+'</td><td data-label="Responsável">'+escapeAttr(t.responsavel)+'</td><td data-label="Data">'+(t.prazo?fmtDatePT(t.prazo):'—')+'</td></tr>').join('')+
+    '</tbody></table></div>';
+}
+
 document.getElementById('relTarefasUploadBtn').addEventListener('click', ()=>{
   document.getElementById('relTarefasFileInput').click();
 });
@@ -5786,17 +5835,37 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
   statusEl.textContent = 'A processar '+file.name+'…';
   try{
     const buffer = await file.arrayBuffer();
-    const tarefas = parseTarefasWorkbook(buffer);
-    if(tarefas.length===0){
+    const parsed = parseTarefasWorkbook(buffer);
+    if(parsed.length===0){
       statusEl.textContent = 'Não foi possível reconhecer tarefas neste ficheiro (confirma as colunas Tarefa/Responsável/Prazo).';
       e.target.value = '';
       return;
     }
     const rel = getRelatorioAtual();
-    rel.abertas = rel.abertas.concat(tarefas);
+    let nPendentes=0, nConcluidas=0, nCanceladas=0, nSemCategoria=0;
+    parsed.forEach(p=>{
+      if(p.bucket==='cancelada'){
+        rel.canceladas.push({tarefa:p.tarefa, responsavel:p.responsavel, prazo:p.prazo});
+        nCanceladas++;
+      } else if(p.bucket==='concluida'){
+        if(p.categoria){
+          if(!rel.tarefas[p.responsavel]) rel.tarefas[p.responsavel] = {avaliacoes_fisicas:0, reavaliacoes:0, integracao:0, prescricoes:0};
+          const atual = parseInt(rel.tarefas[p.responsavel][p.categoria],10) || 0;
+          rel.tarefas[p.responsavel][p.categoria] = atual + 1;
+          nConcluidas++;
+        } else {
+          nSemCategoria++;
+        }
+      } else {
+        rel.abertas.push({tarefa:p.tarefa, responsavel:p.responsavel, prazo:p.prazo, estado:'em_curso'});
+        nPendentes++;
+      }
+    });
     saveRelatorioAtual();
-    statusEl.textContent = tarefas.length+' tarefa(s) importada(s) de '+file.name+'.';
+    statusEl.textContent = nPendentes+' pendentes, '+nConcluidas+' concluídas contabilizadas, '+nCanceladas+' canceladas/adormecidas'+(nSemCategoria>0 ? ' ('+nSemCategoria+' concluídas sem categoria correspondente, ignoradas)' : '')+'.';
     renderRelAbertasList(rel);
+    renderRelTarefasTable(rel);
+    renderRelCanceladasList(rel);
   }catch(err){
     console.error(err);
     statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
