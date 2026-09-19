@@ -5685,19 +5685,54 @@ function normalizeHeader(h){
   return String(h||'').trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 }
-function parseTarefasWorkbook(arrayBuffer){
-  const wb = XLSX.read(arrayBuffer, {type:'array', cellDates:true});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-  if(rows.length < 2) return [];
-  const header = rows[0].map(normalizeHeader);
+function dateCellToISO(raw){
+  if(raw instanceof Date) return raw.getUTCFullYear()+'-'+pad(raw.getUTCMonth()+1)+'-'+pad(raw.getUTCDate());
+  if(raw){
+    const s = String(raw).trim();
+    const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if(dmy) return dmy[3]+'-'+pad(parseInt(dmy[2],10))+'-'+pad(parseInt(dmy[1],10));
+    if(ymd) return ymd[1]+'-'+pad(parseInt(ymd[2],10))+'-'+pad(parseInt(ymd[3],10));
+  }
+  return '';
+}
+
+// Layout conhecido: export de "Tarefas" do sistema do ginásio (colunas fixas
+// "Estado da Tarefa", "Tipo de Tarefa", "Data da Tarefa", "Responsável",
+// "Nome do Cliente"). "Prazo Excedido" fica em aberto; "Finalizada com
+// Sucesso/Atraso" conta como concluída; "Canceladas"/"Adormecidas" não são
+// importadas (já não são tarefas pendentes).
+function parseKnownTarefasLayout(rows, idx){
+  const out = [];
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || r.length===0) continue;
+    const tipo = String(r[idx.tipoTarefa]||'').trim();
+    if(!tipo) continue;
+    const estadoTarefa = normalizeHeader(r[idx.estadoTarefa]);
+    if(/cancelad|adormecid/.test(estadoTarefa)) continue;
+    const estado = /finalizad/.test(estadoTarefa) ? 'concluida' : 'em_curso';
+    const cliente = idx.nomeCliente>=0 ? String(r[idx.nomeCliente]||'').trim() : '';
+    out.push({
+      tarefa: cliente ? (tipo+' — '+cliente) : tipo,
+      responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
+      prazo: idx.dataTarefa>=0 ? dateCellToISO(r[idx.dataTarefa]) : '',
+      estado
+    });
+  }
+  return out;
+}
+
+// Layout genérico: cabeçalhos livres (Tarefa/Descrição, Responsável, Prazo,
+// Estado), usado quando o ficheiro não é o export conhecido de Tarefas.
+function parseGenericTarefasLayout(rows, normHeader){
   function findCol(candidates){
-    for(let i=0;i<header.length;i++){ if(candidates.includes(header[i])) return i; }
+    for(let i=0;i<normHeader.length;i++){ if(candidates.includes(normHeader[i])) return i; }
     return -1;
   }
   const idx = {
-    tarefa: findCol(['tarefa','descricao','descrição','assunto','titulo','título']),
-    responsavel: findCol(['responsavel','responsável','tef','atribuido a','atribuído a','colaborador']),
+    tarefa: findCol(['tarefa','descricao','assunto','titulo']),
+    responsavel: findCol(['responsavel','tef','atribuido a','colaborador']),
     prazo: findCol(['prazo','data limite','data-limite','deadline','data']),
     estado: findCol(['estado','status'])
   };
@@ -5708,29 +5743,37 @@ function parseTarefasWorkbook(arrayBuffer){
     if(!r || r.length===0) continue;
     const tarefa = String(r[idx.tarefa]||'').trim();
     if(!tarefa) continue;
-    let prazo = '';
-    if(idx.prazo>=0){
-      const raw = r[idx.prazo];
-      if(raw instanceof Date){
-        prazo = raw.getUTCFullYear()+'-'+pad(raw.getUTCMonth()+1)+'-'+pad(raw.getUTCDate());
-      } else if(raw){
-        const s = String(raw).trim();
-        const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-        const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-        if(dmy) prazo = dmy[3]+'-'+pad(parseInt(dmy[2],10))+'-'+pad(parseInt(dmy[1],10));
-        else if(ymd) prazo = ymd[1]+'-'+pad(parseInt(ymd[2],10))+'-'+pad(parseInt(ymd[3],10));
-      }
-    }
     const estadoRaw = idx.estado>=0 ? normalizeHeader(r[idx.estado]) : '';
-    const estado = /conclu|feito|done|resolvid/.test(estadoRaw) ? 'concluida' : 'em_curso';
+    const estado = /conclu|feito|done|resolvid|finalizad/.test(estadoRaw) ? 'concluida' : 'em_curso';
     out.push({
       tarefa,
       responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
-      prazo,
+      prazo: idx.prazo>=0 ? dateCellToISO(r[idx.prazo]) : '',
       estado
     });
   }
   return out;
+}
+
+function parseTarefasWorkbook(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, {type:'array', cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  if(rows.length < 2) return [];
+  const header = rows[0].map(h=>String(h||'').trim());
+  const normHeader = header.map(normalizeHeader);
+  function findExact(name){ return normHeader.indexOf(normalizeHeader(name)); }
+  const idxKnown = {
+    estadoTarefa: findExact('Estado da Tarefa'),
+    tipoTarefa: findExact('Tipo de Tarefa'),
+    dataTarefa: findExact('Data da Tarefa'),
+    responsavel: findExact('Responsável'),
+    nomeCliente: findExact('Nome do Cliente')
+  };
+  if(idxKnown.tipoTarefa>=0 && idxKnown.dataTarefa>=0){
+    return parseKnownTarefasLayout(rows, idxKnown);
+  }
+  return parseGenericTarefasLayout(rows, normHeader);
 }
 
 document.getElementById('relTarefasUploadBtn').addEventListener('click', ()=>{
