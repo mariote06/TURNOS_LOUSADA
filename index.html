@@ -5760,7 +5760,8 @@ document.getElementById('relAddAberta').addEventListener('click', ()=>{
 // Excel ou texto dd/mm/aaaa ou aaaa-mm-dd.
 function normalizeHeader(h){
   return String(h||'').trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[ºª]/g,'');
 }
 function dateCellToISO(raw){
   if(raw instanceof Date) return raw.getUTCFullYear()+'-'+pad(raw.getUTCMonth()+1)+'-'+pad(raw.getUTCDate());
@@ -5779,17 +5780,34 @@ function dateCellToISO(raw){
 // "Nome do Cliente"). "Prazo Excedido" fica em aberto; "Finalizada com
 // Sucesso/Atraso" conta como concluída; "Canceladas"/"Adormecidas" não são
 // importadas (já não são tarefas pendentes).
-// Mapeia o "Tipo de Tarefa" para uma das 4 colunas de Tarefas Realizadas.
-// Verifica "reavaliação" antes de "avaliação" porque o texto de reavaliação
-// também contém "avaliação física". Devolve null se não corresponder a
-// nenhuma das 4 categorias (ex.: Sessão PT, Avaliação Nutricional...).
+// Mapeia o "Tipo de Tarefa" para uma das 4 colunas de Tarefas Realizadas,
+// por correspondência EXATA a uma lista fechada de tipos conhecidos (não por
+// conter a palavra) — cada tipo só entra na categoria em que está listado.
+function buildTipoTarefaMap(){
+  const map = {};
+  function add(list, categoria){ list.forEach(t=>{ map[normalizeHeader(t)] = categoria; }); }
+  add(['1ª Avaliação Física'], 'avaliacoes_fisicas');
+  add([
+    'Marcar 1ª Avaliação Física',
+    'Marcar 1ª Avaliação Física 2ª Tentativa',
+    'Marcar 1ª Avaliação Física 3ª Tentativa',
+    'Marcar 1ª Avaliação Física (Reinscrição)',
+    'Marcar 1ª Avaliação Física (Reinscrição) 2ª Tentativa',
+    'Marcar 1ª Avaliação Física (Reinscrição) 3ª Tentativa'
+  ], 'avaliacoes_fisicas');
+  add(['Reavaliação Física'], 'reavaliacoes');
+  add([
+    'Marcar Reavaliação Física',
+    'Marcar Reavaliação Física 2ª Tentativa',
+    'Marcar Reavaliação Física 3ª Tentativa'
+  ], 'reavaliacoes');
+  add(['Treino de Integração'], 'integracao');
+  add(['Prescrição Plano de Treino'], 'prescricoes');
+  return map;
+}
+const TIPO_TAREFA_MAP = buildTipoTarefaMap();
 function categorizeTipoTarefa(tipoRaw){
-  const t = normalizeHeader(tipoRaw);
-  if(/reavaliação física|reavaliacao fisica/.test(t)) return 'reavaliacoes';
-  if(/avaliação física|avaliacao fisica/.test(t)) return 'avaliacoes_fisicas';
-  if(/treino de integração|treino de integracao/.test(t)) return 'integracao';
-  if(/prescrição|prescricao/.test(t)) return 'prescricoes';
-  return null;
+  return TIPO_TAREFA_MAP[normalizeHeader(tipoRaw)] || null;
 }
 
 // Layout conhecido: export de "Tarefas" do sistema do ginásio. Classifica
