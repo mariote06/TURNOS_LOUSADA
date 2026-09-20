@@ -1271,6 +1271,15 @@ function pad(n){ return n<10 ? '0'+n : ''+n; }
 function isoDate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 const RANGE_START_ISO = isoDate(RANGE_START);
 
+// Declarados aqui em cima (em vez de junto ao resto do código de
+// sincronização, mais abaixo) para existirem antes de qualquer código do
+// resto do ficheiro que possa chamar touchMeta() logo ao carregar a página
+// — como "let", ficariam inacessíveis (erro de zona morta temporal) até à
+// sua declaração original ser alcançada na ordem de execução.
+let linkedFileHandle = null;
+let linkedWriteTimer = null;
+const STORE_META = 'tef_turnos_meta_v1'; // {updatedAt: iso}
+
 const DEFAULT_TEMPLATE = {
   Seg: [
     {start:'06:30', end:'10:30', name:'Pedro B.'},
@@ -6666,7 +6675,6 @@ document.getElementById('btnExportYear').addEventListener('click', async ()=>{
    guardar "handles" de ficheiros).
 --------------------------------------------------------------- */
 const FS_ACCESS_SUPPORTED = 'showSaveFilePicker' in window && 'showOpenFilePicker' in window;
-let linkedFileHandle = null;
 
 function idbOpen(){
   return new Promise((resolve, reject)=>{
@@ -6872,15 +6880,12 @@ restoreLinkedHandle();
    reserva, ou em dispositivos que não suportam a ligação direta
    acima (ex.: iPhone/Safari).
 --------------------------------------------------------------- */
-const STORE_META = 'tef_turnos_meta_v1'; // {updatedAt: iso}
-
 function nowISO(){ return new Date().toISOString(); }
 function loadMeta(){
   try{ const raw = localStorage.getItem(STORE_META); if(raw) return JSON.parse(raw); }catch(e){}
   return {updatedAt: null};
 }
 function saveMeta(m){ localStorage.setItem(STORE_META, JSON.stringify(m)); }
-let linkedWriteTimer = null;
 function touchMeta(){
   saveMeta({updatedAt: nowISO()});
   updateSyncStatusLabel();
