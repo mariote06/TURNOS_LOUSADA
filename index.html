@@ -967,7 +967,7 @@
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="ptCountTable">
         <thead>
-          <tr><th>PT</th><th>Internos</th><th>Externos</th><th>Treinos vendidos</th><th>Prescrição de Treino</th><th>Avaliação Física</th><th>Treino de Integração</th><th>Tarefas em Atraso</th></tr>
+          <tr><th>PT</th><th>Internos</th><th>Externos</th><th>Treinos vendidos</th><th>Prescrição de Treino</th><th>1ª Avaliação Física</th><th>Marcar 1ª Avaliação Física</th><th>Reavaliação Física</th><th>Marcar Reavaliação Física</th><th>Treino de Integração</th><th>Tarefas em Atraso</th></tr>
         </thead>
         <tbody id="ptCountTableBody"></tbody>
         <tfoot>
@@ -977,7 +977,10 @@
             <td data-label="Externos" id="ptCountTotalExternos">0</td>
             <td data-label="Treinos vendidos" id="ptCountTotalGeral">0</td>
             <td data-label="Prescrição de Treino" id="ptCountTotalPrescricao">0</td>
-            <td data-label="Avaliação Física" id="ptCountTotalAvaliacao">0</td>
+            <td data-label="1ª Avaliação Física" id="ptCountTotalAvaliacao">0</td>
+            <td data-label="Marcar 1ª Avaliação Física" id="ptCountTotalMarcarAvaliacao">0</td>
+            <td data-label="Reavaliação Física" id="ptCountTotalReavaliacao">0</td>
+            <td data-label="Marcar Reavaliação Física" id="ptCountTotalMarcarReavaliacao">0</td>
             <td data-label="Treino de Integração" id="ptCountTotalIntegracao">0</td>
             <td data-label="Tarefas em Atraso" id="ptCountTotalAtraso">0</td>
           </tr>
@@ -996,8 +999,20 @@
         <div id="rankPrescricao"></div>
       </div>
       <div class="pt-ranking-col">
-        <h4>🩺 Avaliação Física</h4>
+        <h4>🩺 1ª Avaliação Física</h4>
         <div id="rankAvaliacao"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>📞 Marcar 1ª Avaliação Física</h4>
+        <div id="rankMarcarAvaliacao"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>🔁 Reavaliação Física</h4>
+        <div id="rankReavaliacao"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>📞 Marcar Reavaliação Física</h4>
+        <div id="rankMarcarReavaliacao"></div>
       </div>
       <div class="pt-ranking-col">
         <h4>🤝 Treino de Integração</h4>
@@ -4447,7 +4462,10 @@ function ptCountMonthKey(){
 
 const PT_TASK_FIELDS = [
   {key:'prescricao', label:'Prescrição de Treino', rankTarget:'rankPrescricao', totalId:'ptCountTotalPrescricao'},
-  {key:'avaliacao_fisica', label:'Avaliação Física', rankTarget:'rankAvaliacao', totalId:'ptCountTotalAvaliacao'},
+  {key:'avaliacao_fisica', label:'1ª Avaliação Física', rankTarget:'rankAvaliacao', totalId:'ptCountTotalAvaliacao'},
+  {key:'marcar_avaliacao_fisica', label:'Marcar 1ª Avaliação Física', rankTarget:'rankMarcarAvaliacao', totalId:'ptCountTotalMarcarAvaliacao'},
+  {key:'reavaliacao_fisica', label:'Reavaliação Física', rankTarget:'rankReavaliacao', totalId:'ptCountTotalReavaliacao'},
+  {key:'marcar_reavaliacao_fisica', label:'Marcar Reavaliação Física', rankTarget:'rankMarcarReavaliacao', totalId:'ptCountTotalMarcarReavaliacao'},
   {key:'treino_integracao', label:'Treino de Integração', rankTarget:'rankIntegracao', totalId:'ptCountTotalIntegracao'},
   {key:'tarefas_atraso', label:'Tarefas em Atraso', rankTarget:'rankAtraso', totalId:'ptCountTotalAtraso'}
 ];
@@ -4464,13 +4482,13 @@ function renderPtCountTab(){
   document.getElementById('ptCountMonthNext').disabled = ptCountMonthIdx >= MONTH_LIST.length-1;
 
   if(names.length === 0){
-    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
     updatePtCountTotals();
     return;
   }
 
   names.forEach(name=>{
-    const entry = monthData[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+    const entry = monthData[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
     let taskCells = '';
     PT_TASK_FIELDS.forEach(f=>{
       taskCells += '<td data-label="'+f.label+'"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="'+f.key+'" '+
@@ -4495,7 +4513,7 @@ function renderPtCountTab(){
       const val = parseInt(e.target.value, 10) || 0;
       const mKey = ptCountMonthKey();
       if(!PT_COUNTS[mKey]) PT_COUNTS[mKey] = {};
-      if(!PT_COUNTS[mKey][name]) PT_COUNTS[mKey][name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+      if(!PT_COUNTS[mKey][name]) PT_COUNTS[mKey][name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
       PT_COUNTS[mKey][name][field] = val;
       savePtCounts(PT_COUNTS);
       const row = e.target.closest('tr');
@@ -4525,7 +4543,7 @@ function renderPtRanking(containerId, values){
 
 function updatePtCountTotals(){
   let totalInternos = 0, totalExternos = 0;
-  const taskTotals = {prescricao:0, avaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+  const taskTotals = {prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
   const names = Object.keys(TECH_REGISTRY);
   const monthData = PT_COUNTS[ptCountMonthKey()] || {};
 
@@ -4536,6 +4554,9 @@ function updatePtCountTotals(){
     totalExternos += e.externos || 0;
     taskTotals.prescricao += e.prescricao || 0;
     taskTotals.avaliacao_fisica += e.avaliacao_fisica || 0;
+    taskTotals.marcar_avaliacao_fisica += e.marcar_avaliacao_fisica || 0;
+    taskTotals.reavaliacao_fisica += e.reavaliacao_fisica || 0;
+    taskTotals.marcar_reavaliacao_fisica += e.marcar_reavaliacao_fisica || 0;
     taskTotals.treino_integracao += e.treino_integracao || 0;
     taskTotals.tarefas_atraso += e.tarefas_atraso || 0;
   });
@@ -4582,22 +4603,21 @@ document.getElementById('ptTarefasFileInput').addEventListener('change', async (
     }
     const mKey = ptCountMonthKey();
     if(!PT_COUNTS[mKey]) PT_COUNTS[mKey] = {};
-    // Este ficheiro passa a ser a fonte destes 4 campos para o mês — zera-os
+    // Este ficheiro passa a ser a fonte destes campos para o mês — zera-os
     // antes de voltar a contar, para uma reimportação não duplicar valores.
     Object.keys(PT_COUNTS[mKey]).forEach(name=>{
       const en = PT_COUNTS[mKey][name];
-      en.prescricao = 0; en.avaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0;
+      en.prescricao = 0; en.avaliacao_fisica = 0; en.marcar_avaliacao_fisica = 0;
+      en.reavaliacao_fisica = 0; en.marcar_reavaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0;
     });
     const today = isoDate(new Date());
     let nConcluidas=0, nAtraso=0, nIgnoradas=0;
     parsed.forEach(p=>{
       if(!p.responsavel) return;
-      if(!PT_COUNTS[mKey][p.responsavel]) PT_COUNTS[mKey][p.responsavel] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+      if(!PT_COUNTS[mKey][p.responsavel]) PT_COUNTS[mKey][p.responsavel] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
       const entry = PT_COUNTS[mKey][p.responsavel];
       if(p.bucket==='concluida'){
-        if(p.categoria==='prescricoes'){ entry.prescricao++; nConcluidas++; }
-        else if(p.categoria==='avaliacoes_fisicas' || p.categoria==='reavaliacoes'){ entry.avaliacao_fisica++; nConcluidas++; }
-        else if(p.categoria==='integracao'){ entry.treino_integracao++; nConcluidas++; }
+        if(p.categoria && entry.hasOwnProperty(p.categoria)){ entry[p.categoria]++; nConcluidas++; }
         else nIgnoradas++;
       } else if(p.bucket==='pendente'){
         if(p.prazo && p.prazo < today){ entry.tarefas_atraso++; nAtraso++; }
@@ -5786,7 +5806,7 @@ function dateCellToISO(raw){
 function buildTipoTarefaMap(){
   const map = {};
   function add(list, categoria){ list.forEach(t=>{ map[normalizeHeader(t)] = categoria; }); }
-  add(['1ª Avaliação Física'], 'avaliacoes_fisicas');
+  add(['1ª Avaliação Física'], 'avaliacao_fisica');
   add([
     'Marcar 1ª Avaliação Física',
     'Marcar 1ª Avaliação Física 2ª Tentativa',
@@ -5794,18 +5814,28 @@ function buildTipoTarefaMap(){
     'Marcar 1ª Avaliação Física (Reinscrição)',
     'Marcar 1ª Avaliação Física (Reinscrição) 2ª Tentativa',
     'Marcar 1ª Avaliação Física (Reinscrição) 3ª Tentativa'
-  ], 'avaliacoes_fisicas');
-  add(['Reavaliação Física'], 'reavaliacoes');
+  ], 'marcar_avaliacao_fisica');
+  add(['Reavaliação Física'], 'reavaliacao_fisica');
   add([
     'Marcar Reavaliação Física',
     'Marcar Reavaliação Física 2ª Tentativa',
     'Marcar Reavaliação Física 3ª Tentativa'
-  ], 'reavaliacoes');
-  add(['Treino de Integração'], 'integracao');
-  add(['Prescrição Plano de Treino'], 'prescricoes');
+  ], 'marcar_reavaliacao_fisica');
+  add(['Treino de Integração'], 'treino_integracao');
+  add(['Prescrição Plano de Treino'], 'prescricao');
   return map;
 }
 const TIPO_TAREFA_MAP = buildTipoTarefaMap();
+// O Relatório só tem 4 colunas de tarefas — agrupa aqui as categorias finas
+// (que distinguem "Marcar X" de "X") de volta nessas 4.
+const RELATORIO_CATEGORIA_MAP = {
+  avaliacao_fisica: 'avaliacoes_fisicas',
+  marcar_avaliacao_fisica: 'avaliacoes_fisicas',
+  reavaliacao_fisica: 'reavaliacoes',
+  marcar_reavaliacao_fisica: 'reavaliacoes',
+  treino_integracao: 'integracao',
+  prescricao: 'prescricoes'
+};
 function categorizeTipoTarefa(tipoRaw){
   return TIPO_TAREFA_MAP[normalizeHeader(tipoRaw)] || null;
 }
@@ -5932,10 +5962,11 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
         rel.canceladas.push({tarefa:p.tarefa, responsavel:p.responsavel, prazo:p.prazo});
         nCanceladas++;
       } else if(p.bucket==='concluida'){
-        if(p.categoria){
+        const relCat = RELATORIO_CATEGORIA_MAP[p.categoria];
+        if(relCat){
           if(!rel.tarefas[p.responsavel]) rel.tarefas[p.responsavel] = {avaliacoes_fisicas:0, reavaliacoes:0, integracao:0, prescricoes:0};
-          const atual = parseInt(rel.tarefas[p.responsavel][p.categoria],10) || 0;
-          rel.tarefas[p.responsavel][p.categoria] = atual + 1;
+          const atual = parseInt(rel.tarefas[p.responsavel][relCat],10) || 0;
+          rel.tarefas[p.responsavel][relCat] = atual + 1;
           nConcluidas++;
         } else {
           nSemCategoria++;
