@@ -967,21 +967,21 @@
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="ptCountTable">
         <thead>
-          <tr><th>PT</th><th>Internos</th><th>Externos</th><th>Treinos vendidos</th><th>Prescrição de Treino</th><th>1ª Avaliação Física</th><th>Marcar 1ª Avaliação Física</th><th>Reavaliação Física</th><th>Marcar Reavaliação Física</th><th>Treino de Integração</th><th>Tarefas em Atraso</th></tr>
+          <tr><th>PT</th><th>PT Interno</th><th>PT Externo</th><th>Treinos vendidos</th><th>Marcar 1ª Avaliação Física</th><th>1ª Avaliação Física</th><th>Marcar Reavaliação Física</th><th>Reavaliação Física</th><th>Treinos de Integração</th><th>Prescrição de Treino</th><th>Tarefas em Atraso</th></tr>
         </thead>
         <tbody id="ptCountTableBody"></tbody>
         <tfoot>
           <tr style="font-weight:700;background:#fbfaf7;">
             <td data-label="Total">TOTAL</td>
-            <td data-label="Internos" id="ptCountTotalInternos">0</td>
-            <td data-label="Externos" id="ptCountTotalExternos">0</td>
+            <td data-label="PT Interno" id="ptCountTotalInternos">0</td>
+            <td data-label="PT Externo" id="ptCountTotalExternos">0</td>
             <td data-label="Treinos vendidos" id="ptCountTotalGeral">0</td>
-            <td data-label="Prescrição de Treino" id="ptCountTotalPrescricao">0</td>
-            <td data-label="1ª Avaliação Física" id="ptCountTotalAvaliacao">0</td>
             <td data-label="Marcar 1ª Avaliação Física" id="ptCountTotalMarcarAvaliacao">0</td>
-            <td data-label="Reavaliação Física" id="ptCountTotalReavaliacao">0</td>
+            <td data-label="1ª Avaliação Física" id="ptCountTotalAvaliacao">0</td>
             <td data-label="Marcar Reavaliação Física" id="ptCountTotalMarcarReavaliacao">0</td>
-            <td data-label="Treino de Integração" id="ptCountTotalIntegracao">0</td>
+            <td data-label="Reavaliação Física" id="ptCountTotalReavaliacao">0</td>
+            <td data-label="Treinos de Integração" id="ptCountTotalIntegracao">0</td>
+            <td data-label="Prescrição de Treino" id="ptCountTotalPrescricao">0</td>
             <td data-label="Tarefas em Atraso" id="ptCountTotalAtraso">0</td>
           </tr>
         </tfoot>
@@ -995,28 +995,28 @@
         <div id="rankTreinosVendidos"></div>
       </div>
       <div class="pt-ranking-col">
-        <h4>📋 Prescrição de Treino</h4>
-        <div id="rankPrescricao"></div>
+        <h4>📞 Marcar 1ª Avaliação Física</h4>
+        <div id="rankMarcarAvaliacao"></div>
       </div>
       <div class="pt-ranking-col">
         <h4>🩺 1ª Avaliação Física</h4>
         <div id="rankAvaliacao"></div>
       </div>
       <div class="pt-ranking-col">
-        <h4>📞 Marcar 1ª Avaliação Física</h4>
-        <div id="rankMarcarAvaliacao"></div>
+        <h4>📞 Marcar Reavaliação Física</h4>
+        <div id="rankMarcarReavaliacao"></div>
       </div>
       <div class="pt-ranking-col">
         <h4>🔁 Reavaliação Física</h4>
         <div id="rankReavaliacao"></div>
       </div>
       <div class="pt-ranking-col">
-        <h4>📞 Marcar Reavaliação Física</h4>
-        <div id="rankMarcarReavaliacao"></div>
+        <h4>🤝 Treinos de Integração</h4>
+        <div id="rankIntegracao"></div>
       </div>
       <div class="pt-ranking-col">
-        <h4>🤝 Treino de Integração</h4>
-        <div id="rankIntegracao"></div>
+        <h4>📋 Prescrição de Treino</h4>
+        <div id="rankPrescricao"></div>
       </div>
       <div class="pt-ranking-col">
         <h4>⏰ Tarefas em Atraso</h4>
@@ -4470,12 +4470,12 @@ function ptCountMonthKey(){
 }
 
 const PT_TASK_FIELDS = [
-  {key:'prescricao', label:'Prescrição de Treino', rankTarget:'rankPrescricao', totalId:'ptCountTotalPrescricao'},
-  {key:'avaliacao_fisica', label:'1ª Avaliação Física', rankTarget:'rankAvaliacao', totalId:'ptCountTotalAvaliacao'},
   {key:'marcar_avaliacao_fisica', label:'Marcar 1ª Avaliação Física', rankTarget:'rankMarcarAvaliacao', totalId:'ptCountTotalMarcarAvaliacao'},
-  {key:'reavaliacao_fisica', label:'Reavaliação Física', rankTarget:'rankReavaliacao', totalId:'ptCountTotalReavaliacao'},
+  {key:'avaliacao_fisica', label:'1ª Avaliação Física', rankTarget:'rankAvaliacao', totalId:'ptCountTotalAvaliacao'},
   {key:'marcar_reavaliacao_fisica', label:'Marcar Reavaliação Física', rankTarget:'rankMarcarReavaliacao', totalId:'ptCountTotalMarcarReavaliacao'},
-  {key:'treino_integracao', label:'Treino de Integração', rankTarget:'rankIntegracao', totalId:'ptCountTotalIntegracao'},
+  {key:'reavaliacao_fisica', label:'Reavaliação Física', rankTarget:'rankReavaliacao', totalId:'ptCountTotalReavaliacao'},
+  {key:'treino_integracao', label:'Treinos de Integração', rankTarget:'rankIntegracao', totalId:'ptCountTotalIntegracao'},
+  {key:'prescricao', label:'Prescrição de Treino', rankTarget:'rankPrescricao', totalId:'ptCountTotalPrescricao'},
   {key:'tarefas_atraso', label:'Tarefas em Atraso', rankTarget:'rankAtraso', totalId:'ptCountTotalAtraso'}
 ];
 
@@ -4507,9 +4507,9 @@ function renderPtCountTab(){
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td data-label="PT" style="font-weight:700;">'+name+'</td>'+
-      '<td data-label="Internos"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="internos" '+
+      '<td data-label="PT Interno"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="internos" '+
         'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry.internos>0?entry.internos:'')+'" placeholder="0"></td>'+
-      '<td data-label="Externos"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="externos" '+
+      '<td data-label="PT Externo"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="externos" '+
         'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry.externos>0?entry.externos:'')+'" placeholder="0"></td>'+
       '<td data-label="Treinos vendidos" class="hrs pt-row-total">'+((entry.internos||0)+(entry.externos||0))+'</td>'+
       taskCells;
