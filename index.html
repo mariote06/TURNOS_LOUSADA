@@ -4483,6 +4483,7 @@ function renderPtCountTab(){
   const tbody = document.getElementById('ptCountTableBody');
   tbody.innerHTML = '';
   const monthKey = ptCountMonthKey();
+  if(limparNomesOrfaosPtCounts(monthKey) > 0) savePtCounts(PT_COUNTS);
   const monthData = PT_COUNTS[monthKey] || {};
   const names = Array.from(new Set(Object.keys(TECH_REGISTRY).concat(Object.keys(monthData)))).sort((a,b)=>a.localeCompare(b,'pt'));
   const m = MONTH_LIST[ptCountMonthIdx];
@@ -4548,6 +4549,43 @@ function renderPtRanking(containerId, values){
     '<div class="pt-rank-row"><span class="pt-rank-pos">'+(medals[idx]||(idx+1)+'.')+'</span>'+
     '<span class="pt-rank-name">'+v.name+'</span><span class="pt-rank-val">'+v.value+'</span></div>'
   ).join('');
+}
+
+// Remove entradas de PT_COUNTS que já não correspondem a ninguém: nomes que
+// não estão em Técnicos (não são um TEF registado) e cujos campos de
+// tarefas ficaram todos a zero depois de uma reimportação — normalmente
+// nomes antigos e mal escritos que entretanto passaram a ser corrigidos
+// para o nome certo (ex.: "Gaspar" depois de "Luís Gaspar" já existir).
+// Remove/funde entradas de PT_COUNTS que já não correspondem ao nome certo:
+// se um nome não registado agora tem correspondência (por alcunha ou nome
+// igual/parecido a um TEF), soma os valores dele na entrada certa e apaga o
+// nome antigo — mesmo que já tivesse dados (ex.: "Max Marques" com tarefas
+// entra a somar para "José Marques"). Um nome sem qualquer correspondência
+// só é removido se estiver mesmo todo a zero.
+function limparNomesOrfaosPtCounts(mKey){
+  const monthData = PT_COUNTS[mKey];
+  if(!monthData) return 0;
+  const registeredNames = Object.keys(TECH_REGISTRY);
+  const taskFields = ['prescricao','avaliacao_fisica','marcar_avaliacao_fisica','reavaliacao_fisica','marcar_reavaliacao_fisica','treino_integracao','tarefas_atraso'];
+  let alterados = 0;
+  Object.keys(monthData).forEach(name=>{
+    if(registeredNames.includes(name)) return;
+    const orphan = monthData[name];
+    const match = matchTefName(name, registeredNames);
+    if(match){
+      if(!monthData[match]) monthData[match] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+      const target = monthData[match];
+      taskFields.forEach(f=>{ target[f] = (target[f]||0) + (orphan[f]||0); });
+      if(!(target.internos||0)) target.internos = orphan.internos||0;
+      if(!(target.externos||0)) target.externos = orphan.externos||0;
+      delete monthData[name];
+      alterados++;
+      return;
+    }
+    const semDados = taskFields.every(f=>!(orphan[f]||0)) && !(orphan.internos||0) && !(orphan.externos||0);
+    if(semDados){ delete monthData[name]; alterados++; }
+  });
+  return alterados;
 }
 
 function updatePtCountTotals(){
@@ -4641,6 +4679,9 @@ document.getElementById('ptTarefasFileInput').addEventListener('change', async (
       msg += ' ⚠️ Nomes não reconhecidos (aparecem na tabela tal como vêm do ficheiro): '+
         resolucao.unresolved.map(u=>u.nome+' ('+u.count+')').join(', ')+'.';
     }
+    const nRemovidos = limparNomesOrfaosPtCounts(mKey);
+    if(nRemovidos>0) msg += ' '+nRemovidos+' entrada(s) antiga(s) com nome incorreto foram fundidas/removidas.';
+    savePtCounts(PT_COUNTS);
     statusEl.textContent = msg;
     renderPtCountTab();
   }catch(err){
