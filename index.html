@@ -1023,6 +1023,16 @@
         <div id="rankAtraso"></div>
       </div>
     </div>
+
+    <h3 style="font-size:15px;margin:26px 0 10px;">⏰ Tarefas em Atraso — Detalhe</h3>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="tec-table" id="tarefasAtrasoDetalheTable">
+        <thead>
+          <tr><th>PT</th><th>Tarefa</th><th>Cliente</th><th>Prazo</th></tr>
+        </thead>
+        <tbody id="tarefasAtrasoDetalheBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- SUBSTITUIÇÕES TAB -->
@@ -4498,7 +4508,7 @@ function renderPtCountTab(){
   }
 
   names.forEach(name=>{
-    const entry = monthData[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+    const entry = monthData[name] || {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0, tarefasAtrasoDetalhe:[]};
     let taskCells = '';
     PT_TASK_FIELDS.forEach(f=>{
       taskCells += '<td data-label="'+f.label+'"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="'+f.key+'" '+
@@ -4523,7 +4533,7 @@ function renderPtCountTab(){
       const val = parseInt(e.target.value, 10) || 0;
       const mKey = ptCountMonthKey();
       if(!PT_COUNTS[mKey]) PT_COUNTS[mKey] = {};
-      if(!PT_COUNTS[mKey][name]) PT_COUNTS[mKey][name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+      if(!PT_COUNTS[mKey][name]) PT_COUNTS[mKey][name] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0, tarefasAtrasoDetalhe:[]};
       PT_COUNTS[mKey][name][field] = val;
       savePtCounts(PT_COUNTS);
       const row = e.target.closest('tr');
@@ -4535,6 +4545,30 @@ function renderPtCountTab(){
   });
 
   updatePtCountTotals();
+  renderTarefasAtrasoDetalhe(monthKey);
+}
+
+// Lista, TEF a TEF, cada tarefa em atraso importada (tarefa, cliente, prazo)
+// — o detalhe por trás do número que aparece na coluna "Tarefas em Atraso".
+function renderTarefasAtrasoDetalhe(monthKey){
+  const tbody = document.getElementById('tarefasAtrasoDetalheBody');
+  if(!tbody) return;
+  const monthData = PT_COUNTS[monthKey] || {};
+  const rows = [];
+  Object.keys(monthData).forEach(name=>{
+    (monthData[name].tarefasAtrasoDetalhe || []).forEach(t=> rows.push({nome:name, tarefa:t.tarefa, cliente:t.cliente, prazo:t.prazo}));
+  });
+  if(rows.length===0){
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--ink-soft);font-style:italic;padding:14px;">Sem tarefas em atraso registadas este mês.</td></tr>';
+    return;
+  }
+  rows.sort((a,b)=> a.nome.localeCompare(b.nome,'pt') || (a.prazo||'').localeCompare(b.prazo||''));
+  tbody.innerHTML = rows.map(r=>
+    '<tr><td data-label="PT" style="font-weight:700;">'+escapeAttr(r.nome)+'</td>'+
+    '<td data-label="Tarefa">'+escapeAttr(r.tarefa)+'</td>'+
+    '<td data-label="Cliente">'+(r.cliente ? escapeAttr(r.cliente) : '—')+'</td>'+
+    '<td data-label="Prazo">'+(r.prazo ? fmtDatePT(r.prazo) : '—')+'</td></tr>'
+  ).join('');
 }
 
 function renderPtRanking(containerId, values){
@@ -4573,9 +4607,13 @@ function limparNomesOrfaosPtCounts(mKey){
     const orphan = monthData[name];
     const match = matchTefName(name, registeredNames);
     if(match){
-      if(!monthData[match]) monthData[match] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+      if(!monthData[match]) monthData[match] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0, tarefasAtrasoDetalhe:[]};
       const target = monthData[match];
       taskFields.forEach(f=>{ target[f] = (target[f]||0) + (orphan[f]||0); });
+      if(!target.tarefasAtrasoDetalhe) target.tarefasAtrasoDetalhe = [];
+      if(orphan.tarefasAtrasoDetalhe && orphan.tarefasAtrasoDetalhe.length){
+        target.tarefasAtrasoDetalhe = target.tarefasAtrasoDetalhe.concat(orphan.tarefasAtrasoDetalhe);
+      }
       if(!(target.internos||0)) target.internos = orphan.internos||0;
       if(!(target.externos||0)) target.externos = orphan.externos||0;
       delete monthData[name];
@@ -4658,18 +4696,24 @@ document.getElementById('ptTarefasFileInput').addEventListener('change', async (
       const en = PT_COUNTS[mKey][name];
       en.prescricao = 0; en.avaliacao_fisica = 0; en.marcar_avaliacao_fisica = 0;
       en.reavaliacao_fisica = 0; en.marcar_reavaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0;
+      en.tarefasAtrasoDetalhe = [];
     });
     const today = isoDate(new Date());
     let nConcluidas=0, nAtraso=0, nIgnoradas=0;
     parsed.forEach(p=>{
       if(!p.responsavel) return;
-      if(!PT_COUNTS[mKey][p.responsavel]) PT_COUNTS[mKey][p.responsavel] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+      if(!PT_COUNTS[mKey][p.responsavel]) PT_COUNTS[mKey][p.responsavel] = {internos:0, externos:0, prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0, tarefasAtrasoDetalhe:[]};
       const entry = PT_COUNTS[mKey][p.responsavel];
       if(p.bucket==='concluida'){
         if(p.categoria && entry.hasOwnProperty(p.categoria)){ entry[p.categoria]++; nConcluidas++; }
         else nIgnoradas++;
       } else if(p.bucket==='pendente'){
-        if(p.prazo && p.prazo < today){ entry.tarefas_atraso++; nAtraso++; }
+        if(p.prazo && p.prazo < today){
+          entry.tarefas_atraso++;
+          nAtraso++;
+          if(!entry.tarefasAtrasoDetalhe) entry.tarefasAtrasoDetalhe = [];
+          entry.tarefasAtrasoDetalhe.push({tarefa: p.tipo || p.tarefa, cliente: p.cliente || '', prazo: p.prazo});
+        }
       }
     });
     savePtCounts(PT_COUNTS);
@@ -5918,6 +5962,8 @@ function parseKnownTarefasLayout(rows, idx){
     const cliente = idx.nomeCliente>=0 ? String(r[idx.nomeCliente]||'').trim() : '';
     out.push({
       tarefa: cliente ? (tipo+' — '+cliente) : tipo,
+      tipo,
+      cliente,
       responsavel: idx.responsavel>=0 ? String(r[idx.responsavel]||'').trim() : '',
       prazo: idx.dataTarefa>=0 ? dateCellToISO(r[idx.dataTarefa]) : '',
       bucket,
