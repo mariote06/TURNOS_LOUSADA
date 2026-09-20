@@ -4473,9 +4473,9 @@ const PT_TASK_FIELDS = [
 function renderPtCountTab(){
   const tbody = document.getElementById('ptCountTableBody');
   tbody.innerHTML = '';
-  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
   const monthKey = ptCountMonthKey();
   const monthData = PT_COUNTS[monthKey] || {};
+  const names = Array.from(new Set(Object.keys(TECH_REGISTRY).concat(Object.keys(monthData)))).sort((a,b)=>a.localeCompare(b,'pt'));
   const m = MONTH_LIST[ptCountMonthIdx];
   document.getElementById('ptCountMonthLabel').textContent = MONTH_NAMES[m.month]+' '+m.year;
   document.getElementById('ptCountMonthPrev').disabled = ptCountMonthIdx <= 0;
@@ -4544,8 +4544,8 @@ function renderPtRanking(containerId, values){
 function updatePtCountTotals(){
   let totalInternos = 0, totalExternos = 0;
   const taskTotals = {prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
-  const names = Object.keys(TECH_REGISTRY);
   const monthData = PT_COUNTS[ptCountMonthKey()] || {};
+  const names = Array.from(new Set(Object.keys(TECH_REGISTRY).concat(Object.keys(monthData))));
 
   names.forEach(name=>{
     const e = monthData[name];
@@ -4595,12 +4595,14 @@ document.getElementById('ptTarefasFileInput').addEventListener('change', async (
   statusEl.textContent = 'A processar '+file.name+'…';
   try{
     const buffer = await file.arrayBuffer();
-    const parsed = parseTarefasWorkbook(buffer);
-    if(parsed.length===0){
+    const rawParsed = parseTarefasWorkbook(buffer);
+    if(rawParsed.length===0){
       statusEl.textContent = 'Não foi possível reconhecer tarefas neste ficheiro (confirma as colunas Tarefa/Responsável/Prazo).';
       e.target.value = '';
       return;
     }
+    const resolucao = resolveTarefasResponsaveis(rawParsed);
+    const parsed = resolucao.items;
     const mKey = ptCountMonthKey();
     if(!PT_COUNTS[mKey]) PT_COUNTS[mKey] = {};
     // Este ficheiro passa a ser a fonte destes campos para o mês — zera-os
@@ -4624,7 +4626,13 @@ document.getElementById('ptTarefasFileInput').addEventListener('change', async (
       }
     });
     savePtCounts(PT_COUNTS);
-    statusEl.textContent = nConcluidas+' tarefa(s) fechada(s) contabilizadas, '+nAtraso+' em atraso'+(nIgnoradas>0 ? ' ('+nIgnoradas+' fechadas sem categoria correspondente, ignoradas)' : '')+'.';
+    let msg = nConcluidas+' tarefa(s) fechada(s) contabilizadas, '+nAtraso+' em atraso'+(nIgnoradas>0 ? ' ('+nIgnoradas+' fechadas sem categoria correspondente, ignoradas)' : '')+'.';
+    if(resolucao.nCorrigidos>0) msg += ' '+resolucao.nCorrigidos+' tarefa(s) com nome de responsável corrigido automaticamente.';
+    if(resolucao.unresolved.length>0){
+      msg += ' ⚠️ Nomes não reconhecidos (aparecem na tabela tal como vêm do ficheiro): '+
+        resolucao.unresolved.map(u=>u.nome+' ('+u.count+')').join(', ')+'.';
+    }
+    statusEl.textContent = msg;
     renderPtCountTab();
   }catch(err){
     console.error(err);
@@ -5926,6 +5934,93 @@ function parseTarefasWorkbook(arrayBuffer){
   return parseGenericTarefasLayout(rows, normHeader);
 }
 
+// Tenta associar um "Responsável" livre (como vem do Excel de Tarefas) a um
+// TEF registado no separador Técnicos, para as tarefas não ficarem
+// atribuídas a um nome que nunca aparece nas tabelas. Corresponde por nome
+// igual (ignorando acentos/maiúsculas), depois por alcunhas conhecidas
+// registadas manualmente e, falhando isso, por o nome do ficheiro ser uma
+// palavra que só existe em UM TEF registado (ex.: "Gaspar" -> "Luís
+// Gaspar", "Samuel" -> "Samuel Vinagre"). Devolve null se não encontrar uma
+// correspondência única e segura.
+const STORE_NAME_ALIASES = 'tef_turnos_name_aliases_v1';
+function loadNameAliases(){
+  try{ const raw = localStorage.getItem(STORE_NAME_ALIASES); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveNameAliases(a){ localStorage.setItem(STORE_NAME_ALIASES, JSON.stringify(a)); touchMeta(); }
+let NAME_ALIASES = loadNameAliases();
+// Alcunhas/variantes confirmadas manualmente (ex.: como aparecem no sistema
+// de tarefas do ginásio, diferentes do nome completo registado em Técnicos).
+const DEFAULT_NAME_ALIASES = {
+  'perry barbosa': 'Pedro Barbosa',
+  'max marques': 'José Marques'
+};
+Object.keys(DEFAULT_NAME_ALIASES).forEach(k=>{ if(!(k in NAME_ALIASES)) NAME_ALIASES[k] = DEFAULT_NAME_ALIASES[k]; });
+saveNameAliases(NAME_ALIASES);
+
+function normalizeNameForMatch(name){
+  return String(name||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function matchTefName(rawName, registeredNames){
+  const norm = normalizeNameForMatch(rawName);
+  if(!norm) return null;
+  if(NAME_ALIASES[norm] && registeredNames.includes(NAME_ALIASES[norm])) return NAME_ALIASES[norm];
+  const exact = registeredNames.find(n => normalizeNameForMatch(n) === norm);
+  if(exact) return exact;
+  const rawTokens = norm.split(/\s+/).filter(Boolean);
+  const candidates = registeredNames.filter(n=>{
+    const regTokens = normalizeNameForMatch(n).split(/\s+/).filter(Boolean);
+    const rawSubsetOfReg = rawTokens.every(t => regTokens.includes(t));
+    const regSubsetOfRaw = regTokens.every(t => rawTokens.includes(t));
+    return rawSubsetOfReg || regSubsetOfRaw;
+  });
+  return candidates.length===1 ? candidates[0] : null;
+}
+// Aplica matchTefName ao campo "responsavel" de cada tarefa parseada,
+// devolvendo os itens (com o responsável já corrigido quando possível) e um
+// resumo de quantos foram corrigidos e quais nomes ficaram por reconhecer.
+// Nomes que já se sabe não corresponderem a nenhum TEF atual (ex-membros da
+// equipa) — não são "corrigidos" para outra pessoa, mas também deixam de
+// aparecer no aviso de "nomes não reconhecidos"; as tarefas continuam
+// contabilizadas à parte, sob o próprio nome.
+const STORE_FORMER_MEMBERS = 'tef_turnos_ex_membros_v1';
+function loadFormerMembers(){
+  try{ const raw = localStorage.getItem(STORE_FORMER_MEMBERS); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveFormerMembers(m){ localStorage.setItem(STORE_FORMER_MEMBERS, JSON.stringify(m)); touchMeta(); }
+let FORMER_MEMBERS = loadFormerMembers();
+const DEFAULT_FORMER_MEMBERS = ['André Neto'];
+DEFAULT_FORMER_MEMBERS.forEach(n=>{
+  const k = normalizeNameForMatch(n);
+  if(!(k in FORMER_MEMBERS)) FORMER_MEMBERS[k] = n;
+});
+saveFormerMembers(FORMER_MEMBERS);
+
+function resolveTarefasResponsaveis(parsed){
+  const registeredNames = Object.keys(TECH_REGISTRY);
+  const cache = {};
+  const unresolvedCounts = {};
+  let nCorrigidos = 0;
+  const resolved = parsed.map(p=>{
+    if(!p.responsavel) return p;
+    if(registeredNames.includes(p.responsavel)) return p;
+    if(!(p.responsavel in cache)) cache[p.responsavel] = matchTefName(p.responsavel, registeredNames);
+    const match = cache[p.responsavel];
+    if(match){
+      nCorrigidos++;
+      return Object.assign({}, p, {responsavel: match});
+    }
+    if(!FORMER_MEMBERS[normalizeNameForMatch(p.responsavel)]){
+      unresolvedCounts[p.responsavel] = (unresolvedCounts[p.responsavel]||0) + 1;
+    }
+    return p;
+  });
+  const unresolved = Object.keys(unresolvedCounts).map(name=>({nome:name, count:unresolvedCounts[name]}))
+    .sort((a,b)=> b.count-a.count);
+  return {items: resolved, nCorrigidos, unresolved};
+}
+
 function renderRelCanceladasList(rel){
   const el = document.getElementById('relCanceladasList');
   if(!el) return;
@@ -5949,12 +6044,14 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
   statusEl.textContent = 'A processar '+file.name+'…';
   try{
     const buffer = await file.arrayBuffer();
-    const parsed = parseTarefasWorkbook(buffer);
-    if(parsed.length===0){
+    const rawParsed = parseTarefasWorkbook(buffer);
+    if(rawParsed.length===0){
       statusEl.textContent = 'Não foi possível reconhecer tarefas neste ficheiro (confirma as colunas Tarefa/Responsável/Prazo).';
       e.target.value = '';
       return;
     }
+    const resolucao = resolveTarefasResponsaveis(rawParsed);
+    const parsed = resolucao.items;
     const rel = getRelatorioAtual();
     let nPendentes=0, nConcluidas=0, nCanceladas=0, nSemCategoria=0;
     parsed.forEach(p=>{
@@ -5977,7 +6074,12 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
       }
     });
     saveRelatorioAtual();
-    statusEl.textContent = nPendentes+' pendentes, '+nConcluidas+' concluídas contabilizadas, '+nCanceladas+' canceladas/adormecidas'+(nSemCategoria>0 ? ' ('+nSemCategoria+' concluídas sem categoria correspondente, ignoradas)' : '')+'.';
+    let msg = nPendentes+' pendentes, '+nConcluidas+' concluídas contabilizadas, '+nCanceladas+' canceladas/adormecidas'+(nSemCategoria>0 ? ' ('+nSemCategoria+' concluídas sem categoria correspondente, ignoradas)' : '')+'.';
+    if(resolucao.nCorrigidos>0) msg += ' '+resolucao.nCorrigidos+' tarefa(s) com nome de responsável corrigido automaticamente.';
+    if(resolucao.unresolved.length>0){
+      msg += ' ⚠️ Nomes não reconhecidos: '+resolucao.unresolved.map(u=>u.nome+' ('+u.count+')').join(', ')+'.';
+    }
+    statusEl.textContent = msg;
     renderRelAbertasList(rel);
     renderRelTarefasTable(rel);
     renderRelCanceladasList(rel);
