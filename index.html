@@ -6680,16 +6680,34 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   if(ce.obs) paragraph('Observações: '+ce.obs);
   y += 4;
 
-  // 4. Tarefas Realizadas
-  heading('4. Tarefas Realizadas');
-  const te = rel.tarefas[name] || {};
-  table(['1ªs Aval. Físicas','Reavaliações','Treinos Integr.','Prescrições'],
-    [[te.avaliacoes_fisicas||0, te.reavaliacoes||0, te.integracao||0, te.prescricoes||0]],
-    [tW*0.25,tW*0.25,tW*0.25,tW*0.25]);
+  // 4. Treinos Vendidos
+  heading('4. Treinos Vendidos');
+  const pt = (PT_COUNTS[monthKey] && PT_COUNTS[monthKey][name]) || {};
+  const internos = pt.internos||0, externos = pt.externos||0;
+  paragraph('Internos: '+internos+'   ·   Externos: '+externos+'   ·   Total: '+(internos+externos));
+  y += 4;
+
+  // 5. Tarefas Realizadas
+  heading('5. Tarefas Realizadas');
+  table(['Marcar 1ª Aval.','1ª Aval. Física','Marcar Reaval.','Reaval. Física','Treino Integr.','Prescrição'],
+    [[pt.marcar_avaliacao_fisica||0, pt.avaliacao_fisica||0, pt.marcar_reavaliacao_fisica||0, pt.reavaliacao_fisica||0, pt.treino_integracao||0, pt.prescricao||0]],
+    [tW/6,tW/6,tW/6,tW/6,tW/6,tW/6]);
   y += 6;
 
-  // 5. Tarefas Pendentes / Em Atraso
-  heading('5. Tarefas Pendentes / Em Atraso');
+  // 6. Tarefas em Atraso
+  heading('6. Tarefas em Atraso');
+  const detalheAtraso = pt.tarefasAtrasoDetalhe || [];
+  if(detalheAtraso.length===0){
+    paragraph('Sem tarefas em atraso registadas.');
+  } else {
+    table(['Tarefa','Cliente','Prazo'],
+      detalheAtraso.map(t=>[t.tarefa||'—', t.cliente||'—', t.prazo?fmtDatePT(t.prazo):'—']),
+      [tW*0.4, tW*0.4, tW*0.2]);
+  }
+  y += 4;
+
+  // 7. Tarefas Pendentes / Em Atraso
+  heading('7. Tarefas Pendentes / Em Atraso');
   const minhasAbertas = rel.abertas.filter(t=> t.responsavel===name);
   if(minhasAbertas.length===0){
     paragraph('Sem tarefas pendentes registadas.');
@@ -6706,8 +6724,8 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   }
   y += 4;
 
-  // 6. Substituições
-  heading('6. Substituições Pagas pelo Titular');
+  // 8. Substituições
+  heading('8. Substituições Pagas pelo Titular');
   const minhasSubst = (typeof collectAllSubstitutions==='function' ? collectAllSubstitutions() : [])
     .filter(r=> r.iso.slice(0,7)===monthKey && (r.titular===name || r.substituto===name));
   if(minhasSubst.length===0){
@@ -6719,8 +6737,8 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   }
   y += 4;
 
-  // 7. Férias
-  heading('7. Férias Usadas Este Mês');
+  // 9. Férias
+  heading('9. Férias Usadas Este Mês');
   const feriasMes = Object.keys(FERIAS_DIAS[name] || {}).filter(iso=> iso.slice(0,7)===monthKey).sort();
   if(feriasMes.length===0){
     paragraph('Sem dias de férias registados este mês.');
