@@ -6376,6 +6376,41 @@ document.getElementById('relFillTurnos').addEventListener('click', ()=>{
 // distintos que passaram durante esse turno nesse dia específico (não
 // agregado pelo mês todo) — devolve uma lista ordenada da mais para a
 // menos concorrida, uma entrada por (dia, turno).
+// Turnos, nº de turnos, horas e valor estimado só a partir do que está
+// atribuído a este TEF no horário-base (campo "name" do turno) — ignora
+// por completo quem entrou como substituto, mesmo que tenha sido esse
+// quem efetivamente trabalhou esse dia.
+function computeAtribuicaoBaseTef(name, monthKey){
+  const my = monthKey.split('-').map(Number);
+  const y = my[0], mo = my[1];
+  const daysInMonth = new Date(y, mo, 0).getDate();
+  const rangeInfo = {};
+  let totalHoras = 0, totalValor = 0;
+  const status = TECH_REGISTRY[name] && TECH_REGISTRY[name].status;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateObj = new Date(y, mo-1, d);
+    const iso = isoDate(dateObj);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForReportDate(iso, dKey);
+    shifts.forEach(s=>{
+      if((s.name||'').trim() !== name) return;
+      const hrs = hoursBetween(s.start, s.end);
+      totalHoras += hrs;
+      if(status && RATES[status]){
+        const rate = resolveRate(RATES[status], iso);
+        totalValor += hrs * (rate ? rate.value : 0);
+      }
+      const key = s.start+'–'+s.end;
+      if(!rangeInfo[key]) rangeInfo[key] = new Set();
+      rangeInfo[key].add(dKey);
+    });
+  }
+  const rangeKeys = Object.keys(rangeInfo).sort();
+  const turnos = rangeKeys.map(rk=> compressDayList(Array.from(rangeInfo[rk]))+' '+rk).join('\n');
+  const numTurnos = rangeKeys.reduce((sum,rk)=> sum + rangeInfo[rk].size, 0);
+  return {turnos, numTurnos, horas: totalHoras, valor: totalValor};
+}
+
 function computeTurnoFrequenciaPorTef(name, monthKey){
   const acessos = ACESSOS[monthKey];
   if(!acessos || !acessos.visits || acessos.visits.length===0) return null;
@@ -6648,13 +6683,11 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   heading('1. Dados Gerais');
   const info = TECH_REGISTRY[name] || {};
   const vinculoLabel = {dependente:'Dependente', independente:'Independente', estagiario:'Estagiário'}[info.status] || '—';
-  const generoLabel = info.gender==='F' ? 'Mulher' : 'Homem';
-  const monthStart = new Date(m.year, m.month, 1);
-  const monthEnd = new Date(m.year, m.month+1, 0);
-  const budget = computeBudgetPerWorker(monthStart, monthEnd);
-  const b = budget[name] || {hours:0, value:0};
-  paragraph('Sexo: '+generoLabel+'   ·   Vínculo: '+vinculoLabel);
-  paragraph('Horas neste mês: '+fmtHours(b.hours)+' h   ·   Valor estimado: '+(info.status==='estagiario' ? 'não remunerado' : fmtEUR(b.value)));
+  const atrib = computeAtribuicaoBaseTef(name, monthKey);
+  paragraph('Vínculo: '+vinculoLabel);
+  paragraph('Turno(s) atribuído(s): '+(atrib.turnos||'—'));
+  paragraph('Nº de turnos/semana: '+atrib.numTurnos);
+  paragraph('Horas neste mês: '+fmtHours(atrib.horas)+' h   ·   Valor estimado: '+(info.status==='estagiario' ? 'não remunerado' : fmtEUR(atrib.valor)));
   y += 4;
 
   // 2. Avaliação
@@ -6673,8 +6706,7 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   // 3. Clientes por Turno
   heading('3. Clientes por Turno / Ocupação de Sala');
   const ce = rel.clientes[name] || {};
-  paragraph('Turno(s): '+(ce.turnos||'—'));
-  paragraph('Turnos/sem.: '+(ce.dias||'—')+'   ·   Clientes atendidos: '+(ce.clientes||'—'));
+  paragraph('Clientes atendidos: '+(ce.clientes||'—'));
   paragraph('Turno com maior frequência: '+(ce.turnoMaisFreq||'—'));
   paragraph('Turnos com menor frequência: '+(ce.turnosMenosFreq||'—'));
   if(ce.obs) paragraph('Observações: '+ce.obs);
@@ -6706,21 +6738,14 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   }
   y += 4;
 
-  // 7. Tarefas Pendentes / Em Atraso
-  heading('7. Tarefas Pendentes / Em Atraso');
+  // 7. Outras Tarefas Pendentes
+  heading('7. Outras Tarefas Pendentes');
   const minhasAbertas = rel.abertas.filter(t=> t.responsavel===name);
-  if(minhasAbertas.length===0){
-    paragraph('Sem tarefas pendentes registadas.');
+  const remaining = minhasAbertas.filter(t=>!isTaskOverdue(t) && !isKnownTaskCategoria(t.tarefa));
+  if(remaining.length===0){
+    paragraph('Sem outras tarefas pendentes registadas.');
   } else {
-    const overdue = minhasAbertas.filter(isTaskOverdue);
-    const remaining = minhasAbertas.filter(t=>!isTaskOverdue(t) && !isKnownTaskCategoria(t.tarefa));
-    paragraph('Com prazo excedido:');
-    if(overdue.length===0) paragraph('Nenhuma.');
-    else table(['Tarefa','Prazo'], overdue.map(t=>[t.tarefa||'—', t.prazo?fmtDatePT(t.prazo):'—']), [tW*0.7, tW*0.3]);
-    y += 3;
-    paragraph('Restantes:');
-    if(remaining.length===0) paragraph('Nenhuma.');
-    else table(['Tarefa','Prazo'], remaining.map(t=>[t.tarefa||'—', t.prazo?fmtDatePT(t.prazo):'—']), [tW*0.7, tW*0.3]);
+    table(['Tarefa','Prazo'], remaining.map(t=>[t.tarefa||'—', t.prazo?fmtDatePT(t.prazo):'—']), [tW*0.7, tW*0.3]);
   }
   y += 4;
 
