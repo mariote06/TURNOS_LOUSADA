@@ -1126,13 +1126,14 @@
     </div>
 
     <h3 style="font-size:15px;margin:22px 0 10px;">1. Clientes por Turno / Ocupação de Sala</h3>
-    <div class="modal-actions" style="justify-content:flex-start;margin:0 0 10px;">
-      <button type="button" class="btn ghost" id="relFillTurnos">🔄 Preencher Turno(s) e Dias/sem. a partir do Calendário</button>
+    <div class="modal-actions" style="justify-content:flex-start;margin:0 0 10px;flex-wrap:wrap;">
+      <button type="button" class="btn ghost" id="relFillTurnos">🔄 Preencher Turno(s) e Turnos/sem. a partir do Calendário</button>
+      <button type="button" class="btn ghost" id="relFillFrequencia">📊 Calcular Frequência (a partir de Entradas/Saídas)</button>
     </div>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="relClientesTable">
         <thead>
-          <tr><th>TEF</th><th>Turno(s)</th><th>Dias/sem.</th><th>Clientes atendidos</th><th>Nº aulas/turno</th><th>Observações</th></tr>
+          <tr><th>TEF</th><th>Turno(s)</th><th>Turnos/sem.</th><th>Clientes atendidos</th><th>Turno com maior frequência</th><th>Turnos com menor frequência</th><th>Observações</th></tr>
         </thead>
         <tbody id="relClientesBody"></tbody>
       </table>
@@ -5153,7 +5154,7 @@ function applyAcessosToRelatorio(monthKey, perTef){
     RELATORIOS[monthKey] = {instalacao:'LSD', coordenador:'Mário', data:'', clientes:{}, tarefas:{}, abertas:[], canceladas:[], observacoes:'', prints:[]};
   }
   Object.keys(perTef).forEach(name=>{
-    if(!RELATORIOS[monthKey].clientes[name]) RELATORIOS[monthKey].clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+    if(!RELATORIOS[monthKey].clientes[name]) RELATORIOS[monthKey].clientes[name] = {turnos:'', dias:'', clientes:'', turnoMaisFreq:'', turnosMenosFreq:'', obs:''};
     RELATORIOS[monthKey].clientes[name].clientes = perTef[name].count;
   });
   saveRelatorios(RELATORIOS);
@@ -5625,9 +5626,7 @@ function getRelatorioAtual(){
 }
 function saveRelatorioAtual(){ saveRelatorios(RELATORIOS); }
 function relTecNames(){
-  return Object.keys(TECH_REGISTRY)
-    .filter(n => (TECH_REGISTRY[n].status||'') !== 'estagiario')
-    .sort((a,b)=>a.localeCompare(b,'pt'));
+  return Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
 }
 function escapeAttr(v){
   return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -5679,7 +5678,8 @@ function computeTurnosPorTef(monthKey){
       const days = Array.from(info.ranges[rk]);
       return compressDayList(days)+' '+rk;
     });
-    result[name] = { turnos: parts.join('; '), dias: info.days.size };
+    const turnosPorSemana = rangeKeys.reduce((sum,rk)=> sum + info.ranges[rk].size, 0);
+    result[name] = { turnos: parts.join('\n'), dias: turnosPorSemana };
   });
   return result;
 }
@@ -5743,18 +5743,19 @@ function renderRelClientesTable(rel){
   tbody.innerHTML = '';
   const names = relTecNames();
   if(names.length===0){
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
     return;
   }
   names.forEach(name=>{
-    const e = rel.clientes[name] || {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+    const e = rel.clientes[name] || {turnos:'', dias:'', clientes:'', turnoMaisFreq:'', turnosMenosFreq:'', obs:''};
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
-      '<td data-label="Turno(s)"><input type="text" class="rel-input" data-name="'+encodeURIComponent(name)+'" data-field="turnos" value="'+escapeAttr(e.turnos)+'"></td>'+
-      '<td data-label="Dias/sem."><input type="text" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="dias" value="'+escapeAttr(e.dias)+'"></td>'+
+      '<td data-label="Turno(s)"><textarea class="rel-input" rows="2" data-name="'+encodeURIComponent(name)+'" data-field="turnos" style="min-width:170px;resize:vertical;">'+escapeAttr(e.turnos)+'</textarea></td>'+
+      '<td data-label="Turnos/sem."><input type="text" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="dias" value="'+escapeAttr(e.dias)+'"></td>'+
       '<td data-label="Clientes atendidos"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="clientes" value="'+escapeAttr(e.clientes)+'"></td>'+
-      '<td data-label="Nº aulas/turno"><input type="number" min="0" class="rel-input rel-narrow" data-name="'+encodeURIComponent(name)+'" data-field="aulas" value="'+escapeAttr(e.aulas)+'"></td>'+
+      '<td data-label="Turno com maior frequência"><input type="text" class="rel-input" data-name="'+encodeURIComponent(name)+'" data-field="turnoMaisFreq" value="'+escapeAttr(e.turnoMaisFreq)+'"></td>'+
+      '<td data-label="Turnos com menor frequência"><input type="text" class="rel-input" data-name="'+encodeURIComponent(name)+'" data-field="turnosMenosFreq" value="'+escapeAttr(e.turnosMenosFreq)+'"></td>'+
       '<td data-label="Observações"><input type="text" class="rel-input" data-name="'+encodeURIComponent(name)+'" data-field="obs" value="'+escapeAttr(e.obs)+'"></td>';
     tbody.appendChild(tr);
   });
@@ -5763,7 +5764,7 @@ function renderRelClientesTable(rel){
       const name = decodeURIComponent(e.target.dataset.name);
       const field = e.target.dataset.field;
       const rel2 = getRelatorioAtual();
-      if(!rel2.clientes[name]) rel2.clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+      if(!rel2.clientes[name]) rel2.clientes[name] = {turnos:'', dias:'', clientes:'', turnoMaisFreq:'', turnosMenosFreq:'', obs:''};
       rel2.clientes[name][field] = e.target.value;
       saveRelatorioAtual();
     });
@@ -5820,23 +5821,45 @@ function renderTaskRow(t, idx){
   return row;
 }
 
+// Devolve true se a tarefa (pelo texto, antes do " — Cliente") corresponder
+// a uma das 6 categorias conhecidas (Marcar 1ª Avaliação Física, 1ª
+// Avaliação Física, Marcar Reavaliação Física, Reavaliação Física, Treinos
+// de Integração, Prescrição de Treino).
+function isKnownTaskCategoria(tarefaText){
+  const tipo = String(tarefaText||'').split(' — ')[0];
+  return !!categorizeTipoTarefa(tipo);
+}
+
+function renderGroupedTaskList(container, rel, indices, emptyMsg){
+  container.innerHTML = '';
+  if(indices.length===0){
+    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">'+emptyMsg+'</p>';
+    return;
+  }
+  const byTef = {};
+  indices.forEach(idx=>{
+    const name = rel.abertas[idx].responsavel || 'Sem responsável';
+    (byTef[name] = byTef[name] || []).push(idx);
+  });
+  Object.keys(byTef).sort((a,b)=>a.localeCompare(b,'pt')).forEach(name=>{
+    const heading = document.createElement('div');
+    heading.style.cssText = 'font-weight:700;font-size:13px;margin:12px 0 4px;color:var(--rust);';
+    heading.textContent = name;
+    container.appendChild(heading);
+    byTef[name].forEach(idx=> container.appendChild(renderTaskRow(rel.abertas[idx], idx)));
+  });
+}
+
 function renderRelAbertasList(rel){
   const overdueEl = document.getElementById('relAbertasOverdue');
   const remainingEl = document.getElementById('relAbertasRemaining');
-  overdueEl.innerHTML = '';
-  remainingEl.innerHTML = '';
   const overdueIdx = [], remainingIdx = [];
-  rel.abertas.forEach((t, idx)=> (isTaskOverdue(t) ? overdueIdx : remainingIdx).push(idx));
-  if(overdueIdx.length===0){
-    overdueEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem tarefas com prazo excedido.</p>';
-  } else {
-    overdueIdx.forEach(idx=> overdueEl.appendChild(renderTaskRow(rel.abertas[idx], idx)));
-  }
-  if(remainingIdx.length===0){
-    remainingEl.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:13px;margin:4px 0;">Sem outras tarefas pendentes.</p>';
-  } else {
-    remainingIdx.forEach(idx=> remainingEl.appendChild(renderTaskRow(rel.abertas[idx], idx)));
-  }
+  rel.abertas.forEach((t, idx)=>{
+    if(isTaskOverdue(t)) overdueIdx.push(idx);
+    else if(!isKnownTaskCategoria(t.tarefa)) remainingIdx.push(idx);
+  });
+  renderGroupedTaskList(overdueEl, rel, overdueIdx, 'Sem tarefas com prazo excedido.');
+  renderGroupedTaskList(remainingEl, rel, remainingIdx, 'Sem outras tarefas pendentes.');
   function persistField(idx, field, value){
     const rel2 = getRelatorioAtual();
     if(!rel2.abertas[idx]) return;
@@ -5851,8 +5874,8 @@ function renderRelAbertasList(rel){
         const idx = parseInt(e.target.dataset.idx,10);
         if(rel2.abertas[idx]) rel2.abertas[idx][e.target.dataset.field] = e.target.value;
         saveRelatorioAtual();
-        // só re-renderiza ao mudar o prazo (pode mudar de grupo); texto livre mantém o foco
-        if(e.target.dataset.field==='prazo') renderRelAbertasList(rel2);
+        // só re-renderiza ao mudar o prazo/responsável (pode mudar de grupo); texto livre mantém o foco
+        if(e.target.dataset.field==='prazo' || e.target.dataset.field==='responsavel') renderRelAbertasList(rel2);
       });
     });
     container.querySelectorAll('select.rel-input').forEach(sel=>{
@@ -6317,10 +6340,72 @@ document.getElementById('relFillTurnos').addEventListener('click', ()=>{
     return;
   }
   Object.keys(computed).forEach(name=>{
-    if(!rel.clientes[name]) rel.clientes[name] = {turnos:'', dias:'', clientes:'', aulas:'', obs:''};
+    if(!rel.clientes[name]) rel.clientes[name] = {turnos:'', dias:'', clientes:'', turnoMaisFreq:'', turnosMenosFreq:'', obs:''};
     rel.clientes[name].turnos = computed[name].turnos;
     rel.clientes[name].dias = String(computed[name].dias);
   });
+  saveRelatorioAtual();
+  renderRelClientesTable(rel);
+});
+
+// Para cada turno atribuído a este TEF no mês, conta clientes distintos
+// (a partir das visitas de Entradas/Saídas) e devolve os turnos ordenados
+// do mais para o menos frequentado. null se não houver dados desse mês.
+function computeTurnoFrequenciaPorTef(name, monthKey){
+  const acessos = ACESSOS[monthKey];
+  if(!acessos || !acessos.visits || acessos.visits.length===0) return null;
+  const byDate = {};
+  acessos.visits.forEach(v=>{ (byDate[v.date] = byDate[v.date]||[]).push(v); });
+  const perTurno = {};
+  Object.keys(byDate).forEach(iso=>{
+    const parts = iso.split('-').map(Number);
+    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+    const dKey = dayKeyOf(dateObj);
+    const shifts = shiftsForReportDate(iso, dKey);
+    const myShifts = shifts.filter(s=>{
+      const effective = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name;
+      return effective === name;
+    }).map(s=>({key: s.start+'–'+s.end, startMin: timeToMinutes(s.start), endMin: timeToMinutes(s.end)}));
+    if(myShifts.length===0) return;
+    byDate[iso].forEach(v=>{
+      const inMin = timeToMinutes(v.in);
+      let outMin = timeToMinutes(v.out);
+      if(outMin < inMin) outMin += 24*60;
+      myShifts.forEach(si=>{
+        if(inMin < si.endMin && outMin > si.startMin){
+          if(!perTurno[si.key]) perTurno[si.key] = new Set();
+          perTurno[si.key].add(v.code);
+        }
+      });
+    });
+  });
+  return Object.keys(perTurno).map(key=>({turno:key, clientes:perTurno[key].size}))
+    .sort((a,b)=> b.clientes - a.clientes);
+}
+
+document.getElementById('relFillFrequencia').addEventListener('click', ()=>{
+  const monthKey = relMonthKey();
+  if(!ACESSOS[monthKey] || !ACESSOS[monthKey].visits || ACESSOS[monthKey].visits.length===0){
+    alert('Ainda não há dados de Entradas/Saídas carregados para este mês — carrega o PDF de Visitas Diárias nesse separador primeiro.');
+    return;
+  }
+  const rel = getRelatorioAtual();
+  const names = relTecNames();
+  let algumEncontrado = false;
+  names.forEach(name=>{
+    const ranked = computeTurnoFrequenciaPorTef(name, monthKey);
+    if(!ranked || ranked.length===0) return;
+    algumEncontrado = true;
+    if(!rel.clientes[name]) rel.clientes[name] = {turnos:'', dias:'', clientes:'', turnoMaisFreq:'', turnosMenosFreq:'', obs:''};
+    rel.clientes[name].turnoMaisFreq = ranked[0].turno+' ('+ranked[0].clientes+' clientes)';
+    rel.clientes[name].turnosMenosFreq = ranked.length>1
+      ? ranked.slice(1).map(r=>r.turno+' ('+r.clientes+')').join(', ')
+      : '';
+  });
+  if(!algumEncontrado){
+    alert('Não foi possível cruzar nenhum turno com as visitas deste mês.');
+    return;
+  }
   saveRelatorioAtual();
   renderRelClientesTable(rel);
 });
@@ -6402,9 +6487,9 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
   const tW = pageW - marginX*2;
 
   heading('1. Clientes por Turno / Ocupação de Sala');
-  table(['TEF','Turno(s)','Dias/sem.','Clientes','Nº aulas','Observações'],
-    names.map(n=>{ const e = rel.clientes[n]||{}; return [n, e.turnos||'—', e.dias||'—', e.clientes||'—', e.aulas||'—', e.obs||'—']; }),
-    [28,32,18,18,18,tW-28-32-18-18-18]);
+  table(['TEF','Turno(s)','Turnos/sem.','Clientes','Turno c/ + freq.','Turnos c/ - freq.','Observações'],
+    names.map(n=>{ const e = rel.clientes[n]||{}; return [n, e.turnos||'—', e.dias||'—', e.clientes||'—', e.turnoMaisFreq||'—', e.turnosMenosFreq||'—', e.obs||'—']; }),
+    [24,30,16,14,26,26,tW-24-30-16-14-26-26]);
   y += 6;
 
   heading('2. Substituições Pagas pelo Titular');
