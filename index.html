@@ -1192,6 +1192,7 @@
       <div id="relAbertasRemaining"></div>
 
       <button type="button" class="btn ghost" id="relAddAberta" style="margin-top:10px;">+ Adicionar tarefa aberta</button>
+      <button type="button" class="btn ghost" id="relClearAbertas" style="margin-top:10px;">🧹 Limpar Todas as Tarefas Abertas</button>
 
       <h4 style="font-size:13px;margin:20px 0 8px;color:var(--ink-soft);">🗑️ Canceladas / Adormecidas (informativo — não contam para nada)</h4>
       <div id="relCanceladasList"></div>
@@ -5958,6 +5959,13 @@ document.getElementById('relClearTarefasRealizadas').addEventListener('click', (
   saveRelatorioAtual();
   renderRelTarefasTable(rel);
 });
+document.getElementById('relClearAbertas').addEventListener('click', ()=>{
+  if(!confirm('Limpar TODAS as tarefas abertas/pendentes deste mês (importadas e adicionadas à mão)? Esta ação não pode ser desfeita.')) return;
+  const rel = getRelatorioAtual();
+  rel.abertas = [];
+  saveRelatorioAtual();
+  renderRelAbertasList(rel);
+});
 
 // Lê um Excel de tarefas com cabeçalhos flexíveis (Tarefa/Descrição,
 // Responsável/TEF, Prazo/Data Limite, Estado) e devolve uma lista de
@@ -6230,16 +6238,20 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
     const resolucao = resolveTarefasResponsaveis(rawParsed);
     const parsed = resolucao.items;
     const rel = getRelatorioAtual();
-    // Este ficheiro passa a ser a fonte de "Tarefas Realizadas" para o mês —
-    // zera os 4 contadores antes de voltar a contar, para uma reimportação
-    // não somar em cima dos valores antigos (ex.: depois de corrigir a
-    // categorização de "Marcar...").
+    // Este ficheiro passa a ser a fonte de "Tarefas Realizadas", "Tarefas
+    // Abertas" (as importadas) e "Canceladas/Adormecidas" para o mês — limpa
+    // tudo o que veio de uma importação anterior antes de voltar a contar,
+    // para uma reimportação não duplicar nem somar em cima dos valores
+    // antigos. As tarefas abertas adicionadas à mão (sem esta marca) não são
+    // tocadas.
     Object.keys(rel.tarefas).forEach(nome=>{
       rel.tarefas[nome].avaliacoes_fisicas = 0;
       rel.tarefas[nome].reavaliacoes = 0;
       rel.tarefas[nome].integracao = 0;
       rel.tarefas[nome].prescricoes = 0;
     });
+    rel.abertas = rel.abertas.filter(t=> !t.importado);
+    rel.canceladas = [];
     let nPendentes=0, nConcluidas=0, nCanceladas=0, nSemCategoria=0;
     parsed.forEach(p=>{
       if(p.bucket==='cancelada'){
@@ -6256,7 +6268,7 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
           nSemCategoria++;
         }
       } else {
-        rel.abertas.push({tarefa:p.tarefa, responsavel:p.responsavel, prazo:p.prazo, estado:'em_curso'});
+        rel.abertas.push({tarefa:p.tarefa, responsavel:p.responsavel, prazo:p.prazo, estado:'em_curso', importado:true});
         nPendentes++;
       }
     });
