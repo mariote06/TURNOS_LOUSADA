@@ -6372,13 +6372,17 @@ document.getElementById('relFillTurnos').addEventListener('click', ()=>{
 // Para cada turno atribuído a este TEF no mês, conta clientes distintos
 // (a partir das visitas de Entradas/Saídas) e devolve os turnos ordenados
 // do mais para o menos frequentado. null se não houver dados desse mês.
+// Para cada dia do mês em que este TEF teve turno, conta os clientes
+// distintos que passaram durante esse turno nesse dia específico (não
+// agregado pelo mês todo) — devolve uma lista ordenada da mais para a
+// menos concorrida, uma entrada por (dia, turno).
 function computeTurnoFrequenciaPorTef(name, monthKey){
   const acessos = ACESSOS[monthKey];
   if(!acessos || !acessos.visits || acessos.visits.length===0) return null;
   const byDate = {};
   acessos.visits.forEach(v=>{ (byDate[v.date] = byDate[v.date]||[]).push(v); });
-  const perTurno = {};
-  Object.keys(byDate).forEach(iso=>{
+  const perDiaTurno = [];
+  Object.keys(byDate).sort().forEach(iso=>{
     const parts = iso.split('-').map(Number);
     const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
     const dKey = dayKeyOf(dateObj);
@@ -6388,20 +6392,21 @@ function computeTurnoFrequenciaPorTef(name, monthKey){
       return effective === name;
     }).map(s=>({key: s.start+'–'+s.end, startMin: timeToMinutes(s.start), endMin: timeToMinutes(s.end)}));
     if(myShifts.length===0) return;
-    byDate[iso].forEach(v=>{
-      const inMin = timeToMinutes(v.in);
-      let outMin = timeToMinutes(v.out);
-      if(outMin < inMin) outMin += 24*60;
-      myShifts.forEach(si=>{
-        if(inMin < si.endMin && outMin > si.startMin){
-          if(!perTurno[si.key]) perTurno[si.key] = new Set();
-          perTurno[si.key].add(v.code);
-        }
+    myShifts.forEach(si=>{
+      const clientSet = new Set();
+      byDate[iso].forEach(v=>{
+        const inMin = timeToMinutes(v.in);
+        let outMin = timeToMinutes(v.out);
+        if(outMin < inMin) outMin += 24*60;
+        if(inMin < si.endMin && outMin > si.startMin) clientSet.add(v.code);
       });
+      perDiaTurno.push({iso, dKey, turno: si.key, clientes: clientSet.size});
     });
   });
-  return Object.keys(perTurno).map(key=>({turno:key, clientes:perTurno[key].size}))
-    .sort((a,b)=> b.clientes - a.clientes);
+  return perDiaTurno.sort((a,b)=> b.clientes - a.clientes);
+}
+function formatTurnoFrequenciaEntry(e){
+  return e.dKey+' '+fmtDatePT(e.iso)+' '+e.turno+' ('+e.clientes+' cliente'+(e.clientes===1?'':'s')+')';
 }
 
 document.getElementById('relFillFrequencia').addEventListener('click', ()=>{
@@ -6418,9 +6423,11 @@ document.getElementById('relFillFrequencia').addEventListener('click', ()=>{
     if(!ranked || ranked.length===0) return;
     algumEncontrado = true;
     if(!rel.clientes[name]) rel.clientes[name] = {turnos:'', dias:'', clientes:'', turnoMaisFreq:'', turnosMenosFreq:'', obs:''};
-    rel.clientes[name].turnoMaisFreq = ranked[0].turno+' ('+ranked[0].clientes+' clientes)';
-    rel.clientes[name].turnosMenosFreq = ranked.length>1
-      ? ranked.slice(1).map(r=>r.turno+' ('+r.clientes+')').join(', ')
+    rel.clientes[name].turnoMaisFreq = formatTurnoFrequenciaEntry(ranked[0]);
+    const minClientes = ranked[ranked.length-1].clientes;
+    const piores = ranked.filter(r=> r.clientes===minClientes);
+    rel.clientes[name].turnosMenosFreq = ranked.length>1 && minClientes<ranked[0].clientes
+      ? piores.map(formatTurnoFrequenciaEntry).join('; ')
       : '';
   });
   if(!algumEncontrado){
