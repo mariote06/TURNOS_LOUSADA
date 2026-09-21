@@ -1125,6 +1125,17 @@
       </div>
     </div>
 
+    <div class="panel" style="padding:16px 18px;margin-bottom:24px;">
+      <h4 style="margin:0 0 8px;">📇 Ficha Individual do TEF</h4>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+        Gera um PDF com tudo o que este relatório sabe sobre um TEF em concreto, neste mês: dados gerais, avaliação, turnos e clientes, tarefas realizadas e pendentes, substituições e férias.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <select id="relFichaTefSelect" class="rel-input" style="max-width:260px;"></select>
+        <button type="button" class="btn primary" id="relFichaTefBtn">📄 Gerar Ficha em PDF</button>
+      </div>
+    </div>
+
     <h3 style="font-size:15px;margin:22px 0 10px;">1. Clientes por Turno / Ocupação de Sala</h3>
     <div class="modal-actions" style="justify-content:flex-start;margin:0 0 10px;flex-wrap:wrap;">
       <button type="button" class="btn ghost" id="relFillTurnos">🔄 Preencher Turno(s) e Turnos/sem. a partir do Calendário</button>
@@ -5736,6 +5747,16 @@ function renderRelatorioTab(){
   renderRelCanceladasList(rel);
   renderRelPrintsList(rel);
   renderRelAvalTable();
+  renderFichaTefSelect();
+}
+
+function renderFichaTefSelect(){
+  const sel = document.getElementById('relFichaTefSelect');
+  if(!sel) return;
+  const prev = sel.value;
+  const names = relTecNames();
+  sel.innerHTML = names.map(n=>'<option value="'+encodeURIComponent(n)+'">'+n+'</option>').join('');
+  if(prev && names.includes(decodeURIComponent(prev))) sel.value = prev;
 }
 
 function renderRelClientesTable(rel){
@@ -6565,6 +6586,143 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
   });
 
   doc.save('Relatorio_TEF_'+relMonthKey()+'.pdf');
+});
+
+document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('relFichaTefSelect');
+  if(!sel.value){ alert('Escolhe um TEF.'); return; }
+  const name = decodeURIComponent(sel.value);
+  const jspdfLib = window.jspdf;
+  if(!jspdfLib){ alert('Não foi possível carregar a biblioteca de PDF (precisas de estar online da primeira vez que exportas).'); return; }
+  const { jsPDF } = jspdfLib;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const pageW = 210, pageH = 297, marginX = 14;
+  let y = 0;
+
+  const rel = getRelatorioAtual();
+  const monthKey = relMonthKey();
+  const m = MONTH_LIST[relMonthIdx];
+  const monthLabel = MONTH_NAMES[m.month]+' '+m.year;
+  const instalacaoLabel = rel.instalacao==='PNF' ? 'Penafiel (PNF)' : 'Lousada (LSD)';
+  const tW = pageW - marginX*2;
+
+  function ensureSpace(h){ if(y + h > pageH - 16){ doc.addPage(); y = 16; } }
+  function heading(text){
+    ensureSpace(10);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12.5);
+    doc.setTextColor(31,56,100);
+    doc.text(text, marginX, y);
+    y += 5;
+    doc.setDrawColor(31,56,100); doc.setLineWidth(0.4);
+    doc.line(marginX, y-3, pageW-marginX, y-3);
+    y += 3;
+  }
+  function paragraph(text){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.setTextColor(28,35,33);
+    const lines = doc.splitTextToSize(text, pageW - marginX*2);
+    lines.forEach(line=>{ ensureSpace(5.5); doc.text(line, marginX, y); y += 5.5; });
+  }
+  function table(header, rowsData, colWidths){
+    ensureSpace(14);
+    y = drawSimpleTable(doc, marginX, y, colWidths, header, rowsData);
+  }
+
+  doc.setFillColor(31,56,100);
+  doc.rect(0,0,pageW,28,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Ficha Individual — '+name, marginX, 14);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(monthLabel+' · '+instalacaoLabel, marginX, 21);
+  y = 38;
+
+  // 1. Dados gerais
+  heading('1. Dados Gerais');
+  const info = TECH_REGISTRY[name] || {};
+  const vinculoLabel = {dependente:'Dependente', independente:'Independente', estagiario:'Estagiário'}[info.status] || '—';
+  const generoLabel = info.gender==='F' ? 'Mulher' : 'Homem';
+  const monthStart = new Date(m.year, m.month, 1);
+  const monthEnd = new Date(m.year, m.month+1, 0);
+  const budget = computeBudgetPerWorker(monthStart, monthEnd);
+  const b = budget[name] || {hours:0, value:0};
+  paragraph('Sexo: '+generoLabel+'   ·   Vínculo: '+vinculoLabel);
+  paragraph('Horas neste mês: '+fmtHours(b.hours)+' h   ·   Valor estimado: '+(info.status==='estagiario' ? 'não remunerado' : fmtEUR(b.value)));
+  y += 4;
+
+  // 2. Avaliação
+  heading('2. Avaliação');
+  const latest = getLatestEvalPerTecnico()[name];
+  if(!latest){
+    paragraph('Sem avaliação registada.');
+  } else {
+    const total = computeWeightedTotal(latest.scores);
+    const cls = classifyAvalScore(total);
+    paragraph('Última avaliação: '+fmtDatePT(latest.date)+'   ·   Pontuação: '+total+'/100   ·   Classificação: '+cls.label);
+    if(latest.plano) paragraph('Plano de melhoria: '+latest.plano);
+  }
+  y += 4;
+
+  // 3. Clientes por Turno
+  heading('3. Clientes por Turno / Ocupação de Sala');
+  const ce = rel.clientes[name] || {};
+  paragraph('Turno(s): '+(ce.turnos||'—'));
+  paragraph('Turnos/sem.: '+(ce.dias||'—')+'   ·   Clientes atendidos: '+(ce.clientes||'—'));
+  paragraph('Turno com maior frequência: '+(ce.turnoMaisFreq||'—'));
+  paragraph('Turnos com menor frequência: '+(ce.turnosMenosFreq||'—'));
+  if(ce.obs) paragraph('Observações: '+ce.obs);
+  y += 4;
+
+  // 4. Tarefas Realizadas
+  heading('4. Tarefas Realizadas');
+  const te = rel.tarefas[name] || {};
+  table(['1ªs Aval. Físicas','Reavaliações','Treinos Integr.','Prescrições'],
+    [[te.avaliacoes_fisicas||0, te.reavaliacoes||0, te.integracao||0, te.prescricoes||0]],
+    [tW*0.25,tW*0.25,tW*0.25,tW*0.25]);
+  y += 6;
+
+  // 5. Tarefas Pendentes / Em Atraso
+  heading('5. Tarefas Pendentes / Em Atraso');
+  const minhasAbertas = rel.abertas.filter(t=> t.responsavel===name);
+  if(minhasAbertas.length===0){
+    paragraph('Sem tarefas pendentes registadas.');
+  } else {
+    const overdue = minhasAbertas.filter(isTaskOverdue);
+    const remaining = minhasAbertas.filter(t=>!isTaskOverdue(t) && !isKnownTaskCategoria(t.tarefa));
+    paragraph('Com prazo excedido:');
+    if(overdue.length===0) paragraph('Nenhuma.');
+    else table(['Tarefa','Prazo'], overdue.map(t=>[t.tarefa||'—', t.prazo?fmtDatePT(t.prazo):'—']), [tW*0.7, tW*0.3]);
+    y += 3;
+    paragraph('Restantes:');
+    if(remaining.length===0) paragraph('Nenhuma.');
+    else table(['Tarefa','Prazo'], remaining.map(t=>[t.tarefa||'—', t.prazo?fmtDatePT(t.prazo):'—']), [tW*0.7, tW*0.3]);
+  }
+  y += 4;
+
+  // 6. Substituições
+  heading('6. Substituições Pagas pelo Titular');
+  const minhasSubst = (typeof collectAllSubstitutions==='function' ? collectAllSubstitutions() : [])
+    .filter(r=> r.iso.slice(0,7)===monthKey && (r.titular===name || r.substituto===name));
+  if(minhasSubst.length===0){
+    paragraph('Sem substituições deste tipo neste mês, como titular ou substituto.');
+  } else {
+    table(['Data','Turno','Titular','Substituto'],
+      minhasSubst.map(r=>[fmtDatePT(r.iso), r.start+'–'+r.end, r.titular, r.substituto]),
+      [tW*0.2,tW*0.2,tW*0.3,tW*0.3]);
+  }
+  y += 4;
+
+  // 7. Férias
+  heading('7. Férias Usadas Este Mês');
+  const feriasMes = Object.keys(FERIAS_DIAS[name] || {}).filter(iso=> iso.slice(0,7)===monthKey).sort();
+  if(feriasMes.length===0){
+    paragraph('Sem dias de férias registados este mês.');
+  } else {
+    const totalHoras = feriasMes.reduce((s,iso)=> s + (FERIAS_DIAS[name][iso]||0), 0);
+    paragraph(feriasMes.length+' dia(s) de férias, '+fmtHours(totalHoras)+' h no total: '+feriasMes.map(fmtDatePT).join(', '));
+  }
+
+  doc.save('Ficha_'+name.replace(/\s+/g,'_')+'_'+monthKey+'.pdf');
 });
 
 /* ---------------------------------------------------------------
