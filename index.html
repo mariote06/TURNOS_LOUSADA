@@ -1164,6 +1164,9 @@
     </div>
 
     <h3 style="font-size:15px;margin:26px 0 10px;">3. Tarefas Realizadas</h3>
+    <div class="modal-actions" style="justify-content:flex-start;margin:0 0 10px;">
+      <button type="button" class="btn ghost" id="relClearTarefasRealizadas">🧹 Limpar Tarefas Realizadas</button>
+    </div>
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="relTarefasTable">
         <thead>
@@ -5947,6 +5950,13 @@ document.getElementById('relAddAberta').addEventListener('click', ()=>{
   rel.abertas.push({tarefa:'', responsavel:'', prazo:'', estado:'em_curso'});
   saveRelatorioAtual();
   renderRelAbertasList(rel);
+});
+document.getElementById('relClearTarefasRealizadas').addEventListener('click', ()=>{
+  if(!confirm('Limpar todos os valores de Tarefas Realizadas deste mês? Esta ação não pode ser desfeita.')) return;
+  const rel = getRelatorioAtual();
+  rel.tarefas = {};
+  saveRelatorioAtual();
+  renderRelTarefasTable(rel);
 });
 
 // Lê um Excel de tarefas com cabeçalhos flexíveis (Tarefa/Descrição,
