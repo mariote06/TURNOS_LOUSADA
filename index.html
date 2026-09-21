@@ -5800,6 +5800,23 @@ function renderRelTarefasTable(rel){
     tbody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados.</td></tr>';
     return;
   }
+  const totals = {avaliacoes_fisicas:0, reavaliacoes:0, integracao:0, prescricoes:0};
+  names.forEach(name=>{
+    const e = rel.tarefas[name] || {};
+    totals.avaliacoes_fisicas += parseInt(e.avaliacoes_fisicas,10) || 0;
+    totals.reavaliacoes += parseInt(e.reavaliacoes,10) || 0;
+    totals.integracao += parseInt(e.integracao,10) || 0;
+    totals.prescricoes += parseInt(e.prescricoes,10) || 0;
+  });
+  const totalRow = document.createElement('tr');
+  totalRow.style.cssText = 'font-weight:700;background:#fbfaf7;';
+  totalRow.innerHTML =
+    '<td data-label="Total">TOTAL</td>'+
+    '<td data-label="1ªs Avaliações Físicas">'+totals.avaliacoes_fisicas+'</td>'+
+    '<td data-label="Reavaliações">'+totals.reavaliacoes+'</td>'+
+    '<td data-label="Treinos de Integração">'+totals.integracao+'</td>'+
+    '<td data-label="Prescrições de Treino">'+totals.prescricoes+'</td>';
+  tbody.appendChild(totalRow);
   names.forEach(name=>{
     const e = rel.tarefas[name] || {avaliacoes_fisicas:'', reavaliacoes:'', integracao:'', prescricoes:''};
     const tr = document.createElement('tr');
@@ -5819,6 +5836,18 @@ function renderRelTarefasTable(rel){
       if(!rel2.tarefas[name]) rel2.tarefas[name] = {avaliacoes_fisicas:'', reavaliacoes:'', integracao:'', prescricoes:''};
       rel2.tarefas[name][field] = e.target.value;
       saveRelatorioAtual();
+      const t2 = {avaliacoes_fisicas:0, reavaliacoes:0, integracao:0, prescricoes:0};
+      names.forEach(n=>{
+        const en = rel2.tarefas[n] || {};
+        t2.avaliacoes_fisicas += parseInt(en.avaliacoes_fisicas,10) || 0;
+        t2.reavaliacoes += parseInt(en.reavaliacoes,10) || 0;
+        t2.integracao += parseInt(en.integracao,10) || 0;
+        t2.prescricoes += parseInt(en.prescricoes,10) || 0;
+      });
+      totalRow.children[1].textContent = t2.avaliacoes_fisicas;
+      totalRow.children[2].textContent = t2.reavaliacoes;
+      totalRow.children[3].textContent = t2.integracao;
+      totalRow.children[4].textContent = t2.prescricoes;
     });
   });
 }
