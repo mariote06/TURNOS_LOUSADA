@@ -6220,6 +6220,16 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
     const resolucao = resolveTarefasResponsaveis(rawParsed);
     const parsed = resolucao.items;
     const rel = getRelatorioAtual();
+    // Este ficheiro passa a ser a fonte de "Tarefas Realizadas" para o mês —
+    // zera os 4 contadores antes de voltar a contar, para uma reimportação
+    // não somar em cima dos valores antigos (ex.: depois de corrigir a
+    // categorização de "Marcar...").
+    Object.keys(rel.tarefas).forEach(nome=>{
+      rel.tarefas[nome].avaliacoes_fisicas = 0;
+      rel.tarefas[nome].reavaliacoes = 0;
+      rel.tarefas[nome].integracao = 0;
+      rel.tarefas[nome].prescricoes = 0;
+    });
     let nPendentes=0, nConcluidas=0, nCanceladas=0, nSemCategoria=0;
     parsed.forEach(p=>{
       if(p.bucket==='cancelada'){
