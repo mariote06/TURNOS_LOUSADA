@@ -261,6 +261,12 @@
   .pt-ranking-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
   .pt-ranking-col{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
   .pt-ranking-col h4{margin:0 0 10px;font-size:13.5px;}
+  .nota-tipo-btn{opacity:0.55;}
+  .nota-tipo-btn.active{opacity:1;box-shadow:0 0 0 2px var(--accent) inset;}
+  .nota-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--paper);}
+  .nota-item.positivo{border-left:4px solid #2f6f4e;}
+  .nota-item.negativo{border-left:4px solid var(--rust);}
+  .nota-item-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
   .pt-rank-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
   .pt-rank-row:last-child{border-bottom:none;}
   .pt-rank-pos{font-weight:700;color:var(--ink-soft);width:22px;flex-shrink:0;}
@@ -816,6 +822,25 @@
         <div class="aval-weights-total" id="avalWeightsTotal"></div>
         <button type="button" class="btn ghost" id="btnResetWeights" style="margin-top:10px;">Repor pesos por omissão</button>
       </div>
+    </div>
+
+    <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+      <h4 style="margin:0 0 10px;font-size:13.5px;">📝 Nota Rápida</h4>
+      <p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">
+        Regista, em segundos, uma observação positiva ou negativa de um TEF, associada a um tópico/subtópico da avaliação — para teres já apontado quando fores avaliá-lo.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <select id="notaTecnicoSelect" class="rel-input" style="max-width:200px;"></select>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="btn nota-tipo-btn" id="notaTipoPositivo" data-tipo="positivo">👍 Positiva</button>
+          <button type="button" class="btn nota-tipo-btn" id="notaTipoNegativo" data-tipo="negativo">👎 Negativa</button>
+        </div>
+        <select id="notaGrupoSelect" class="rel-input" style="max-width:230px;"></select>
+        <select id="notaCriterioSelect" class="rel-input" style="max-width:230px;"></select>
+      </div>
+      <textarea id="notaTexto" placeholder="Escreve a nota (ex.: elogiou-a um cliente por uma explicação muito clara do exercício)..." rows="2" style="width:100%;margin-top:10px;font:14px 'Inter';border:1px solid var(--line);border-radius:8px;padding:8px 10px;box-sizing:border-box;resize:vertical;"></textarea>
+      <button type="button" class="btn primary" id="notaGuardarBtn" style="margin-top:8px;">Guardar Nota</button>
+      <div id="notaListaContainer" style="margin-top:16px;"></div>
     </div>
 
     <div class="panel" style="padding:16px 18px;">
@@ -3942,6 +3967,100 @@ function renderAvalTab(){
   if(!document.getElementById('avalData').value) document.getElementById('avalData').value = isoDate(new Date());
   if(editingAvalId === null) renderAvalGroups({});
   renderAvalHistory();
+  renderNotasRapidas();
+}
+
+/* ---------------------------------------------------------------
+   NOTAS RÁPIDAS — observações positivas/negativas por TEF, ligadas
+   a um tópico/subtópico da grelha de Avaliação, para captar no
+   momento e teres já apontado quando fores avaliar formalmente.
+--------------------------------------------------------------- */
+const STORE_QUICK_NOTES = 'tef_turnos_notas_rapidas_v1';
+function loadQuickNotes(){
+  try{ const raw = localStorage.getItem(STORE_QUICK_NOTES); if(raw) return JSON.parse(raw); }catch(e){}
+  return {};
+}
+function saveQuickNotes(n){ localStorage.setItem(STORE_QUICK_NOTES, JSON.stringify(n)); touchMeta(); }
+let QUICK_NOTES = loadQuickNotes();
+let notaTipoAtual = 'positivo';
+
+function populateNotaSelects(){
+  const tecSel = document.getElementById('notaTecnicoSelect');
+  const prevTec = tecSel.value;
+  const names = relTecNames();
+  tecSel.innerHTML = names.map(n=>'<option value="'+encodeURIComponent(n)+'">'+n+'</option>').join('');
+  if(prevTec && names.includes(decodeURIComponent(prevTec))) tecSel.value = prevTec;
+
+  const grupoSel = document.getElementById('notaGrupoSelect');
+  if(grupoSel.options.length===0){
+    grupoSel.innerHTML = EVAL_GROUPS.map(g=>'<option value="'+encodeURIComponent(g.name)+'">'+g.name+'</option>').join('');
+  }
+  populateNotaCriterioSelect();
+}
+function populateNotaCriterioSelect(){
+  const grupoSel = document.getElementById('notaGrupoSelect');
+  const critSel = document.getElementById('notaCriterioSelect');
+  const grupoName = decodeURIComponent(grupoSel.value||'');
+  const grupo = EVAL_GROUPS.find(g=>g.name===grupoName) || EVAL_GROUPS[0];
+  critSel.innerHTML = grupo.criteria.map(c=>'<option value="'+encodeURIComponent(c.label)+'">'+c.label+'</option>').join('');
+}
+document.getElementById('notaGrupoSelect').addEventListener('change', populateNotaCriterioSelect);
+
+function setNotaTipo(tipo){
+  notaTipoAtual = tipo;
+  document.getElementById('notaTipoPositivo').classList.toggle('active', tipo==='positivo');
+  document.getElementById('notaTipoNegativo').classList.toggle('active', tipo==='negativo');
+}
+document.getElementById('notaTipoPositivo').addEventListener('click', ()=> setNotaTipo('positivo'));
+document.getElementById('notaTipoNegativo').addEventListener('click', ()=> setNotaTipo('negativo'));
+
+document.getElementById('notaGuardarBtn').addEventListener('click', ()=>{
+  const tecSel = document.getElementById('notaTecnicoSelect');
+  if(!tecSel.value){ alert('Escolhe um técnico.'); return; }
+  const tecnico = decodeURIComponent(tecSel.value);
+  const grupo = decodeURIComponent(document.getElementById('notaGrupoSelect').value||'');
+  const criterio = decodeURIComponent(document.getElementById('notaCriterioSelect').value||'');
+  const texto = document.getElementById('notaTexto').value.trim();
+  if(!texto){ alert('Escreve o texto da nota.'); return; }
+  if(!QUICK_NOTES[tecnico]) QUICK_NOTES[tecnico] = [];
+  QUICK_NOTES[tecnico].push({id:'nota_'+Date.now(), data:isoDate(new Date()), tipo:notaTipoAtual, grupo, criterio, nota:texto});
+  saveQuickNotes(QUICK_NOTES);
+  document.getElementById('notaTexto').value = '';
+  renderNotaLista();
+});
+document.getElementById('notaTecnicoSelect').addEventListener('change', renderNotaLista);
+
+function renderNotaLista(){
+  const container = document.getElementById('notaListaContainer');
+  const tecSel = document.getElementById('notaTecnicoSelect');
+  if(!tecSel.value){ container.innerHTML=''; return; }
+  const tecnico = decodeURIComponent(tecSel.value);
+  const notas = (QUICK_NOTES[tecnico]||[]).slice().sort((a,b)=> b.data.localeCompare(a.data));
+  if(notas.length===0){
+    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:4px 0;">Sem notas registadas para '+tecnico+'.</p>';
+    return;
+  }
+  container.innerHTML = notas.map(n=>
+    '<div class="nota-item '+n.tipo+'">'+
+      '<div class="nota-item-head"><span>'+(n.tipo==='positivo'?'👍':'👎')+' '+fmtDatePT(n.data)+' · '+escapeAttr(n.grupo)+' — '+escapeAttr(n.criterio)+'</span>'+
+      '<button type="button" class="rel-rm" data-id="'+n.id+'" title="Remover">×</button></div>'+
+      '<div style="font-size:13px;">'+escapeAttr(n.nota)+'</div>'+
+    '</div>'
+  ).join('');
+  container.querySelectorAll('.rel-rm').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const id = e.target.dataset.id;
+      QUICK_NOTES[tecnico] = (QUICK_NOTES[tecnico]||[]).filter(n=>n.id!==id);
+      saveQuickNotes(QUICK_NOTES);
+      renderNotaLista();
+    });
+  });
+}
+
+function renderNotasRapidas(){
+  populateNotaSelects();
+  setNotaTipo(notaTipoAtual);
+  renderNotaLista();
 }
 
 document.getElementById('btnSaveAval').addEventListener('click', ()=>{
