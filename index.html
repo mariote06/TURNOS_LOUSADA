@@ -6932,6 +6932,37 @@ document.getElementById('btnExportRelatorioPdf').addEventListener('click', ()=>{
   doc.save('Relatorio_TEF_'+relMonthKey()+'.pdf');
 });
 
+// Gera um pequeno texto motivacional para a Ficha Individual, com base nos
+// critérios Top/Low Performer da avaliação usada nesse relatório.
+function gerarMensagemMotivacional(name, scores){
+  const firstName = name.split(' ')[0];
+  if(!scores){
+    return firstName+', continua o bom trabalho! Ainda não há critérios de avaliação pontuados para personalizar mais esta mensagem — fica para o próximo relatório.';
+  }
+  const topAll = [], lowAll = [];
+  EVAL_GROUPS.forEach(group=>{
+    group.criteria.forEach(c=>{
+      const v = scores[c.key];
+      if(v===undefined || v===null || v==='') return;
+      const n = parseInt(v,10);
+      if(n>=5) topAll.push(c.label);
+      else if(n<=2) lowAll.push(c.label);
+    });
+  });
+  let msg = firstName+', ';
+  if(topAll.length){
+    msg += 'continua a destacar-te em '+topAll.slice(0,2).join(' e ')+' — é notado e faz a diferença para os clientes. ';
+  } else {
+    msg += 'o teu trabalho este mês foi sólido. ';
+  }
+  if(lowAll.length){
+    msg += 'O foco para o próximo período é '+lowAll.slice(0,2).join(' e ')+' — com um pouco de atenção aí, o próximo relatório vai refletir essa evolução.';
+  } else {
+    msg += 'Mantém este nível e continua a procurar formas de te superares.';
+  }
+  return msg;
+}
+
 document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   const sel = document.getElementById('relFichaTefSelect');
   if(!sel.value){ alert('Escolhe um TEF.'); return; }
@@ -6992,21 +7023,8 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   paragraph('Horas neste mês: '+fmtHours(atrib.horas)+' h   ·   Valor estimado: '+(info.status==='estagiario' ? 'não remunerado' : fmtEUR(atrib.valor)));
   y += 4;
 
-  // 2. Avaliação
-  heading('2. Avaliação');
-  const latest = getLatestEvalPerTecnico()[name];
-  if(!latest){
-    paragraph('Sem avaliação registada.');
-  } else {
-    const total = computeWeightedTotal(latest.scores);
-    const cls = classifyAvalScore(total);
-    paragraph('Última avaliação: '+fmtDatePT(latest.date)+'   ·   Pontuação: '+total+'/100   ·   Classificação: '+cls.label);
-    if(latest.plano) paragraph('Plano de melhoria: '+latest.plano);
-  }
-  y += 4;
-
-  // 3. Clientes por Turno
-  heading('3. Clientes por Turno / Ocupação de Sala');
+  // 2. Clientes por Turno
+  heading('2. Clientes por Turno / Ocupação de Sala');
   const ce = rel.clientes[name] || {};
   paragraph('Clientes atendidos: '+(ce.clientes||'—'));
   paragraph('Turno com maior frequência: '+(ce.turnoMaisFreq||'—'));
@@ -7014,22 +7032,22 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   if(ce.obs) paragraph('Observações: '+ce.obs);
   y += 4;
 
-  // 4. Treinos Vendidos
-  heading('4. Treinos Vendidos');
+  // 3. Treinos PT
+  heading('3. Treinos PT');
   const pt = (PT_COUNTS[monthKey] && PT_COUNTS[monthKey][name]) || {};
   const internos = pt.internos||0, externos = pt.externos||0;
   paragraph('Internos: '+internos+'   ·   Externos: '+externos+'   ·   Total: '+(internos+externos));
   y += 4;
 
-  // 5. Tarefas Realizadas
-  heading('5. Tarefas Realizadas');
+  // 4. Tarefas Realizadas
+  heading('4. Tarefas Realizadas');
   table(['Marcar 1ª Aval.','1ª Aval. Física','Marcar Reaval.','Reaval. Física','Treino Integr.','Prescrição'],
     [[pt.marcar_avaliacao_fisica||0, pt.avaliacao_fisica||0, pt.marcar_reavaliacao_fisica||0, pt.reavaliacao_fisica||0, pt.treino_integracao||0, pt.prescricao||0]],
     [tW/6,tW/6,tW/6,tW/6,tW/6,tW/6]);
   y += 6;
 
-  // 6. Tarefas em Atraso
-  heading('6. Tarefas em Atraso');
+  // 5. Tarefas em Atraso
+  heading('5. Tarefas em Atraso');
   const detalheAtraso = pt.tarefasAtrasoDetalhe || [];
   if(detalheAtraso.length===0){
     paragraph('Sem tarefas em atraso registadas.');
@@ -7040,8 +7058,8 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   }
   y += 4;
 
-  // 7. Outras Tarefas Pendentes
-  heading('7. Outras Tarefas Pendentes');
+  // 6. Outras Tarefas Pendentes
+  heading('6. Outras Tarefas Pendentes');
   const minhasAbertas = rel.abertas.filter(t=> t.responsavel===name);
   const remaining = minhasAbertas.filter(t=>!isTaskOverdue(t) && !isKnownTaskCategoria(t.tarefa));
   if(remaining.length===0){
@@ -7051,21 +7069,23 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   }
   y += 4;
 
-  // 8. Substituições
-  heading('8. Substituições Pagas pelo Titular');
+  // 7. Substituições
+  heading('7. Substituições');
   const minhasSubst = (typeof collectAllSubstitutions==='function' ? collectAllSubstitutions() : [])
     .filter(r=> r.iso.slice(0,7)===monthKey && (r.titular===name || r.substituto===name));
-  if(minhasSubst.length===0){
-    paragraph('Sem substituições deste tipo neste mês, como titular ou substituto.');
-  } else {
-    table(['Data','Turno','Titular','Substituto'],
-      minhasSubst.map(r=>[fmtDatePT(r.iso), r.start+'–'+r.end, r.titular, r.substituto]),
-      [tW*0.2,tW*0.2,tW*0.3,tW*0.3]);
-  }
+  const substGinasio = minhasSubst.filter(r=>!r.payTitular);
+  const substDireto = minhasSubst.filter(r=>r.payTitular);
+  paragraph('Pagas pelo Ginásio:');
+  if(substGinasio.length===0) paragraph('Nenhuma.');
+  else table(['Data','Turno','Titular','Substituto'], substGinasio.map(r=>[fmtDatePT(r.iso), r.start+'–'+r.end, r.titular, r.substituto]), [tW*0.2,tW*0.2,tW*0.3,tW*0.3]);
+  y += 3;
+  paragraph('Pagas Diretamente pelo TEF:');
+  if(substDireto.length===0) paragraph('Nenhuma.');
+  else table(['Data','Turno','Titular','Substituto'], substDireto.map(r=>[fmtDatePT(r.iso), r.start+'–'+r.end, r.titular, r.substituto]), [tW*0.2,tW*0.2,tW*0.3,tW*0.3]);
   y += 4;
 
-  // 9. Férias
-  heading('9. Férias Usadas Este Mês');
+  // 8. Férias
+  heading('8. Férias Usadas Este Mês');
   const feriasMes = Object.keys(FERIAS_DIAS[name] || {}).filter(iso=> iso.slice(0,7)===monthKey).sort();
   if(feriasMes.length===0){
     paragraph('Sem dias de férias registados este mês.');
@@ -7073,6 +7093,61 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
     const totalHoras = feriasMes.reduce((s,iso)=> s + (FERIAS_DIAS[name][iso]||0), 0);
     paragraph(feriasMes.length+' dia(s) de férias, '+fmtHours(totalHoras)+' h no total: '+feriasMes.map(fmtDatePT).join(', '));
   }
+  y += 4;
+
+  // 9. Avaliação (movida para o fim)
+  heading('9. Avaliação');
+  const evalsDoMes = AVALIACOES.filter(a=> a.tecnico===name && a.date && a.date.slice(0,7)===monthKey);
+  const latestDoMes = evalsDoMes.length ? evalsDoMes.reduce((a,b)=> a.date>b.date?a:b) : null;
+  const latestGeral = getLatestEvalPerTecnico()[name];
+  const scoresRef = latestDoMes || latestGeral;
+
+  paragraph('Última avaliação do mês:');
+  if(!latestDoMes){
+    paragraph('Sem avaliação registada neste mês.');
+  } else {
+    const total = computeWeightedTotal(latestDoMes.scores);
+    const cls = classifyAvalScore(total);
+    paragraph('Data: '+fmtDatePT(latestDoMes.date)+'   ·   Desempenho: '+total+'/100 — '+cls.label);
+    if(latestDoMes.plano) paragraph('Plano de melhoria: '+latestDoMes.plano);
+  }
+  y += 3;
+
+  paragraph('Notas Rápidas do período a avaliar:');
+  const notasDoMes = (QUICK_NOTES[name]||[]).filter(n=> n.data && n.data.slice(0,7)===monthKey);
+  if(notasDoMes.length===0){
+    paragraph('Sem notas rápidas registadas este mês.');
+  } else {
+    table(['Data','Tipo','Tópico','Subtópico','Nota'],
+      notasDoMes.map(n=>[fmtDatePT(n.data), n.tipo==='positivo'?'Positiva':'Negativa', n.grupo, n.criterio, n.nota]),
+      [tW*0.12,tW*0.1,tW*0.16,tW*0.17,tW*0.45]);
+  }
+  y += 3;
+
+  paragraph('Relatório de Desenvolvimento (por tópico):');
+  if(!scoresRef){
+    paragraph('Sem avaliação com critérios pontuados para gerar este relatório.');
+  } else {
+    EVAL_GROUPS.forEach(group=>{
+      const top = [], avg = [], low = [];
+      group.criteria.forEach(c=>{
+        const v = scoresRef.scores[c.key];
+        if(v===undefined || v===null || v==='') return;
+        const n = parseInt(v,10);
+        if(n>=5) top.push(c.label);
+        else if(n>=3) avg.push(c.label);
+        else low.push(c.label);
+      });
+      paragraph(group.name+':');
+      paragraph('  Top Performer: '+(top.length?top.join(', '):'—'));
+      paragraph('  Average Performer: '+(avg.length?avg.join(', '):'—'));
+      paragraph('  Low Performer (prioridade): '+(low.length?low.join(', '):'—'));
+    });
+  }
+  y += 3;
+
+  paragraph('Mensagem:');
+  paragraph(gerarMensagemMotivacional(name, scoresRef ? scoresRef.scores : null));
 
   doc.save('Ficha_'+name.replace(/\s+/g,'_')+'_'+monthKey+'.pdf');
 });
