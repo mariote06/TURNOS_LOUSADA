@@ -268,6 +268,13 @@
   .nota-item.negativo{border-left:4px solid var(--rust);}
   .nota-item-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
   .aval-crit-notas{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .candidate-interview{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
+  .interview-secao{margin-bottom:12px;}
+  .interview-secao-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:13px;}
+  .interview-perguntas{margin:0 0 6px;padding-left:18px;font-size:12.5px;color:var(--ink-soft);}
+  .interview-perguntas li{margin-bottom:2px;}
+  .interview-notas, .interview-notas-finais{width:100%;box-sizing:border-box;font:13px 'Inter';border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical;}
+  .interview-final{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
   .pt-rank-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
   .pt-rank-row:last-child{border-bottom:none;}
   .pt-rank-pos{font-weight:700;color:var(--ink-soft);width:22px;flex-shrink:0;}
@@ -4537,6 +4544,105 @@ function updateCandidateStatus(id, estado){
   if(c){ c.estado = estado; saveCandidates(CANDIDATES); renderCandidates(); }
 }
 
+/* ---------------------------------------------------------------
+   ENTREVISTA DE RECRUTAMENTO — guião estruturado por secções, com
+   notas e uma apreciação (1-5) por secção, mais recomendação final.
+--------------------------------------------------------------- */
+const INTERVIEW_TEMPLATE = [
+  {name:'Experiência e Formação', perguntas:[
+    'Que formação/certificações tens em exercício físico?',
+    'Fala-me da tua experiência anterior a treinar clientes (contexto, tipo de público).',
+    'Que metodologias de treino conheces e costumas usar?'
+  ]},
+  {name:'Comunicação e Relação com Clientes', perguntas:[
+    'Como te apresentarias a um cliente novo, no primeiro dia dele no ginásio?',
+    'Como lidarias com um cliente desmotivado ou resistente a mudar de exercício?',
+    'Dá um exemplo de uma vez em que tiveste de explicar algo tecnicamente difícil de forma simples.'
+  ]},
+  {name:'Disponibilidade e Compromisso', perguntas:[
+    'Qual é a tua disponibilidade de horário (manhãs, tardes, fins de semana)?',
+    'Estás disponível para fazer substituições pontuais a colegas?',
+    'Como é a tua deslocação até ao ginásio (distância, transporte)?'
+  ]},
+  {name:'Motivação e Fit Cultural', perguntas:[
+    'Porque queres trabalhar neste ginásio em concreto?',
+    'Onde te vês profissionalmente daqui a 2-3 anos?',
+    'Como costumas reagir a feedback ou críticas construtivas de um coordenador?'
+  ]},
+  {name:'Situações Práticas', perguntas:[
+    'Um cliente com uma lesão no ombro pede para fazer um exercício que sabes não ser aconselhado — o que fazes?',
+    'A sala está cheia e três clientes pedem a tua atenção ao mesmo tempo — como priorizas?',
+    'Um colega falta ao turno sem avisar — como reages?'
+  ]}
+];
+const RECOMENDACAO_OPTIONS = ['Contratar', 'Contratar com reservas', 'Não avançar'];
+
+function defaultEntrevista(){
+  const secoes = {};
+  INTERVIEW_TEMPLATE.forEach(s=>{ secoes[s.name] = {notas:'', rating:''}; });
+  return {secoes, recomendacao:'', notasFinais:''};
+}
+function getCandidateEntrevista(c){
+  if(!c.entrevista) c.entrevista = defaultEntrevista();
+  INTERVIEW_TEMPLATE.forEach(s=>{ if(!c.entrevista.secoes[s.name]) c.entrevista.secoes[s.name] = {notas:'', rating:''}; });
+  return c.entrevista;
+}
+function buildInterviewHtml(c){
+  const ent = getCandidateEntrevista(c);
+  const secoesHtml = INTERVIEW_TEMPLATE.map(s=>{
+    const val = ent.secoes[s.name];
+    let opts = '<option value="">Apreciação —</option>';
+    [1,2,3,4,5].forEach(n=>{ opts += '<option value="'+n+'" '+(String(val.rating)===String(n)?'selected':'')+'>'+n+'</option>'; });
+    return '<div class="interview-secao">'+
+      '<div class="interview-secao-head"><strong>'+s.name+'</strong>'+
+        '<select class="rel-input interview-rating" data-id="'+c.id+'" data-secao="'+encodeURIComponent(s.name)+'" style="width:auto;">'+opts+'</select>'+
+      '</div>'+
+      '<ul class="interview-perguntas">'+s.perguntas.map(p=>'<li>'+p+'</li>').join('')+'</ul>'+
+      '<textarea class="rel-input interview-notas" data-id="'+c.id+'" data-secao="'+encodeURIComponent(s.name)+'" rows="2" placeholder="Notas/respostas desta secção...">'+escapeAttr(val.notas)+'</textarea>'+
+    '</div>';
+  }).join('');
+  const recOpts = '<option value="">Recomendação —</option>'+RECOMENDACAO_OPTIONS.map(r=>'<option value="'+r+'" '+(ent.recomendacao===r?'selected':'')+'>'+r+'</option>').join('');
+  return secoesHtml+
+    '<div class="interview-final">'+
+      '<label>Recomendação final <select class="rel-input interview-recomendacao" data-id="'+c.id+'">'+recOpts+'</select></label>'+
+      '<textarea class="rel-input interview-notas-finais" data-id="'+c.id+'" rows="2" placeholder="Impressão geral / próximos passos...">'+escapeAttr(ent.notasFinais)+'</textarea>'+
+    '</div>';
+}
+function wireInterviewInputs(container){
+  container.querySelectorAll('.interview-rating').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const c = CANDIDATES.find(x=>x.id===e.target.dataset.id);
+      if(!c) return;
+      getCandidateEntrevista(c).secoes[decodeURIComponent(e.target.dataset.secao)].rating = e.target.value;
+      saveCandidates(CANDIDATES);
+    });
+  });
+  container.querySelectorAll('.interview-notas').forEach(ta=>{
+    ta.addEventListener('input', (e)=>{
+      const c = CANDIDATES.find(x=>x.id===e.target.dataset.id);
+      if(!c) return;
+      getCandidateEntrevista(c).secoes[decodeURIComponent(e.target.dataset.secao)].notas = e.target.value;
+      saveCandidates(CANDIDATES);
+    });
+  });
+  container.querySelectorAll('.interview-recomendacao').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const c = CANDIDATES.find(x=>x.id===e.target.dataset.id);
+      if(!c) return;
+      getCandidateEntrevista(c).recomendacao = e.target.value;
+      saveCandidates(CANDIDATES);
+    });
+  });
+  container.querySelectorAll('.interview-notas-finais').forEach(ta=>{
+    ta.addEventListener('input', (e)=>{
+      const c = CANDIDATES.find(x=>x.id===e.target.dataset.id);
+      if(!c) return;
+      getCandidateEntrevista(c).notasFinais = e.target.value;
+      saveCandidates(CANDIDATES);
+    });
+  });
+}
+
 function renderCandidates(){
   const container = document.getElementById('candidateCards');
   container.innerHTML = '';
@@ -4569,8 +4675,10 @@ function renderCandidates(){
         '<label class="btn ghost" style="cursor:pointer;">'+(c.cvFileName?'Substituir CV':'Carregar CV')+
           '<input type="file" class="cand-cv-input" data-id="'+c.id+'" style="display:none;">'+
         '</label>'+
+        '<button type="button" class="btn ghost cand-interview-toggle" data-id="'+c.id+'">🗣️ Entrevista de Recrutamento</button>'+
         '<button type="button" class="btn danger cand-delete-btn" data-id="'+c.id+'">Remover</button>'+
-      '</div>';
+      '</div>'+
+      '<div class="candidate-interview" id="interview-'+c.id+'" style="display:none;">'+buildInterviewHtml(c)+'</div>';
     container.appendChild(card);
   });
 
@@ -4589,6 +4697,13 @@ function renderCandidates(){
   container.querySelectorAll('.cand-delete-btn').forEach(btn=>{
     btn.addEventListener('click', (e)=> deleteCandidate(e.target.dataset.id));
   });
+  container.querySelectorAll('.cand-interview-toggle').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const panel = document.getElementById('interview-'+e.target.dataset.id);
+      if(panel) panel.style.display = panel.style.display==='none' ? '' : 'none';
+    });
+  });
+  wireInterviewInputs(container);
 }
 
 /* ---------------------------------------------------------------
