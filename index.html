@@ -267,6 +267,7 @@
   .nota-item.positivo{border-left:4px solid #2f6f4e;}
   .nota-item.negativo{border-left:4px solid var(--rust);}
   .nota-item-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
+  .aval-crit-notas{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
   .pt-rank-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
   .pt-rank-row:last-child{border-bottom:none;}
   .pt-rank-pos{font-weight:700;color:var(--ink-soft);width:22px;flex-shrink:0;}
@@ -3851,6 +3852,7 @@ let editingAvalId = null;
 function renderAvalGroups(scores){
   const el = document.getElementById('avalGroups');
   el.innerHTML = '';
+  const tecnicoAtual = document.getElementById('avalTecnico').value;
   EVAL_GROUPS.forEach(group=>{
     const wrap = document.createElement('div');
     wrap.className = 'aval-group';
@@ -3859,8 +3861,12 @@ function renderAvalGroups(scores){
       const val = (scores && scores[c.key]) || '';
       let opts = '<option value="">—</option>';
       [1,2,3,4,5].forEach(n=>{ opts += '<option value="'+n+'" '+(String(val)===String(n)?'selected':'')+'>'+n+'</option>'; });
+      const notas = (QUICK_NOTES[tecnicoAtual]||[]).filter(nt=> nt.grupo===group.name && nt.criterio===c.label);
+      const nPos = notas.filter(nt=>nt.tipo==='positivo').length;
+      const nNeg = notas.filter(nt=>nt.tipo==='negativo').length;
+      const tallyHtml = (nPos+nNeg)>0 ? '<div class="aval-crit-notas">👍 '+nPos+'  ·  👎 '+nNeg+'</div>' : '';
       rows += '<div class="aval-crit-row">'+
-        '<div class="aval-crit-text"><div class="aval-crit-label">'+c.label+'</div><div class="aval-crit-desc">'+c.desc+'</div></div>'+
+        '<div class="aval-crit-text"><div class="aval-crit-label">'+c.label+'</div><div class="aval-crit-desc">'+c.desc+'</div>'+tallyHtml+'</div>'+
         '<select class="aval-score-select" data-key="'+c.key+'">'+opts+'</select>'+
       '</div>';
     });
@@ -3969,6 +3975,9 @@ function renderAvalTab(){
   renderAvalHistory();
   renderNotasRapidas();
 }
+document.getElementById('avalTecnico').addEventListener('change', ()=>{
+  if(editingAvalId === null) renderAvalGroups({});
+});
 
 /* ---------------------------------------------------------------
    NOTAS RÁPIDAS — observações positivas/negativas por TEF, ligadas
