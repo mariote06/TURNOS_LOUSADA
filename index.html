@@ -846,6 +846,7 @@
         <select id="notaGrupoSelect" class="rel-input" style="max-width:230px;"></select>
         <select id="notaCriterioSelect" class="rel-input" style="max-width:230px;"></select>
       </div>
+      <select id="notaSugestaoSelect" class="rel-input" style="width:100%;margin-top:8px;"></select>
       <textarea id="notaTexto" placeholder="Escreve a nota (ex.: elogiou-a um cliente por uma explicação muito clara do exercício)..." rows="2" style="width:100%;margin-top:10px;font:14px 'Inter';border:1px solid var(--line);border-radius:8px;padding:8px 10px;box-sizing:border-box;resize:vertical;"></textarea>
       <button type="button" class="btn primary" id="notaGuardarBtn" style="margin-top:8px;">Guardar Nota</button>
       <div id="notaListaContainer" style="margin-top:16px;"></div>
@@ -4000,6 +4001,319 @@ function saveQuickNotes(n){ localStorage.setItem(STORE_QUICK_NOTES, JSON.stringi
 let QUICK_NOTES = loadQuickNotes();
 let notaTipoAtual = 'positivo';
 
+// Sugestões de texto por subtópico (chave = criterio.key em EVAL_GROUPS),
+// 4 positivas e 4 negativas cada — servem de ponto de partida rápido; o
+// texto escolhido fica na caixa para ser ajustado antes de guardar.
+const NOTA_SUGESTOES = {
+  historico_cliente: {
+    positivo: [
+      'Reviu o histórico antes do treino e ajustou por causa de uma lesão antiga no joelho.',
+      'Lembrou-se, sem consultar nada, de uma cirurgia recente ao ombro e adaptou logo os exercícios.',
+      'Perguntou ao cliente como tinha corrido a última sessão antes de avançar com o plano.',
+      'Detetou uma incoerência no histórico (alergia registada vs. suplemento sugerido) e alertou.'
+    ],
+    negativo: [
+      'Propôs um exercício contraindicado sem verificar o histórico do cliente.',
+      'Repetiu um exercício que já tinha causado dor na sessão anterior, sem verificar notas.',
+      'Não sabia identificar quais os clientes com restrições médicas na sua carteira.',
+      'Ignorou uma nota de lesão escrita no sistema e seguiu o plano padrão.'
+    ]
+  },
+  origem_prescricao: {
+    positivo: [
+      'Soube explicar exatamente porque o cliente tinha aquele plano (prescrição do PT) e seguiu-o à risca.',
+      'Identificou um cliente sem prescrição e encaminhou-o para marcar avaliação.',
+      'Confirmou com o PT uma dúvida sobre a prescrição antes de alterar o treino.',
+      'Sabia distinguir, cliente a cliente, se a prescrição era standard, de aulas de grupo ou externa.'
+    ],
+    negativo: [
+      'Não sabia dizer qual era a origem do plano de treino do cliente que estava a acompanhar.',
+      'Deixou um cliente sem prescrição treinar "à sua maneira" durante semanas sem sinalizar.',
+      'Alterou uma prescrição externa sem validar com quem a tinha definido.',
+      'Confundiu a prescrição de dois clientes com nomes parecidos.'
+    ]
+  },
+  variaveis_treino: {
+    positivo: [
+      'Geriu bem o descanso entre séries, ajustando conforme a fadiga visível do cliente.',
+      'Reduziu a intensidade de forma proativa quando percebeu sinais de sobrecarga.',
+      'Ajustou a carga de um cliente com boa evolução, sem esperar que fosse pedido.',
+      'Soube explicar ao cliente porque estava a variar o volume de treino esse mês.'
+    ],
+    negativo: [
+      'Não ajustou o volume de treino mesmo com o cliente a queixar-se de fadiga excessiva.',
+      'Usa sempre a mesma carga e intensidade independentemente do cliente.',
+      'Não soube justificar porque escolheu aquela frequência de treino semanal.',
+      'Deixou o cliente treinar exausto sem ajustar nada na sessão.'
+    ]
+  },
+  metodologias: {
+    positivo: [
+      'Introduziu um circuito novo para variar a rotina de um cliente há meses no mesmo plano.',
+      'Explicou a um cliente a diferença entre super série e drop set de forma clara.',
+      'Usou tri-set com um cliente mais avançado para otimizar o tempo de treino.',
+      'Sugeriu uma metodologia diferente quando notou que o cliente estava desmotivado com a rotina.'
+    ],
+    negativo: [
+      'Usa sempre o mesmo tipo de treino com todos os clientes, sem variar metodologia.',
+      'Não conhece metodologias além do treino tradicional em séries.',
+      'Tentou aplicar um circuito mas fez a montagem de forma confusa e ineficiente.',
+      'Não soube responder quando um cliente perguntou porque estava a fazer aquele tipo de treino.'
+    ]
+  },
+  progressoes: {
+    positivo: [
+      'Fez a progressão de carga de forma gradual e bem documentada ao longo do mês.',
+      'Avançou a dificuldade de um exercício assim que o cliente mostrou domínio da técnica.',
+      'Ajustou a progressão de um cliente que regressou de lesão, com cautela.',
+      'Registou os avanços de carga em cada sessão para acompanhar a evolução.'
+    ],
+    negativo: [
+      'Manteve as mesmas cargas há 2 meses sem qualquer progressão visível.',
+      'Avançou a carga depressa demais, sem respeitar a evolução do cliente, e causou dor.',
+      'Não sabia dizer há quanto tempo o cliente estava na mesma fase de treino.',
+      'Regrediu a carga sem motivo aparente, sem explicar ao cliente porquê.'
+    ]
+  },
+  empatia: {
+    positivo: [
+      'Percebeu que um cliente estava desanimado e ajustou o tom da sessão, dando mais apoio.',
+      'Parou para ouvir um cliente que estava a passar por um problema pessoal.',
+      'Adaptou a linguagem para um cliente mais idoso, com mais paciência e clareza.',
+      'Notou o desconforto de um cliente novo e tranquilizou-o antes de começar.'
+    ],
+    negativo: [
+      'Foi seco com um cliente iniciante que estava claramente inseguro.',
+      'Ignorou um cliente que parecia frustrado com a falta de resultados.',
+      'Respondeu de forma indiferente a uma queixa de dor de um cliente.',
+      'Não ajustou a abordagem a um cliente visivelmente ansioso com o treino.'
+    ]
+  },
+  energia_motivacao: {
+    positivo: [
+      'Motivou visivelmente um cliente a terminar a última série com energia positiva.',
+      'Manteve o entusiasmo mesmo num turno com a sala cheia e exigente.',
+      'Celebrou com um cliente uma marca pessoal batida naquele dia.',
+      'Contagiou a sala com boa energia numa sessão em grupo.'
+    ],
+    negativo: [
+      'Transmitiu desânimo durante o turno, e isso notou-se no ambiente da sala.',
+      'Ficou apático mesmo quando um cliente pediu mais incentivo.',
+      'Não reagiu quando um cliente desistiu a meio de uma série sem tentar motivá-lo.',
+      'Parecia sem energia logo no início do turno, afetando o ambiente geral.'
+    ]
+  },
+  clareza: {
+    positivo: [
+      'Explicou um exercício técnico com uma analogia simples que o cliente percebeu logo.',
+      'Usou o espelho para mostrar visualmente o erro de postura a corrigir.',
+      'Confirmou com o cliente se tinha percebido bem antes de o deixar sozinho.',
+      'Simplificou a explicação de um circuito complexo para um cliente iniciante.'
+    ],
+    negativo: [
+      'Um cliente queixou-se de não perceber a explicação de um exercício novo.',
+      'Usou termos técnicos demais com um cliente sem experiência.',
+      'Explicou um exercício de forma apressada e o cliente fez mal a técnica.',
+      'Não confirmou se o cliente tinha percebido a instrução antes de avançar.'
+    ]
+  },
+  relacao_confianca: {
+    positivo: [
+      'Um cliente elogiou especificamente a confiança que sente ao treinar com ele.',
+      'Lembrou-se de um detalhe pessoal que o cliente tinha partilhado, criando proximidade.',
+      'Um cliente pediu para ser sempre acompanhado por ele nos turnos seguintes.',
+      'Criou à-vontade suficiente para um cliente relatar uma dificuldade que escondia antes.'
+    ],
+    negativo: [
+      'Um cliente pediu para mudar de TEF por falta de à-vontade.',
+      'Mantém sempre uma distância fria com os clientes, sem criar proximidade.',
+      'Um cliente comentou não se sentir ouvido nas suas preocupações.',
+      'Não constrói relação nenhuma com clientes novos, tratando-os de forma genérica.'
+    ]
+  },
+  presente: {
+    positivo: [
+      'Esteve sempre atento à sala, mesmo com vários clientes em simultâneo.',
+      'Não se distraiu com o telemóvel durante todo o turno.',
+      'Notou logo quando um cliente chegou e cumprimentou-o de imediato.',
+      'Manteve o foco na sala mesmo num turno mais parado, sem se dispersar.'
+    ],
+    negativo: [
+      'Esteve distraído no telemóvel durante parte do turno, com clientes à espera.',
+      'Demorou a notar que um cliente precisava de ajuda com o equipamento.',
+      'Pareceu ausente, a pensar noutra coisa, durante várias sessões.',
+      'Deixou a sala sem supervisão por período longo sem justificação.'
+    ]
+  },
+  compromisso: {
+    positivo: [
+      'Lembrou o objetivo específico de um cliente (perda de peso) e ajustou o treino em função disso.',
+      'Fez questão de perguntar como estava a correr a dieta associada ao objetivo do cliente.',
+      'Ajustou o plano quando percebeu que o objetivo do cliente tinha mudado.',
+      'Relacionou cada exercício com o objetivo final que o cliente lhe tinha dito.'
+    ],
+    negativo: [
+      'Não sabia qual era o objetivo principal de um cliente que acompanha há meses.',
+      'Deu o mesmo treino genérico a clientes com objetivos completamente diferentes.',
+      'Esqueceu-se do objetivo combinado com o cliente na sessão anterior.',
+      'Não relacionou o treino com nenhum objetivo concreto do cliente.'
+    ]
+  },
+  observacao_ajuste: {
+    positivo: [
+      'Corrigiu a postura de um cliente em tempo real, antes de causar lesão.',
+      'Ajustou o peso a meio da série ao notar que estava desadequado.',
+      'Reparou numa assimetria de movimento e adaptou o exercício.',
+      'Interveio de imediato quando viu um cliente a compensar mal um exercício.'
+    ],
+    negativo: [
+      'Não corrigiu uma postura claramente errada durante toda a sessão.',
+      'Só reparou num erro técnico quando o cliente já se queixava de dor.',
+      'Não fez qualquer ajuste mesmo com o cliente visivelmente a lutar com o peso.',
+      'Ignorou sinais claros de cansaço excessivo de um cliente.'
+    ]
+  },
+  feedback: {
+    positivo: [
+      'Fez um ponto de situação com um cliente sobre a evolução do último mês.',
+      'Mostrou ao cliente os números de progressão de carga acumulados.',
+      'Deu feedback construtivo sobre a técnica no final da sessão.',
+      'Planeou com o cliente os próximos passos do treino a médio prazo.'
+    ],
+    negativo: [
+      'Nunca fez um ponto de situação com os clientes sobre a evolução deles.',
+      'Não dá qualquer feedback no final das sessões.',
+      'Um cliente não sabia dizer se estava ou não a evoluir.',
+      'Não tem qualquer planeamento a médio prazo para os seus clientes.'
+    ]
+  },
+  gestao_multiplos: {
+    positivo: [
+      'Geriu bem 3 clientes em simultâneo sem nenhum ficar muito tempo parado.',
+      'Priorizou corretamente o cliente com mais dificuldade num momento de sala cheia.',
+      'Organizou os exercícios para intercalar bem entre vários clientes ao mesmo tempo.',
+      'Manteve todos os clientes ativos mesmo num turno com muita gente.'
+    ],
+    negativo: [
+      'Deixou um cliente vários minutos parado enquanto se dedicava só a outro.',
+      'Perdeu-se na gestão da sala quando esta ficou mais cheia do que o habitual.',
+      'Não conseguiu dar atenção a mais do que um cliente de cada vez.',
+      'Ignorou um cliente que claramente precisava de ajuda por estar ocupado com outro.'
+    ]
+  },
+  manutencao_espaco: {
+    positivo: [
+      'Reportou de imediato uma máquina avariada, evitando que alguém se magoasse.',
+      'Ensinou um cliente novo a usar corretamente uma máquina antes de a deixar sozinho.',
+      'Manteve a sala organizada e limpa durante todo o turno.',
+      'Identificou um risco de segurança (cabo solto) e resolveu antes de haver incidente.'
+    ],
+    negativo: [
+      'Deixou pesos espalhados no chão no final do turno, sem arrumar.',
+      'Não reportou uma avaria de equipamento que já conhecia.',
+      'Deixou um cliente usar mal uma máquina sem corrigir.',
+      'Ignorou um risco de segurança visível na sala durante o turno.'
+    ]
+  },
+  aparencia: {
+    positivo: [
+      'Está sempre fardado e apresentável, mesmo em turnos de manhã cedo.',
+      'Cuidou da farda e imagem mesmo num turno de fim de semana.',
+      'Usa sempre o equipamento identificativo correto (crachá/farda).',
+      'Mantém uma aparência profissional consistente em todos os turnos.'
+    ],
+    negativo: [
+      'Apresentou-se sem farda em mais do que uma ocasião.',
+      'Foi trabalhar com roupa desadequada para o ambiente de ginásio.',
+      'Não usa identificação, dificultando aos clientes saber quem é o TEF.',
+      'Tem uma aparência descuidada que já foi notada por clientes.'
+    ]
+  },
+  pontualidade: {
+    positivo: [
+      'Nunca chegou atrasado este mês e avisou com antecedência numa falta.',
+      'Chegou sempre com tempo para preparar a sala antes do turno começar.',
+      'Avisou com vários dias de antecedência sobre uma ausência prevista.',
+      'Tem um histórico impecável de assiduidade este trimestre.'
+    ],
+    negativo: [
+      'Chegou atrasado ao turno sem avisar previamente.',
+      'Faltou sem justificação, deixando a sala descoberta.',
+      'Avisa sempre em cima da hora quando vai faltar.',
+      'Tem tido atrasos recorrentes no início dos turnos.'
+    ]
+  },
+  trabalho_equipa: {
+    positivo: [
+      'Comunica sempre bem na passagem de turno, deixando tudo explicado.',
+      'Disponibilizou-se de imediato para cobrir uma substituição a um colega.',
+      'Ajudou um colega novo a integrar-se na dinâmica da sala.',
+      'Resolveu com um colega uma sobreposição de horário de forma tranquila.'
+    ],
+    negativo: [
+      'Não avisou os colegas de uma alteração no turno, o que gerou confusão.',
+      'Recusa-se sistematicamente a fazer substituições aos colegas.',
+      'Teve um conflito com um colega que afetou o ambiente da equipa.',
+      'Não passa informação relevante na mudança de turno.'
+    ]
+  },
+  iniciativa: {
+    positivo: [
+      'Propôs sozinho uma melhoria na organização dos equipamentos da sala.',
+      'Resolveu um imprevisto (falta de um colega) sem esperar por instruções.',
+      'Sugeriu uma alteração ao horário que melhorou a cobertura da sala.',
+      'Tomou uma decisão acertada perante uma situação inesperada com um cliente.'
+    ],
+    negativo: [
+      'Fica parado à espera de instruções mesmo perante problemas simples.',
+      'Não propôs nenhuma melhoria ao funcionamento da sala em meses.',
+      'Perante um imprevisto, não soube reagir e teve de ser ajudado.',
+      'Evita assumir responsabilidade quando surge um problema.'
+    ]
+  },
+  formacao_continua: {
+    positivo: [
+      'Procurou formação por iniciativa própria e partilhou o que aprendeu com a equipa.',
+      'Aplicou no dia a dia uma técnica nova aprendida recentemente.',
+      'Mostrou interesse em se inscrever numa formação disponibilizada pelo ginásio.',
+      'Está sempre a par de tendências novas em treino e traz isso para a sala.'
+    ],
+    negativo: [
+      'Não mostra interesse em aprender novas metodologias ou participar em formações.',
+      'Recusou uma oportunidade de formação oferecida pelo ginásio.',
+      'Continua a usar métodos desatualizados sem procurar evoluir.',
+      'Nunca partilha conhecimento novo com a equipa.'
+    ]
+  }
+};
+
+function findSelectedCriterio(){
+  const grupoName = decodeURIComponent(document.getElementById('notaGrupoSelect').value||'');
+  const grupo = EVAL_GROUPS.find(g=>g.name===grupoName);
+  if(!grupo) return null;
+  const critLabel = decodeURIComponent(document.getElementById('notaCriterioSelect').value||'');
+  return grupo.criteria.find(c=>c.label===critLabel) || null;
+}
+function populateNotaSugestoes(){
+  const sel = document.getElementById('notaSugestaoSelect');
+  const criterio = findSelectedCriterio();
+  const lista = criterio && NOTA_SUGESTOES[criterio.key] ? (NOTA_SUGESTOES[criterio.key][notaTipoAtual]||[]) : [];
+  if(lista.length===0){
+    sel.innerHTML = '<option value="">Sem sugestões para este subtópico</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">💡 Escolher uma sugestão (dá para ajustar depois)...</option>'+
+    lista.map((t,i)=>'<option value="'+i+'">'+t+'</option>').join('');
+}
+document.getElementById('notaSugestaoSelect').addEventListener('change', (e)=>{
+  if(e.target.value==='') return;
+  const criterio = findSelectedCriterio();
+  if(!criterio || !NOTA_SUGESTOES[criterio.key]) return;
+  const lista = NOTA_SUGESTOES[criterio.key][notaTipoAtual] || [];
+  const idx = parseInt(e.target.value,10);
+  if(lista[idx]) document.getElementById('notaTexto').value = lista[idx];
+});
+
 function populateNotaSelects(){
   const tecSel = document.getElementById('notaTecnicoSelect');
   const prevTec = tecSel.value;
@@ -4019,13 +4333,16 @@ function populateNotaCriterioSelect(){
   const grupoName = decodeURIComponent(grupoSel.value||'');
   const grupo = EVAL_GROUPS.find(g=>g.name===grupoName) || EVAL_GROUPS[0];
   critSel.innerHTML = grupo.criteria.map(c=>'<option value="'+encodeURIComponent(c.label)+'">'+c.label+'</option>').join('');
+  populateNotaSugestoes();
 }
 document.getElementById('notaGrupoSelect').addEventListener('change', populateNotaCriterioSelect);
+document.getElementById('notaCriterioSelect').addEventListener('change', populateNotaSugestoes);
 
 function setNotaTipo(tipo){
   notaTipoAtual = tipo;
   document.getElementById('notaTipoPositivo').classList.toggle('active', tipo==='positivo');
   document.getElementById('notaTipoNegativo').classList.toggle('active', tipo==='negativo');
+  populateNotaSugestoes();
 }
 document.getElementById('notaTipoPositivo').addEventListener('click', ()=> setNotaTipo('positivo'));
 document.getElementById('notaTipoNegativo').addEventListener('click', ()=> setNotaTipo('negativo'));
