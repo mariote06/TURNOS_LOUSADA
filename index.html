@@ -268,6 +268,13 @@
   .nota-item.negativo{border-left:4px solid var(--rust);}
   .nota-item-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
   .aval-crit-notas{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .briefing-secao{margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--line);}
+  .briefing-secao:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+  .briefing-secao h5{margin:0 0 6px;font-size:13px;color:var(--accent);}
+  .briefing-prompt{font-size:12px;color:var(--ink-soft);font-style:italic;margin:6px 0 0;}
+  .briefing-list{margin:4px 0 0;padding-left:18px;font-size:13px;}
+  .briefing-list li{margin-bottom:2px;}
+  .briefing-empty{font-size:12.5px;color:var(--ink-soft);font-style:italic;margin:4px 0 0;}
   .candidate-interview{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
   .interview-secao{margin-bottom:12px;}
   .interview-secao-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:13px;}
@@ -850,6 +857,18 @@
       <textarea id="notaTexto" placeholder="Escreve a nota (ex.: elogiou-a um cliente por uma explicação muito clara do exercício)..." rows="2" style="width:100%;margin-top:10px;font:14px 'Inter';border:1px solid var(--line);border-radius:8px;padding:8px 10px;box-sizing:border-box;resize:vertical;"></textarea>
       <button type="button" class="btn primary" id="notaGuardarBtn" style="margin-top:8px;">Guardar Nota</button>
       <div id="notaListaContainer" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+      <h4 style="margin:0 0 10px;font-size:13.5px;">🗒️ Briefing da Avaliação</h4>
+      <p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">
+        Guião para a conversa de avaliação com o TEF — resultado geral, pontos fortes, áreas a desenvolver e notas do período, prontos a seguir na reunião.
+      </p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select id="briefingTecnicoSelect" class="rel-input" style="max-width:220px;"></select>
+        <button type="button" class="btn ghost" id="briefingGerarBtn">Gerar Briefing</button>
+      </div>
+      <div id="briefingContainer" style="margin-top:14px;"></div>
     </div>
 
     <div class="panel" style="padding:16px 18px;">
@@ -3982,6 +4001,7 @@ function renderAvalTab(){
   if(editingAvalId === null) renderAvalGroups({});
   renderAvalHistory();
   renderNotasRapidas();
+  populateBriefingTecnicoSelect();
 }
 document.getElementById('avalTecnico').addEventListener('change', ()=>{
   if(editingAvalId === null) renderAvalGroups({});
@@ -4395,6 +4415,78 @@ function renderNotasRapidas(){
   setNotaTipo(notaTipoAtual);
   renderNotaLista();
 }
+
+/* ---------------------------------------------------------------
+   BRIEFING DA AVALIAÇÃO — guião/agenda para a conversa de avaliação
+   com o TEF: resultado geral, pontos fortes, áreas a desenvolver e
+   notas rápidas do período, gerado a partir dos dados já existentes.
+--------------------------------------------------------------- */
+function populateBriefingTecnicoSelect(){
+  const sel = document.getElementById('briefingTecnicoSelect');
+  const prev = sel.value;
+  const names = relTecNames();
+  sel.innerHTML = names.map(n=>'<option value="'+encodeURIComponent(n)+'">'+n+'</option>').join('');
+  if(prev && names.includes(decodeURIComponent(prev))) sel.value = prev;
+}
+function gerarBriefingHtml(name){
+  const monthKey = relMonthKey();
+  const evalsDoMes = AVALIACOES.filter(a=> a.tecnico===name && a.date && a.date.slice(0,7)===monthKey);
+  const latestDoMes = evalsDoMes.length ? evalsDoMes.reduce((a,b)=> a.date>b.date?a:b) : null;
+  const latestGeral = getLatestEvalPerTecnico()[name];
+  const scoresRef = latestDoMes || latestGeral;
+  const notasDoMes = (QUICK_NOTES[name]||[]).filter(n=> n.data && n.data.slice(0,7)===monthKey);
+
+  const topAll = [], lowAll = [];
+  if(scoresRef){
+    EVAL_GROUPS.forEach(group=>{
+      group.criteria.forEach(c=>{
+        const v = scoresRef.scores[c.key];
+        if(v===undefined || v===null || v==='') return;
+        const n = parseInt(v,10);
+        if(n>=5) topAll.push(group.name+' — '+c.label);
+        else if(n<=2) lowAll.push(group.name+' — '+c.label);
+      });
+    });
+  }
+
+  let scoreLine = 'Sem avaliação pontuada disponível.';
+  if(scoresRef){
+    const total = computeWeightedTotal(scoresRef.scores);
+    const cls = classifyAvalScore(total);
+    scoreLine = total+'/100 — '+cls.label+' (avaliação de '+fmtDatePT(scoresRef.date)+')';
+  }
+
+  const notasHtml = notasDoMes.length
+    ? '<ul class="briefing-list">'+notasDoMes.map(n=> '<li>'+(n.tipo==='positivo'?'👍':'👎')+' '+escapeAttr(n.grupo)+' — '+escapeAttr(n.criterio)+': '+escapeAttr(n.nota)+'</li>').join('')+'</ul>'
+    : '<p class="briefing-empty">Sem notas rápidas registadas este mês.</p>';
+
+  const mensagem = gerarMensagemMotivacional(name, scoresRef ? scoresRef.scores : null);
+  const firstName = name.split(' ')[0];
+
+  return ''+
+    '<div class="briefing-secao"><h5>1. Abertura</h5>'+
+      '<p class="briefing-prompt">Contextualiza o período avaliado ('+monthKey+') e agradece a disponibilidade do/a '+firstName+' para esta conversa.</p></div>'+
+    '<div class="briefing-secao"><h5>2. Resultado Geral</h5>'+
+      '<p><strong>'+scoreLine+'</strong></p>'+
+      '<p class="briefing-prompt">Partilha esta pontuação geral e explica, se fizer sentido, como foi calculada (peso de cada grupo de critérios).</p></div>'+
+    '<div class="briefing-secao"><h5>3. Pontos Fortes a Destacar</h5>'+
+      (topAll.length ? '<ul class="briefing-list">'+topAll.map(t=>'<li>'+t+'</li>').join('')+'</ul>' : '<p class="briefing-empty">Sem critérios Top Performer identificados nesta avaliação.</p>')+
+      '<p class="briefing-prompt">Reconhece estes comportamentos com exemplos concretos do dia a dia.</p></div>'+
+    '<div class="briefing-secao"><h5>4. Áreas a Desenvolver (prioridade)</h5>'+
+      (lowAll.length ? '<ul class="briefing-list">'+lowAll.map(t=>'<li>'+t+'</li>').join('')+'</ul>' : '<p class="briefing-empty">Sem critérios Low Performer identificados nesta avaliação.</p>')+
+      '<p class="briefing-prompt">Aborda estas áreas com exemplos concretos e sem julgamento — foca-te em como melhorar.</p></div>'+
+    '<div class="briefing-secao"><h5>5. Notas Rápidas do Período</h5>'+notasHtml+
+      '<p class="briefing-prompt">Usa estas notas como exemplos concretos de comportamentos observados.</p></div>'+
+    '<div class="briefing-secao"><h5>6. Mensagem e Fecho</h5>'+
+      '<p><em>'+escapeAttr(mensagem)+'</em></p>'+
+      '<p class="briefing-prompt">Define em conjunto 1-2 objetivos claros para o próximo período e pergunta se há dúvidas ou preocupações.</p></div>';
+}
+document.getElementById('briefingGerarBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('briefingTecnicoSelect');
+  if(!sel.value){ alert('Escolhe um técnico.'); return; }
+  const name = decodeURIComponent(sel.value);
+  document.getElementById('briefingContainer').innerHTML = gerarBriefingHtml(name);
+});
 
 document.getElementById('btnSaveAval').addEventListener('click', ()=>{
   const tecnico = document.getElementById('avalTecnico').value;
