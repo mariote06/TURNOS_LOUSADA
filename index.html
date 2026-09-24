@@ -8031,11 +8031,16 @@ document.addEventListener('visibilitychange', ()=>{
 });
 
 // Sincronização quase em tempo real: sem servidor próprio não há "instantâneo" verdadeiro,
-// mas verificando o ficheiro ligado a cada poucos segundos (só enquanto a aba está visível),
+// mas verificando o ficheiro ligado a cada dezenas de segundos (só enquanto a aba está visível),
 // as alterações feitas noutro dispositivo aparecem sozinhas, sem precisares de clicar em nada.
+// O intervalo tem um "jitter" aleatório por sessão (45-75s) para que dois aparelhos abertos ao
+// mesmo tempo não façam a verificação exatamente no mesmo segundo — isso reduz a hipótese de
+// ambos tentarem escrever no ficheiro no mesmo instante (o que o OneDrive não consegue
+// reconciliar, e resolve criando um ficheiro novo/duplicado).
+const SYNC_POLL_INTERVAL_MS = 45000 + Math.floor(Math.random()*30000);
 setInterval(()=>{
   if(document.visibilityState === 'visible' && linkedFileHandle) syncFromLinkedFile(true);
-}, 15000);
+}, SYNC_POLL_INTERVAL_MS);
 
 restoreLinkedHandle();
 
