@@ -8102,6 +8102,7 @@ function buildExportPayload(){
     pesosAvaliacao: GROUP_WEIGHTS,
     relatorios: RELATORIOS,
     acessos: ACESSOS,
+    notasRapidas: QUICK_NOTES,
     exportedAt: nowISO()
   };
 }
@@ -8127,6 +8128,7 @@ function applyImportedData(data){
   if(data.pesosAvaliacao){ GROUP_WEIGHTS = data.pesosAvaliacao; localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(GROUP_WEIGHTS)); }
   if(data.relatorios){ RELATORIOS = data.relatorios; localStorage.setItem(STORE_RELATORIO, JSON.stringify(RELATORIOS)); }
   if(data.acessos){ ACESSOS = data.acessos; localStorage.setItem(STORE_ACESSOS, JSON.stringify(ACESSOS)); }
+  if(data.notasRapidas){ QUICK_NOTES = data.notasRapidas; localStorage.setItem(STORE_QUICK_NOTES, JSON.stringify(QUICK_NOTES)); }
   saveMeta({updatedAt: data.exportedAt || nowISO()});
   renderCalendar();
   renderSubstitutionsList();
