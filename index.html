@@ -518,14 +518,16 @@
       <h1 class="brand">Turnos de Sala <small>Equipa de Técnicos de Exercício Físico · Set 2026 — Dez 2030</small></h1>
     </div>
     <div class="tabs" id="groupTabs">
-      <button class="tab-btn active" data-group="sala">Sala</button>
+      <button class="tab-btn active" data-group="inicio">Início</button>
+      <button class="tab-btn" data-group="sala">Sala</button>
       <button class="tab-btn" data-group="equipa">Equipa</button>
       <button class="tab-btn" data-group="gestao">Gestão</button>
     </div>
   </div>
 
   <div class="tabs sub-tabs" id="subTabs">
-    <button class="tab-btn active" data-tab="cal" data-owner="sala">Calendário</button>
+    <button class="tab-btn active" data-tab="inicio" data-owner="inicio">Início</button>
+    <button class="tab-btn" data-tab="cal" data-owner="sala" style="display:none;">Calendário</button>
     <button class="tab-btn" data-tab="feriados" data-owner="sala">Feriados</button>
     <button class="tab-btn" data-tab="substituicoes" data-owner="sala">Substituições</button>
     <button class="tab-btn" data-tab="ferias" data-owner="sala">Férias</button>
@@ -567,7 +569,48 @@
   </div>
 
   <!-- CALENDAR TAB -->
-  <div id="tab-cal">
+  <div id="tab-inicio">
+    <h3 style="font-size:15px;margin:0 0 10px;">📅 Turnos de Hoje</h3>
+    <div class="panel" id="inicioTurnosHoje" style="padding:14px 18px;margin-bottom:20px;"></div>
+
+    <h3 style="font-size:15px;margin:0 0 10px;">⚠️ A Precisar de Atenção</h3>
+    <div class="panel" id="inicioAtencao" style="padding:14px 18px;margin-bottom:20px;"></div>
+
+    <h3 style="font-size:15px;margin:0 0 10px;">📥 Carregar Ficheiros do Mês</h3>
+    <div class="panel" style="padding:14px 18px;margin-bottom:20px;">
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 12px;">
+        Os 3 ficheiros mensais, todos aqui. Usam o mês selecionado no separador Relatório: <strong id="inicioMesAtual"></strong>.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label class="btn ghost" style="cursor:pointer;display:inline-block;">📋 Carregar Excel de Tarefas
+            <input type="file" id="inicioTarefasFileInput" accept=".xlsx,.xls" style="display:none;">
+          </label>
+          <span id="inicioTarefasStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
+        </div>
+        <div>
+          <label class="btn ghost" style="cursor:pointer;display:inline-block;">🚪 Carregar PDF de Entradas/Saídas
+            <input type="file" id="inicioAcessosFileInput" accept="application/pdf" style="display:none;">
+          </label>
+          <span id="inicioAcessosStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
+        </div>
+        <div>
+          <label class="btn ghost" style="cursor:pointer;display:inline-block;">🧘 Carregar Excel de Reservas de Aulas
+            <input type="file" id="inicioAulasFileInput" accept=".xlsx,.xls" style="display:none;">
+          </label>
+          <span id="inicioAulasStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:0 0 10px;">📄 Fichas Individuais</h3>
+    <div class="panel" style="padding:14px 18px;">
+      <button type="button" class="btn primary" id="inicioGerarTodasFichasBtn">Gerar Todas as Fichas Individuais deste Mês</button>
+      <p id="inicioFichasStatus" style="color:var(--ink-soft);font-size:12px;margin:10px 0 0;">Gera um PDF por cada técnico com dados neste mês (podem aparecer vários pedidos de download, um por PDF).</p>
+    </div>
+  </div>
+
+  <div id="tab-cal" style="display:none;">
     <div class="monthbar">
       <div class="monthbar-left">
         <button class="nav-btn" id="prevMonth">‹</button>
@@ -5341,7 +5384,7 @@ document.getElementById('ptCountMonthNext').addEventListener('click', ()=>{
 document.getElementById('ptTarefasUploadBtn').addEventListener('click', ()=>{
   document.getElementById('ptTarefasFileInput').click();
 });
-document.getElementById('ptTarefasFileInput').addEventListener('change', async (e)=>{
+async function handlePtTarefasFile(e){
   const file = e.target.files[0];
   if(!file) return;
   const statusEl = document.getElementById('ptTarefasFileStatus');
@@ -5401,7 +5444,8 @@ document.getElementById('ptTarefasFileInput').addEventListener('change', async (
     statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
   }
   e.target.value = '';
-});
+}
+document.getElementById('ptTarefasFileInput').addEventListener('change', handlePtTarefasFile);
 
 /* ---------------------------------------------------------------
    SUBSTITUIÇÕES — lista e exporta para Excel todas as substituições
@@ -6043,7 +6087,7 @@ function clientsInTimeWindow(visits, fromHHMM, toHHMM){
 document.getElementById('acessosUploadBtn').addEventListener('click', ()=>{
   document.getElementById('acessosFileInput').click();
 });
-document.getElementById('acessosFileInput').addEventListener('change', async (e)=>{
+async function handleAcessosFile(e){
   const file = e.target.files[0];
   if(!file) return;
   const statusEl = document.getElementById('acessosFileStatus');
@@ -6085,7 +6129,8 @@ document.getElementById('acessosFileInput').addEventListener('change', async (e)
     statusEl.textContent = 'Erro ao processar o PDF: '+(err && err.message ? err.message : err);
   }
   e.target.value = '';
-});
+}
+document.getElementById('acessosFileInput').addEventListener('change', handleAcessosFile);
 
 // Resumo, rankings e filtros das reservas de aulas importadas, por mês —
 // independente de já haver ou não um PDF de Entradas/Saídas desse mês.
@@ -6220,7 +6265,7 @@ function fillAulaBufferInputs(){
 document.getElementById('aulasUploadBtn').addEventListener('click', ()=>{
   document.getElementById('aulasFileInput').click();
 });
-document.getElementById('aulasFileInput').addEventListener('change', async (e)=>{
+async function handleAulasFile(e){
   const file = e.target.files[0];
   if(!file) return;
   const statusEl = document.getElementById('aulasFileStatus');
@@ -6254,7 +6299,8 @@ document.getElementById('aulasFileInput').addEventListener('change', async (e)=>
     statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
   }
   e.target.value = '';
-});
+}
+document.getElementById('aulasFileInput').addEventListener('change', handleAulasFile);
 
 /* ---------------------------------------------------------------
    RELATÓRIO MENSAL — clientes por turno, tarefas realizadas e
@@ -6874,7 +6920,7 @@ function renderRelCanceladasList(rel){
 document.getElementById('relTarefasUploadBtn').addEventListener('click', ()=>{
   document.getElementById('relTarefasFileInput').click();
 });
-document.getElementById('relTarefasFileInput').addEventListener('change', async (e)=>{
+async function handleRelTarefasFile(e){
   const file = e.target.files[0];
   if(!file) return;
   const statusEl = document.getElementById('relTarefasFileStatus');
@@ -6939,7 +6985,8 @@ document.getElementById('relTarefasFileInput').addEventListener('change', async 
     statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
   }
   e.target.value = '';
-});
+}
+document.getElementById('relTarefasFileInput').addEventListener('change', handleRelTarefasFile);
 
 function renderRelPrintsList(rel){
   const container = document.getElementById('relPrintsList');
@@ -7372,10 +7419,7 @@ function gerarMensagemMotivacional(name, scores){
   return msg;
 }
 
-document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
-  const sel = document.getElementById('relFichaTefSelect');
-  if(!sel.value){ alert('Escolhe um TEF.'); return; }
-  const name = decodeURIComponent(sel.value);
+function gerarFichaTefPdf(name){
   const jspdfLib = window.jspdf;
   if(!jspdfLib){ alert('Não foi possível carregar a biblioteca de PDF (precisas de estar online da primeira vez que exportas).'); return; }
   const { jsPDF } = jspdfLib;
@@ -7559,6 +7603,128 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
   paragraph(gerarMensagemMotivacional(name, scoresRef ? scoresRef.scores : null));
 
   doc.save('Ficha_'+name.replace(/\s+/g,'_')+'_'+monthKey+'.pdf');
+}
+document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('relFichaTefSelect');
+  if(!sel.value){ alert('Escolhe um TEF.'); return; }
+  gerarFichaTefPdf(decodeURIComponent(sel.value));
+});
+
+/* ---------------------------------------------------------------
+   INÍCIO — painel do dia a dia: turnos de hoje, alertas (tarefas em
+   atraso, avaliações em atraso), upload consolidado dos 3 ficheiros
+   mensais (reutilizando os handlers já existentes, sem duplicar
+   lógica), e geração em lote das Fichas Individuais do mês.
+--------------------------------------------------------------- */
+function renderInicioTab(){
+  document.getElementById('inicioMesAtual').textContent = MONTH_NAMES[MONTH_LIST[relMonthIdx].month]+' '+MONTH_LIST[relMonthIdx].year;
+  renderInicioTurnosHoje();
+  renderInicioAtencao();
+}
+
+function renderInicioTurnosHoje(){
+  const container = document.getElementById('inicioTurnosHoje');
+  const today = new Date();
+  const iso = isoDate(today);
+  const dKey = dayKeyOf(today);
+  const shifts = shiftsForDate(iso, dKey);
+  if(shifts.length===0){
+    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Sem turnos registados hoje ('+fmtDatePT(iso)+').</p>';
+    return;
+  }
+  const linhas = shifts.slice().sort((a,b)=> a.start.localeCompare(b.start)).map(s=>{
+    const isSubst = s.substituteName && s.substituteName.trim();
+    const efetivo = isSubst ? s.substituteName.trim() : s.name;
+    const nota = isSubst ? ' <span style="color:var(--ink-soft);font-size:11.5px;">(substitui '+s.name+')</span>' : '';
+    return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);">'+
+      '<span>'+s.start+'–'+s.end+'</span><span><strong>'+efetivo+'</strong>'+nota+'</span></div>';
+  }).join('');
+  container.innerHTML = '<p style="margin:0 0 6px;color:var(--ink-soft);font-size:12px;">'+fmtDatePT(iso)+'</p>'+linhas;
+}
+
+function renderInicioAtencao(){
+  const container = document.getElementById('inicioAtencao');
+  const mKey = relMonthKey();
+  const partes = [];
+
+  const ptMes = PT_COUNTS[mKey] || {};
+  let totalAtraso = 0;
+  const porTef = [];
+  Object.keys(ptMes).forEach(name=>{
+    const n = ptMes[name].tarefas_atraso || 0;
+    if(n>0){ totalAtraso += n; porTef.push(name+' ('+n+')'); }
+  });
+  if(totalAtraso>0){
+    partes.push('<div style="margin-bottom:12px;"><strong>📋 '+totalAtraso+' tarefa(s) em atraso este mês</strong><br>'+
+      '<span style="color:var(--ink-soft);font-size:12px;">'+porTef.join(', ')+'</span></div>');
+  }
+
+  const LIMITE_DIAS = 60;
+  const hoje = new Date();
+  const latestPerTec = getLatestEvalPerTecnico();
+  const nomes = relTecNames();
+  const semAvaliacao = [], avaliacaoAntiga = [];
+  nomes.forEach(name=>{
+    const latest = latestPerTec[name];
+    if(!latest){ semAvaliacao.push(name); return; }
+    const diasDesde = Math.floor((hoje - new Date(latest.date)) / (1000*60*60*24));
+    if(diasDesde > LIMITE_DIAS) avaliacaoAntiga.push(name+' (há '+diasDesde+' dias)');
+  });
+  if(semAvaliacao.length>0 || avaliacaoAntiga.length>0){
+    let html = '<div><strong>🧑‍🏫 Avaliações em atraso</strong><br>';
+    if(semAvaliacao.length) html += '<span style="color:var(--ink-soft);font-size:12px;">Nunca avaliados: '+semAvaliacao.join(', ')+'</span><br>';
+    if(avaliacaoAntiga.length) html += '<span style="color:var(--ink-soft);font-size:12px;">Há mais de '+LIMITE_DIAS+' dias: '+avaliacaoAntiga.join(', ')+'</span>';
+    html += '</div>';
+    partes.push(html);
+  }
+
+  container.innerHTML = partes.length ? partes.join('') : '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Nada a assinalar de momento. 🎉</p>';
+}
+
+document.getElementById('inicioTarefasFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('inicioTarefasStatus');
+  statusEl.textContent = 'A processar '+file.name+'…';
+  await handlePtTarefasFile({target:{files:[file], value:''}});
+  await handleRelTarefasFile({target:{files:[file], value:''}});
+  statusEl.textContent = 'Atualizado em "Treinos PT / Tarefas" e em "Relatório".';
+  renderInicioAtencao();
+  e.target.value = '';
+});
+document.getElementById('inicioAcessosFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('inicioAcessosStatus');
+  statusEl.textContent = 'A processar '+file.name+'…';
+  await handleAcessosFile({target:{files:[file], value:''}});
+  statusEl.textContent = 'Entradas/Saídas atualizadas.';
+  e.target.value = '';
+});
+document.getElementById('inicioAulasFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('inicioAulasStatus');
+  statusEl.textContent = 'A processar '+file.name+'…';
+  await handleAulasFile({target:{files:[file], value:''}});
+  statusEl.textContent = 'Aulas atualizadas.';
+  e.target.value = '';
+});
+
+document.getElementById('inicioGerarTodasFichasBtn').addEventListener('click', ()=>{
+  const statusEl = document.getElementById('inicioFichasStatus');
+  const nomes = relTecNames();
+  if(nomes.length===0){ statusEl.textContent = 'Sem técnicos registados.'; return; }
+  statusEl.textContent = 'A gerar 1 de '+nomes.length+'…';
+  let i = 0;
+  function gerarProxima(){
+    if(i >= nomes.length){ statusEl.textContent = nomes.length+' ficha(s) gerada(s).'; return; }
+    gerarFichaTefPdf(nomes[i]);
+    i++;
+    statusEl.textContent = 'A gerar '+(i+1<=nomes.length ? i+1 : nomes.length)+' de '+nomes.length+'…';
+    setTimeout(gerarProxima, 400);
+  }
+  gerarProxima();
 });
 
 /* ---------------------------------------------------------------
@@ -7694,6 +7860,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.querySelectorAll('#subTabs .tab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
+    document.getElementById('tab-inicio').style.display = tab==='inicio' ? '' : 'none';
     document.getElementById('tab-cal').style.display = tab==='cal' ? '' : 'none';
     document.getElementById('tab-tpl').style.display = tab==='tpl' ? '' : 'none';
     document.getElementById('tab-tec').style.display = tab==='tec' ? '' : 'none';
@@ -7708,6 +7875,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-acessos').style.display = tab==='acessos' ? '' : 'none';
     document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? '' : 'none';
     document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
+    if(tab==='inicio') renderInicioTab();
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
     if(tab==='feriados') renderFeriadosTab();
