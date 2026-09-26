@@ -534,6 +534,7 @@
     <button class="tab-btn" data-tab="tpl" data-owner="sala">Horário Base</button>
     <button class="tab-btn" data-tab="fin" data-owner="sala" style="display:none;">Finanças</button>
     <button class="tab-btn" data-tab="tec" data-owner="equipa" style="display:none;">Técnicos</button>
+    <button class="tab-btn" data-tab="perfil" data-owner="equipa" style="display:none;">Perfil TEF</button>
     <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
     <button class="tab-btn" data-tab="ptcount" data-owner="equipa" style="display:none;">Treinos PT / Tarefas</button>
     <button class="tab-btn" data-tab="aval" data-owner="equipa" style="display:none;">Avaliação</button>
@@ -838,6 +839,18 @@
   </div>
 
   <!-- DISPONIBILIDADE TAB -->
+  <div id="tab-perfil" style="display:none;">
+    <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
+      <label>Técnico
+        <select id="perfilTecnicoSelect" class="rel-input" style="max-width:240px;"></select>
+      </label>
+      <p style="color:var(--ink-soft);font-size:12px;margin:8px 0 0;">
+        Ficha de perfil do TEF — turnos atuais, disponibilidade, histórico de substituições e o perfil de comportamento construído a partir das Notas Rápidas.
+      </p>
+    </div>
+    <div id="perfilConteudo"></div>
+  </div>
+
   <div id="tab-disp" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
       Disponibilidade semanal de cada técnico, para os horários em que o ginásio está aberto (conforme o Horário Base). É só informativo — clica num quadrado para alternar entre disponível/indisponível/turno normal/por definir; não afeta o calendário nem os turnos.
@@ -4460,6 +4473,167 @@ function renderNotasRapidas(){
 }
 
 /* ---------------------------------------------------------------
+   PERFIL TEF — ficha por técnico com toda a info: turnos atuais,
+   disponibilidade, histórico de substituições (como titular e como
+   substituto) e o perfil de comportamento construído a partir de
+   TODAS as Notas Rápidas já registadas, com um mini-formulário de
+   nota rápida embutido para continuar a alimentar o perfil aqui mesmo.
+--------------------------------------------------------------- */
+function computeTurnosAtuaisTef(name){
+  const todayIso = isoDate(new Date());
+  const linhas = [];
+  WEEK_ORDER.forEach(dayKey=>{
+    templateSlotsForDate(dayKey, todayIso).forEach(s=>{
+      if(s.name===name) linhas.push(dayKey+' '+s.start+'–'+s.end);
+    });
+  });
+  return linhas;
+}
+function buildDisponibilidadeRows(name){
+  const slots = collectWeeklyOpenSlots();
+  const avail = AVAILABILITY[name] || {};
+  const rows = [];
+  WEEK_ORDER.forEach(dayKey=>{
+    slots.forEach(sl=>{
+      if(!dayHasSlot(dayKey, sl.start, sl.end)) return;
+      const val = avail[dayKey+'|'+sl.start+'-'+sl.end];
+      if(val) rows.push(dayKey+' '+sl.start+'–'+sl.end+': '+(val==='sim' ? '✅ Disponível' : '❌ Indisponível'));
+    });
+  });
+  return rows;
+}
+function buildPerfilComportamentoHtml(name){
+  const notas = QUICK_NOTES[name] || [];
+  if(notas.length===0) return '<p class="briefing-empty">Sem notas registadas ainda.</p>';
+  let html = '';
+  EVAL_GROUPS.forEach(group=>{
+    const doGrupo = notas.filter(n=>n.grupo===group.name);
+    if(doGrupo.length===0) return;
+    const nPos = doGrupo.filter(n=>n.tipo==='positivo').length;
+    const nNeg = doGrupo.filter(n=>n.tipo==='negativo').length;
+    const ordenadas = doGrupo.slice().sort((a,b)=> b.data.localeCompare(a.data));
+    html += '<div class="briefing-secao"><h5>'+group.name+' — 👍 '+nPos+' · 👎 '+nNeg+'</h5>'+
+      '<ul class="briefing-list">'+ordenadas.map(n=>'<li>'+(n.tipo==='positivo'?'👍':'👎')+' '+fmtDatePT(n.data)+' ('+escapeAttr(n.criterio)+'): '+escapeAttr(n.nota)+'</li>').join('')+'</ul></div>';
+  });
+  return html || '<p class="briefing-empty">Sem notas registadas ainda.</p>';
+}
+function renderPerfilConteudo(name){
+  const container = document.getElementById('perfilConteudo');
+  const info = TECH_REGISTRY[name] || {};
+  const vinculoLabel = {dependente:'Dependente', independente:'Independente', estagiario:'Estagiário'}[info.status] || '—';
+  const turnosAtuais = computeTurnosAtuaisTef(name);
+  const dispRows = buildDisponibilidadeRows(name);
+  const todasSubst = (typeof collectAllSubstitutions==='function' ? collectAllSubstitutions() : [])
+    .filter(r=> r.titular===name || r.substituto===name);
+  const comoTitular = todasSubst.filter(r=>r.titular===name);
+  const comoSubstituto = todasSubst.filter(r=>r.substituto===name);
+
+  container.innerHTML =
+    '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
+      '<h4 style="margin:0 0 10px;font-size:13.5px;">1. Dados Gerais</h4>'+
+      '<p style="margin:0 0 6px;"><strong>Vínculo:</strong> '+vinculoLabel+'</p>'+
+      '<p style="margin:0;"><strong>Turnos atribuídos atualmente:</strong><br>'+(turnosAtuais.length ? turnosAtuais.join('<br>') : 'Sem turnos atribuídos.')+'</p>'+
+    '</div>'+
+    '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
+      '<h4 style="margin:0 0 10px;font-size:13.5px;">2. Disponibilidade</h4>'+
+      (dispRows.length ? dispRows.join('<br>') : '<p class="briefing-empty">Sem disponibilidade registada.</p>')+
+    '</div>'+
+    '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
+      '<h4 style="margin:0 0 10px;font-size:13.5px;">3. Histórico de Substituições</h4>'+
+      '<p style="margin:0 0 6px;"><strong>Como titular (foi substituído):</strong> '+comoTitular.length+'</p>'+
+      '<p style="margin:0 0 12px;"><strong>Como substituto (substituiu outros):</strong> '+comoSubstituto.length+'</p>'+
+      (todasSubst.length ? '<div style="max-height:220px;overflow-y:auto;">'+todasSubst.slice().sort((a,b)=>b.iso.localeCompare(a.iso)).map(r=>
+        '<div style="font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line);">'+fmtDatePT(r.iso)+' '+r.start+'–'+r.end+' — '+
+        (r.titular===name ? 'substituído por '+r.substituto : 'substituiu '+r.titular)+'</div>'
+      ).join('')+'</div>' : '<p class="briefing-empty">Sem substituições registadas.</p>')+
+    '</div>'+
+    '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
+      '<h4 style="margin:0 0 10px;font-size:13.5px;">4. Perfil de Comportamento</h4>'+
+      buildPerfilComportamentoHtml(name)+
+    '</div>'+
+    '<div class="panel" style="padding:14px 18px;">'+
+      '<h4 style="margin:0 0 10px;font-size:13.5px;">📝 Registar Nota Rápida</h4>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'+
+        '<div style="display:flex;gap:6px;">'+
+          '<button type="button" class="btn nota-tipo-btn" id="perfilNotaTipoPositivo" data-tipo="positivo">👍 Positiva</button>'+
+          '<button type="button" class="btn nota-tipo-btn" id="perfilNotaTipoNegativo" data-tipo="negativo">👎 Negativa</button>'+
+        '</div>'+
+        '<select id="perfilNotaGrupoSelect" class="rel-input" style="max-width:230px;"></select>'+
+        '<select id="perfilNotaCriterioSelect" class="rel-input" style="max-width:230px;"></select>'+
+      '</div>'+
+      '<select id="perfilNotaSugestaoSelect" class="rel-input" style="width:100%;margin-top:8px;"></select>'+
+      '<textarea id="perfilNotaTexto" placeholder="Escreve a nota..." rows="2" style="width:100%;margin-top:10px;font:14px \'Inter\';border:1px solid var(--line);border-radius:8px;padding:8px 10px;box-sizing:border-box;resize:vertical;"></textarea>'+
+      '<button type="button" class="btn primary" id="perfilNotaGuardarBtn" style="margin-top:8px;">Guardar Nota</button>'+
+    '</div>';
+
+  let perfilTipoAtual = 'positivo';
+  function grupoAtual(){ return EVAL_GROUPS.find(g=>g.name===decodeURIComponent(document.getElementById('perfilNotaGrupoSelect').value||'')) || EVAL_GROUPS[0]; }
+  function criterioAtual(){
+    const g = grupoAtual();
+    const critLabel = decodeURIComponent(document.getElementById('perfilNotaCriterioSelect').value||'');
+    return g.criteria.find(c=>c.label===critLabel) || null;
+  }
+  function populateSugestoes(){
+    const criterio = criterioAtual();
+    const lista = criterio && NOTA_SUGESTOES[criterio.key] ? (NOTA_SUGESTOES[criterio.key][perfilTipoAtual]||[]) : [];
+    const sugSel = document.getElementById('perfilNotaSugestaoSelect');
+    sugSel.innerHTML = lista.length
+      ? '<option value="">💡 Escolher uma sugestão (dá para ajustar depois)...</option>'+lista.map((t,i)=>'<option value="'+i+'">'+t+'</option>').join('')
+      : '<option value="">Sem sugestões para este subtópico</option>';
+  }
+  function populateCriterio(){
+    const g = grupoAtual();
+    document.getElementById('perfilNotaCriterioSelect').innerHTML = g.criteria.map(c=>'<option value="'+encodeURIComponent(c.label)+'">'+c.label+'</option>').join('');
+    populateSugestoes();
+  }
+  function populateGrupo(){
+    document.getElementById('perfilNotaGrupoSelect').innerHTML = EVAL_GROUPS.map(g=>'<option value="'+encodeURIComponent(g.name)+'">'+g.name+'</option>').join('');
+    populateCriterio();
+  }
+  function setPerfilTipo(t){
+    perfilTipoAtual = t;
+    document.getElementById('perfilNotaTipoPositivo').classList.toggle('active', t==='positivo');
+    document.getElementById('perfilNotaTipoNegativo').classList.toggle('active', t==='negativo');
+    populateSugestoes();
+  }
+  populateGrupo();
+  setPerfilTipo('positivo');
+  document.getElementById('perfilNotaTipoPositivo').addEventListener('click', ()=> setPerfilTipo('positivo'));
+  document.getElementById('perfilNotaTipoNegativo').addEventListener('click', ()=> setPerfilTipo('negativo'));
+  document.getElementById('perfilNotaGrupoSelect').addEventListener('change', populateCriterio);
+  document.getElementById('perfilNotaCriterioSelect').addEventListener('change', populateSugestoes);
+  document.getElementById('perfilNotaSugestaoSelect').addEventListener('change', (e)=>{
+    if(e.target.value==='') return;
+    const criterio = criterioAtual();
+    if(!criterio || !NOTA_SUGESTOES[criterio.key]) return;
+    const lista = NOTA_SUGESTOES[criterio.key][perfilTipoAtual] || [];
+    const idx = parseInt(e.target.value,10);
+    if(lista[idx]) document.getElementById('perfilNotaTexto').value = lista[idx];
+  });
+  document.getElementById('perfilNotaGuardarBtn').addEventListener('click', ()=>{
+    const grupo = decodeURIComponent(document.getElementById('perfilNotaGrupoSelect').value||'');
+    const criterio = decodeURIComponent(document.getElementById('perfilNotaCriterioSelect').value||'');
+    const texto = document.getElementById('perfilNotaTexto').value.trim();
+    if(!texto){ alert('Escreve o texto da nota.'); return; }
+    if(!QUICK_NOTES[name]) QUICK_NOTES[name] = [];
+    QUICK_NOTES[name].push({id:'nota_'+Date.now(), data:isoDate(new Date()), tipo:perfilTipoAtual, grupo, criterio, nota:texto});
+    saveQuickNotes(QUICK_NOTES);
+    renderPerfilConteudo(name);
+  });
+}
+function renderPerfilTab(){
+  const sel = document.getElementById('perfilTecnicoSelect');
+  const prev = sel.value;
+  const names = relTecNames();
+  sel.innerHTML = names.map(n=>'<option value="'+encodeURIComponent(n)+'">'+n+'</option>').join('');
+  if(prev && names.includes(decodeURIComponent(prev))) sel.value = prev;
+  if(sel.value) renderPerfilConteudo(decodeURIComponent(sel.value));
+}
+document.getElementById('perfilTecnicoSelect').addEventListener('change', (e)=>{
+  if(e.target.value) renderPerfilConteudo(decodeURIComponent(e.target.value));
+});
+
+/* ---------------------------------------------------------------
    BRIEFING DA AVALIAÇÃO — guião/agenda para a conversa de avaliação
    com o TEF: resultado geral, pontos fortes, áreas a desenvolver e
    notas rápidas do período, gerado a partir dos dados já existentes.
@@ -7864,6 +8038,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-cal').style.display = tab==='cal' ? '' : 'none';
     document.getElementById('tab-tpl').style.display = tab==='tpl' ? '' : 'none';
     document.getElementById('tab-tec').style.display = tab==='tec' ? '' : 'none';
+    document.getElementById('tab-perfil').style.display = tab==='perfil' ? '' : 'none';
     document.getElementById('tab-feriados').style.display = tab==='feriados' ? '' : 'none';
     document.getElementById('tab-fin').style.display = tab==='fin' ? '' : 'none';
     document.getElementById('tab-equip').style.display = tab==='equip' ? '' : 'none';
@@ -7878,6 +8053,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='inicio') renderInicioTab();
     if(tab==='tpl') renderTplGrid();
     if(tab==='tec') renderTecTab();
+    if(tab==='perfil') renderPerfilTab();
     if(tab==='feriados') renderFeriadosTab();
     if(tab==='fin') renderFinTab();
     if(tab==='equip') renderEquipTab();
