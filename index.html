@@ -4507,18 +4507,28 @@ function computeTurnosAtuaisTef(name){
   });
   return linhas;
 }
-function buildDisponibilidadeRows(name){
+function buildDisponibilidadeTableHtml(name){
   const slots = collectWeeklyOpenSlots();
-  const avail = AVAILABILITY[name] || {};
-  const rows = [];
-  WEEK_ORDER.forEach(dayKey=>{
-    slots.forEach(sl=>{
-      if(!dayHasSlot(dayKey, sl.start, sl.end)) return;
-      const val = avail[dayKey+'|'+sl.start+'-'+sl.end];
-      if(val) rows.push(dayKey+' '+sl.start+'–'+sl.end+': '+(val==='sim' ? '✅ Disponível' : '❌ Indisponível'));
+  const data = AVAILABILITY[name] || {};
+  let headerCells = '<th></th>';
+  WEEK_ORDER.forEach(dayKey=>{ headerCells += '<th>'+dayKey+'</th>'; });
+  let bodyRows = '';
+  slots.forEach(slot=>{
+    let rowCells = '<td class="disp-timelabel">'+slot.start+'–<wbr>'+slot.end+'</td>';
+    WEEK_ORDER.forEach(dayKey=>{
+      if(dayHasSlot(dayKey, slot.start, slot.end)){
+        const key = dayKey+'|'+slot.start+'-'+slot.end;
+        const state = data[key] || '';
+        const cls = state==='sim' ? 'avail-yes' : (state==='nao' ? 'avail-no' : (state==='turno' ? 'avail-turno' : ''));
+        const label = state==='sim' ? 'Sim' : (state==='nao' ? 'Não' : (state==='turno' ? 'Turno' : '—'));
+        rowCells += '<td><span class="disp-slot-btn '+cls+'" style="display:inline-block;">'+label+'</span></td>';
+      } else {
+        rowCells += '<td><div class="disp-slot-empty"></div></td>';
+      }
     });
+    bodyRows += '<tr>'+rowCells+'</tr>';
   });
-  return rows;
+  return '<table class="disp-week-table"><thead><tr>'+headerCells+'</tr></thead><tbody>'+bodyRows+'</tbody></table>';
 }
 function buildPerfilComportamentoHtml(name){
   const notas = QUICK_NOTES[name] || [];
@@ -4540,11 +4550,31 @@ function renderPerfilConteudo(name){
   const info = TECH_REGISTRY[name] || {};
   const vinculoLabel = {dependente:'Dependente', independente:'Independente', estagiario:'Estagiário'}[info.status] || '—';
   const turnosAtuais = computeTurnosAtuaisTef(name);
-  const dispRows = buildDisponibilidadeRows(name);
   const todasSubst = (typeof collectAllSubstitutions==='function' ? collectAllSubstitutions() : [])
     .filter(r=> r.titular===name || r.substituto===name);
   const comoTitular = todasSubst.filter(r=>r.titular===name);
   const comoSubstituto = todasSubst.filter(r=>r.substituto===name);
+
+  function agruparPorMes(lista){
+    const porMes = {};
+    lista.forEach(r=>{ const mk = r.iso.slice(0,7); (porMes[mk] = porMes[mk]||[]).push(r); });
+    return porMes;
+  }
+  function mesLabel(mk){
+    const [y,m] = mk.split('-').map(Number);
+    return MONTH_NAMES[m-1]+' '+y;
+  }
+  function blocoMensal(lista, outroLadoLabel){
+    if(lista.length===0) return '<p class="briefing-empty">Sem registos.</p>';
+    const porMes = agruparPorMes(lista);
+    const meses = Object.keys(porMes).sort().reverse();
+    return meses.map(mk=>{
+      const linhas = porMes[mk].slice().sort((a,b)=> b.iso.localeCompare(a.iso)).map(r=>
+        '<div style="font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line);">'+fmtDatePT(r.iso)+' '+r.start+'–'+r.end+' — '+outroLadoLabel+': '+(outroLadoLabel==='substituto' ? r.substituto : r.titular)+'</div>'
+      ).join('');
+      return '<div style="margin-bottom:10px;"><strong style="font-size:12.5px;">'+mesLabel(mk)+'</strong> <span style="color:var(--ink-soft);font-size:11.5px;">('+porMes[mk].length+')</span>'+linhas+'</div>';
+    }).join('');
+  }
 
   container.innerHTML =
     '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
@@ -4552,18 +4582,17 @@ function renderPerfilConteudo(name){
       '<p style="margin:0 0 6px;"><strong>Vínculo:</strong> '+vinculoLabel+'</p>'+
       '<p style="margin:0;"><strong>Turnos atribuídos atualmente:</strong><br>'+(turnosAtuais.length ? turnosAtuais.join('<br>') : 'Sem turnos atribuídos.')+'</p>'+
     '</div>'+
-    '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
+    '<div class="panel" style="padding:14px 18px;margin-bottom:16px;overflow-x:auto;">'+
       '<h4 style="margin:0 0 10px;font-size:13.5px;">2. Disponibilidade</h4>'+
-      (dispRows.length ? dispRows.join('<br>') : '<p class="briefing-empty">Sem disponibilidade registada.</p>')+
+      buildDisponibilidadeTableHtml(name)+
     '</div>'+
     '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
       '<h4 style="margin:0 0 10px;font-size:13.5px;">3. Histórico de Substituições</h4>'+
-      '<p style="margin:0 0 6px;"><strong>Como titular (foi substituído):</strong> '+comoTitular.length+'</p>'+
-      '<p style="margin:0 0 12px;"><strong>Como substituto (substituiu outros):</strong> '+comoSubstituto.length+'</p>'+
-      (todasSubst.length ? '<div style="max-height:220px;overflow-y:auto;">'+todasSubst.slice().sort((a,b)=>b.iso.localeCompare(a.iso)).map(r=>
-        '<div style="font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line);">'+fmtDatePT(r.iso)+' '+r.start+'–'+r.end+' — '+
-        (r.titular===name ? 'substituído por '+r.substituto : 'substituiu '+r.titular)+'</div>'
-      ).join('')+'</div>' : '<p class="briefing-empty">Sem substituições registadas.</p>')+
+      '<p style="margin:0 0 10px;"><strong>Como titular (foi substituído):</strong> '+comoTitular.length+'   ·   <strong>Como substituto (substituiu outros):</strong> '+comoSubstituto.length+'</p>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'+
+        '<div><h5 style="margin:0 0 8px;font-size:12.5px;color:var(--accent);">Foi substituído por</h5>'+blocoMensal(comoTitular, 'substituto')+'</div>'+
+        '<div><h5 style="margin:0 0 8px;font-size:12.5px;color:var(--accent);">Substituiu</h5>'+blocoMensal(comoSubstituto, 'titular')+'</div>'+
+      '</div>'+
     '</div>'+
     '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
       '<h4 style="margin:0 0 10px;font-size:13.5px;">4. Perfil de Comportamento</h4>'+
@@ -6609,6 +6638,29 @@ function salaTefsParaCliente(codigo, monthKey){
   });
   return tefs;
 }
+// Lista, para um cliente e mês, cada visita casada com o turno (dia+hora+TEF)
+// que a cobria — é o detalhe por trás dos nomes que aparecem em salaTefsParaCliente.
+function turnosDoClienteNoMes(codigo, monthKey){
+  const acessos = ACESSOS[monthKey];
+  if(!acessos || !acessos.visits) return [];
+  const resultado = [];
+  acessos.visits.filter(v=>v.code===codigo).forEach(v=>{
+    const parts = v.date.split('-').map(Number);
+    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+    const dKey = dayKeyOf(dateObj);
+    const inMin = timeToMinutes(v.in);
+    let outMin = timeToMinutes(v.out);
+    if(outMin < inMin) outMin += 24*60;
+    shiftsForReportDate(v.date, dKey).forEach(s=>{
+      const startMin = timeToMinutes(s.start), endMin = timeToMinutes(s.end);
+      if(inMin < endMin && outMin > startMin){
+        const efetivo = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name;
+        resultado.push({date:v.date, turno:s.start+'–'+s.end, tef:efetivo});
+      }
+    });
+  });
+  return resultado.sort((a,b)=> a.date.localeCompare(b.date));
+}
 function computeSatisfacaoAgregada(){
   const porTef = {};
   function ensure(name){ if(!porTef[name]) porTef[name] = {p1File:[], p1Tarefas:[], p2:[]}; return porTef[name]; }
@@ -6635,7 +6687,7 @@ function renderSatisfacaoResumo(){
     container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Ainda não importaste nenhum questionário.</p>';
     return;
   }
-  const {porTef} = computeSatisfacaoAgregada();
+  const {porTef, detalhe} = computeSatisfacaoAgregada();
   const nomes = Object.keys(porTef).sort((a,b)=>a.localeCompare(b,'pt'));
   if(nomes.length===0){
     container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Sem correspondências encontradas ainda.</p>';
@@ -6655,8 +6707,40 @@ function renderSatisfacaoResumo(){
       '<td data-label="Satisfação Geral"><strong>'+fmtMedia(geral)+'</strong></td>'+
     '</tr>';
   });
-  html += '</tbody></table></div>';
+  html += '</tbody></table></div>'+
+    '<div class="modal-actions" style="justify-content:flex-start;margin:14px 0 8px;">'+
+      '<button type="button" class="btn ghost" id="satisfacaoToggleDetalhe">Ver detalhe das respostas (turnos em que treinou)</button>'+
+    '</div>'+
+    '<div id="satisfacaoDetalheContainer" style="display:none;overflow-x:auto;"></div>';
   container.innerHTML = html;
+
+  document.getElementById('satisfacaoToggleDetalhe').addEventListener('click', (e)=>{
+    const box = document.getElementById('satisfacaoDetalheContainer');
+    const showing = box.style.display !== 'none';
+    if(showing){ box.style.display = 'none'; e.target.textContent = 'Ver detalhe das respostas (turnos em que treinou)'; return; }
+    if(!box.dataset.built){
+      const ordenado = detalhe.slice().sort((a,b)=> b.dataResposta.localeCompare(a.dataResposta));
+      let dHtml = '<table class="tec-table"><thead><tr><th>Cliente</th><th>Data Resposta</th><th>Aval./Presc. (Ficheiro)</th><th>Sala (nota)</th><th>Turnos em que treinou nesse mês</th></tr></thead><tbody>';
+      ordenado.forEach(r=>{
+        const turnos = turnosDoClienteNoMes(r.codigo, r.monthKey);
+        const turnosHtml = turnos.length
+          ? turnos.map(t=> fmtDatePT(t.date)+' '+t.turno+' — '+t.tef).join('<br>')
+          : '<span style="color:var(--ink-soft);">sem correspondência nas Entradas/Saídas desse mês</span>';
+        dHtml += '<tr>'+
+          '<td data-label="Cliente">'+escapeAttr(r.cliente)+'</td>'+
+          '<td data-label="Data Resposta">'+fmtDatePT(r.dataResposta)+'</td>'+
+          '<td data-label="Aval./Presc. (Ficheiro)">'+(r.profissionalArquivo||'—')+(r.p1!==null?' ('+r.p1+')':'')+'</td>'+
+          '<td data-label="Sala (nota)">'+(r.p2!==null?r.p2:'—')+'</td>'+
+          '<td data-label="Turnos em que treinou nesse mês" style="font-size:12px;">'+turnosHtml+'</td>'+
+        '</tr>';
+      });
+      dHtml += '</tbody></table>';
+      box.innerHTML = dHtml;
+      box.dataset.built = '1';
+    }
+    box.style.display = '';
+    e.target.textContent = 'Esconder detalhe das respostas';
+  });
 }
 async function handleSatisfacaoFile(e){
   const file = e.target.files[0];
