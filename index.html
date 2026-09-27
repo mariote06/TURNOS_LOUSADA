@@ -1254,7 +1254,7 @@
     <div class="panel" style="padding:16px 18px;margin-bottom:24px;">
       <h4 style="margin:0 0 8px;">💬 Questionários de Satisfação</h4>
       <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-        Importa o export de questionários (pode ter respostas de vários meses de uma vez). A nota de Acompanhamento em Sala cruza com quem treinou com o cliente (via Entradas/Saídas) e conta para todos os TEFs com quem treinou nesse mês. A Avaliação e Prescrição mostra-se pelo "Profissional Avaliado" do ficheiro e por quem fez a Avaliação/Reavaliação Física nas Tarefas, lado a lado.
+        Importa o export de questionários (pode ter respostas de vários meses de uma vez). A nota de Acompanhamento em Sala cruza com quem treinou com o cliente (via Entradas/Saídas) e conta para todos os TEFs com quem treinou nesse mês. A Avaliação e Prescrição usa o "Profissional Avaliado" do ficheiro.
       </p>
       <label class="btn ghost" style="cursor:pointer;display:inline-block;">📥 Carregar Questionários de Satisfação
         <input type="file" id="satisfacaoFileInput" accept=".xlsx,.xls" style="display:none;">
@@ -6642,17 +6642,15 @@ function renderSatisfacaoResumo(){
     return;
   }
   let html = '<div class="panel" style="padding:0;overflow-x:auto;"><table class="tec-table"><thead><tr>'+
-    '<th>TEF</th><th>Aval./Presc. (Ficheiro)</th><th>Aval./Presc. (Tarefas)</th><th>Acompanh. em Sala</th><th>Satisfação Geral</th>'+
+    '<th>TEF</th><th>Aval./Presc. (Ficheiro)</th><th>Acompanh. em Sala</th><th>Satisfação Geral</th>'+
     '</tr></thead><tbody>';
   nomes.forEach(name=>{
     const e = porTef[name];
-    const mF = media(e.p1File), mT = media(e.p1Tarefas), mS = media(e.p2);
-    const p1Ref = mT!==null ? mT : mF;
-    const geral = media([p1Ref, mS].filter(v=>v!==null));
+    const mF = media(e.p1File), mS = media(e.p2);
+    const geral = media([mF, mS].filter(v=>v!==null));
     html += '<tr>'+
       '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
       '<td data-label="Aval./Presc. (Ficheiro)">'+fmtMedia(mF)+' <span style="color:var(--ink-soft);font-size:11px;">(n='+e.p1File.length+')</span></td>'+
-      '<td data-label="Aval./Presc. (Tarefas)">'+fmtMedia(mT)+' <span style="color:var(--ink-soft);font-size:11px;">(n='+e.p1Tarefas.length+')</span></td>'+
       '<td data-label="Acompanh. em Sala">'+fmtMedia(mS)+' <span style="color:var(--ink-soft);font-size:11px;">(n='+e.p2.length+')</span></td>'+
       '<td data-label="Satisfação Geral"><strong>'+fmtMedia(geral)+'</strong></td>'+
     '</tr>';
