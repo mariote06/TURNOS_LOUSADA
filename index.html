@@ -616,6 +616,18 @@
       </div>
     </div>
 
+    <h3 style="font-size:15px;margin:0 0 10px;">📤 Mapas de Trabalho para a Direção</h3>
+    <div class="panel" style="padding:14px 18px;margin-bottom:20px;">
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 12px;">
+        Usam o mês escolhido acima. O mapa do mês corrente segue até dia 20; a escala do mês seguinte segue até ao último dia do mês.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <button type="button" class="btn primary" id="btnMapaMesCorrente">Mapa de trabalho</button>
+        <button type="button" class="btn primary" id="btnMapaMesSeguinte">Escala do mês seguinte</button>
+      </div>
+      <p id="mapasStatus" style="color:var(--ink-soft);font-size:12px;margin:10px 0 0;"></p>
+    </div>
+
     <div class="panel" style="padding:16px 18px;margin-bottom:20px;">
       <h4 style="margin:0 0 8px;">Reservas de Aulas (Excel)</h4>
       <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
@@ -8292,6 +8304,7 @@ function renderInicioTab(){
   document.getElementById('inicioMesAtual').textContent = MONTH_NAMES[MONTH_LIST[relMonthIdx].month]+' '+MONTH_LIST[relMonthIdx].year;
   document.getElementById('inicioMesPrev').disabled = relMonthIdx <= 0;
   document.getElementById('inicioMesNext').disabled = relMonthIdx >= MONTH_LIST.length-1;
+  updateMapasButtons();
   renderInicioTurnosHoje();
   renderInicioAtencao();
   renderAulaDuracoesPanel();
@@ -8682,6 +8695,276 @@ document.getElementById('btnExportYear').addEventListener('click', async ()=>{
   const range = getYearRange(new Date(year, month, 1));
   await exportScheduleExcel(range.start, range.end, 'turnos_TEF_'+year+'.xlsx');
 });
+
+/* ---------------------------------------------------------------
+   MAPAS DE TRABALHO PARA A DIREÇÃO
+   - Mapa do mês corrente (enviar até dia 20): turnos feitos/previstos,
+     substituições, turnos cancelados e férias, com resumo por TEF.
+   - Escala do mês seguinte (enviar até ao fim do mês): turnos planeados.
+--------------------------------------------------------------- */
+function mapasMonth(offset){
+  const idx = Math.min(Math.max(relMonthIdx + (offset||0), 0), MONTH_LIST.length-1);
+  return MONTH_LIST[idx];
+}
+function mapasLabel(mo){ return MONTH_NAMES[mo.month]+' '+mo.year; }
+function updateMapasButtons(){
+  const cur = mapasMonth(0), nxt = mapasMonth(1);
+  const b1 = document.getElementById('btnMapaMesCorrente');
+  const b2 = document.getElementById('btnMapaMesSeguinte');
+  if(b1) b1.textContent = '📊 Mapa de trabalho — '+mapasLabel(cur);
+  if(b2){
+    b2.textContent = '🗓️ Escala — '+mapasLabel(nxt);
+    b2.disabled = relMonthIdx >= MONTH_LIST.length-1;
+  }
+}
+function mapasMonthDays(mo){
+  const days = [];
+  const d = new Date(mo.year, mo.month, 1);
+  while(d.getMonth() === mo.month){
+    if(d >= RANGE_START && d <= RANGE_END) days.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+function mapasVinculo(name){
+  const e = TECH_REGISTRY[name]; const st = e && e.status;
+  return st==='dependente' ? 'Dependente' : st==='independente' ? 'Independente' : st==='estagiario' ? 'Estagiário' : '';
+}
+// Turnos que foram retirados nesse dia (existiam no horário base e foram removidos)
+function mapasRemovedSlots(iso, dKey){
+  const exc = exceptions[iso];
+  if(HOLIDAY_MAP[iso] || !exc || !exc.removedSlotIds || !exc.removedSlotIds.length) return [];
+  return templateSlotsForDate(dKey, iso).filter(s => exc.removedSlotIds.indexOf(s.id) !== -1);
+}
+function mapasOnFerias(name, iso){
+  return !!(name && FERIAS_DIAS[name] && FERIAS_DIAS[name][iso] !== undefined);
+}
+
+const MAPA_NAVY = 'FF0B2D42', MAPA_CYAN = 'FF17A7E1', MAPA_SOFT = 'FFDCEAF2';
+const MAPA_BORDER = {style:'thin', color:{argb:'FFBCD0DA'}};
+function mapaTitle(ws, title, subtitle, ncols){
+  ws.mergeCells(1,1,1,ncols);
+  const t = ws.getCell(1,1); t.value = title;
+  t.font = {bold:true, size:14, color:{argb:MAPA_NAVY}};
+  ws.mergeCells(2,1,2,ncols);
+  const st = ws.getCell(2,1); st.value = subtitle;
+  st.font = {size:10, color:{argb:'FF6F8291'}};
+  ws.addRow([]);
+}
+function mapaHeader(ws, cols){
+  const r = ws.addRow(cols);
+  r.eachCell(c=>{
+    c.font = {bold:true, color:{argb:'FFFFFFFF'}};
+    c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:MAPA_NAVY}};
+    c.alignment = {vertical:'middle', wrapText:true};
+    c.border = {top:MAPA_BORDER, bottom:MAPA_BORDER, left:MAPA_BORDER, right:MAPA_BORDER};
+  });
+  r.height = 30;
+  return r;
+}
+function mapaRow(ws, vals, fill, bold){
+  const r = ws.addRow(vals);
+  r.eachCell({includeEmpty:true}, c=>{
+    c.border = {top:MAPA_BORDER, bottom:MAPA_BORDER, left:MAPA_BORDER, right:MAPA_BORDER};
+    c.alignment = {vertical:'top', wrapText:true};
+    if(fill) c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:fill}};
+    if(bold) c.font = {bold:true};
+  });
+  return r;
+}
+async function mapaDownload(wb, filename){
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function mapaSubtitle(){
+  const hoje = new Date();
+  return 'Sala de Exercício · Playlife Lousada · gerado a '+fmtDatePT(isoDate(hoje));
+}
+
+async function exportMapaMesCorrente(){
+  if(typeof ExcelJS === 'undefined'){ alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online).'); return; }
+  const mo = mapasMonth(0);
+  const label = mapasLabel(mo);
+  const days = mapasMonthDays(mo);
+  if(days.length===0){ alert('Este mês está fora do período da app.'); return; }
+  const monthKey = mo.year+'-'+pad(mo.month+1);
+
+  const turnos = [];      // linhas detalhadas
+  const resumo = {};      // por TEF
+  function R(n){
+    if(!resumo[n]) resumo[n] = {turnosTit:0, horasTit:0, feitos:0, horasFeitas:0, substFeitas:0, horasSubstFeitas:0, cedidos:0, horasCedidas:0, pagasTit:0, horasPagar:0, cancel:0, feriasDias:0, feriasHoras:0};
+    return resumo[n];
+  }
+
+  days.forEach(d=>{
+    const iso = isoDate(d), dKey = dayKeyOf(d);
+    const hol = HOLIDAY_MAP[iso];
+    const dia = LONG_WEEKDAY[d.getDay()];
+    shiftsForDate(iso, dKey).forEach(s=>{
+      const hrs = hoursBetween(s.start, s.end);
+      const titular = (s.name||'').trim();
+      const sub = (s.substituteName||'').trim();
+      const quemFez = sub || titular;
+      let tipo = 'Normal';
+      if(s._holiday) tipo = 'Feriado';
+      else if(s._adhoc) tipo = 'Turno extra';
+      else if(sub) tipo = 'Substituição';
+      const pagoPor = sub ? (s.payTitular ? 'Titular' : 'Ginásio') : '';
+      const trabalhadorPago = (sub && !s.payTitular) ? sub : titular;
+      turnos.push({k:iso+s.start, vals:[fmtDatePT(iso), dia, hol?hol.name:'', s.start, s.end, hrs, titular, quemFez, tipo, pagoPor, s.nota||''], tipo});
+      if(titular){ const t=R(titular); t.turnosTit++; t.horasTit+=hrs; }
+      if(quemFez){ const q=R(quemFez); q.feitos++; q.horasFeitas+=hrs; }
+      if(sub){
+        const q=R(sub); q.substFeitas++; q.horasSubstFeitas+=hrs;
+        if(titular){ const t=R(titular); t.cedidos++; t.horasCedidas+=hrs; if(s.payTitular) t.pagasTit++; }
+      }
+      if(trabalhadorPago) R(trabalhadorPago).horasPagar += hrs;
+    });
+    mapasRemovedSlots(iso, dKey).forEach(s=>{
+      const hrs = hoursBetween(s.start, s.end);
+      const motivo = mapasOnFerias(s.name, iso) ? 'Férias' : ((exceptions[iso] && exceptions[iso].note) || '');
+      turnos.push({k:iso+s.start, vals:[fmtDatePT(iso), dia, hol?hol.name:'', s.start, s.end, hrs, s.name, '—', 'Turno cancelado', '', motivo], tipo:'Turno cancelado'});
+      R(s.name).cancel++;
+    });
+  });
+
+  turnos.sort((x,y)=> x.k.localeCompare(y.k));
+  const ferias = [];
+  Object.keys(FERIAS_DIAS).forEach(name=>{
+    Object.keys(FERIAS_DIAS[name]||{}).filter(iso=>iso.slice(0,7)===monthKey).sort().forEach(iso=>{
+      const h = FERIAS_DIAS[name][iso]||0;
+      ferias.push([name, fmtDatePT(iso), LONG_WEEKDAY[new Date(iso+'T00:00:00').getDay()], h]);
+      const r = R(name); r.feriasDias++; r.feriasHoras += h;
+    });
+  });
+  ferias.sort((a,b)=> a[0].localeCompare(b[0],'pt'));
+
+  const wb = new ExcelJS.Workbook();
+
+  // 1. Resumo por TEF
+  const ws1 = wb.addWorksheet('Resumo por TEF');
+  const c1 = ['TEF','Vínculo','Turnos atribuídos (titular)','Horas atribuídas','Turnos feitos','Horas feitas','Substituições feitas','Turnos cedidos a substituto','dos quais pagos pelo titular','Turnos cancelados','Dias de férias','Horas de férias','Horas a pagar pelo ginásio'];
+  mapaTitle(ws1, 'Mapa de trabalho — '+label, mapaSubtitle(), c1.length);
+  mapaHeader(ws1, c1);
+  const tot = new Array(c1.length).fill(0);
+  Object.keys(resumo).sort((a,b)=>a.localeCompare(b,'pt')).forEach(n=>{
+    const r = resumo[n];
+    const vals = [n, mapasVinculo(n), r.turnosTit, r.horasTit, r.feitos, r.horasFeitas, r.substFeitas, r.cedidos, r.pagasTit, r.cancel, r.feriasDias, r.feriasHoras, mapasVinculo(n)==='Estagiário' ? 0 : r.horasPagar];
+    vals.forEach((v,i)=>{ if(i>=2) tot[i]+=v; });
+    mapaRow(ws1, vals);
+  });
+  const totRow = tot.map((v,i)=> i===0?'Total': i===1?'':v);
+  mapaRow(ws1, totRow, MAPA_SOFT, true);
+  ws1.columns.forEach((col,i)=>{ col.width = i===0?24 : i===1?14 : 13; });
+  [4,6,12,13].forEach(ci=> ws1.getColumn(ci).numFmt = '0.0#');
+
+  // 2. Turnos (dia a dia)
+  const ws2 = wb.addWorksheet('Turnos');
+  const c2 = ['Data','Dia','Feriado','Início','Fim','Horas','TEF titular','Quem fez o turno','Tipo','Pago por','Nota'];
+  mapaTitle(ws2, 'Turnos — '+label, mapaSubtitle(), c2.length);
+  mapaHeader(ws2, c2);
+  const FILL = {'Substituição':'FFFFF2CC','Turno extra':'FFE2F0D9','Turno cancelado':'FFF8D7D0','Feriado':'FFDCEAF2'};
+  turnos.forEach(t=> mapaRow(ws2, t.vals, FILL[t.tipo]||null, t.tipo!=='Normal'));
+  [12,16,20,8,8,7,20,20,15,10,28].forEach((w,i)=> ws2.getColumn(i+1).width = w);
+  ws2.getColumn(6).numFmt = '0.0#';
+  ws2.autoFilter = {from:{row:4,column:1}, to:{row:ws2.rowCount,column:c2.length}};
+  ws2.views = [{state:'frozen', ySplit:4}];
+
+  // 3. Substituições
+  const ws3 = wb.addWorksheet('Substituições');
+  const c3 = ['Data','Início','Fim','Horas','Titular','Substituto','Pago por','Nota'];
+  mapaTitle(ws3, 'Substituições — '+label, mapaSubtitle(), c3.length);
+  mapaHeader(ws3, c3);
+  const subs = turnos.filter(t=>t.tipo==='Substituição');
+  if(subs.length===0) mapaRow(ws3, ['Sem substituições neste mês.']);
+  subs.forEach(t=>{ const v=t.vals; mapaRow(ws3, [v[0],v[3],v[4],v[5],v[6],v[7],v[9],v[10]], v[9]==='Titular'?'FFF8D7D0':null); });
+  [12,8,8,7,22,22,10,30].forEach((w,i)=> ws3.getColumn(i+1).width = w);
+
+  // 4. Férias
+  const ws4 = wb.addWorksheet('Férias');
+  const c4 = ['TEF','Data','Dia','Horas'];
+  mapaTitle(ws4, 'Férias — '+label, mapaSubtitle(), c4.length);
+  mapaHeader(ws4, c4);
+  if(ferias.length===0) mapaRow(ws4, ['Sem férias marcadas neste mês.']);
+  ferias.forEach(f=> mapaRow(ws4, f));
+  [24,12,16,8].forEach((w,i)=> ws4.getColumn(i+1).width = w);
+
+  await mapaDownload(wb, 'Mapa_Trabalho_Sala_Lousada_'+MONTH_NAMES[mo.month]+'_'+mo.year+'.xlsx');
+  document.getElementById('mapasStatus').textContent = 'Mapa de trabalho de '+label+' gerado ('+turnos.length+' linhas de turnos, '+subs.length+' substituições, '+ferias.length+' dias de férias).';
+}
+
+async function exportMapaMesSeguinte(){
+  if(typeof ExcelJS === 'undefined'){ alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online).'); return; }
+  const mo = mapasMonth(1);
+  const label = mapasLabel(mo);
+  const days = mapasMonthDays(mo);
+  if(days.length===0){ alert('Este mês está fora do período da app.'); return; }
+
+  // grelha: uma linha por dia, uma coluna por turno (ordenado por hora)
+  const linhas = []; let maxT = 0;
+  const horas = {};
+  days.forEach(d=>{
+    const iso = isoDate(d), dKey = dayKeyOf(d);
+    const hol = HOLIDAY_MAP[iso];
+    const sh = shiftsForDate(iso, dKey).slice().sort((a,b)=> a.start.localeCompare(b.start));
+    const cells = sh.map(s=>{
+      const quem = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : (s.name||'').trim();
+      horas[quem] = horas[quem] || {turnos:0, horas:0};
+      horas[quem].turnos++; horas[quem].horas += hoursBetween(s.start, s.end);
+      const extra = (s.substituteName && s.substituteName.trim()) ? ' (subst. '+s.name+')' : '';
+      return s.start+'–'+s.end+'\n'+quem+extra;
+    });
+    maxT = Math.max(maxT, cells.length);
+    let obs = hol ? (hol.closed ? hol.name+' — encerrado' : hol.name) : '';
+    const emFerias = Object.keys(FERIAS_DIAS).filter(n=> mapasOnFerias(n, iso));
+    if(emFerias.length) obs = (obs?obs+' · ':'')+'Férias: '+emFerias.join(', ');
+    linhas.push({vals:[fmtDatePT(iso), LONG_WEEKDAY[d.getDay()]], cells, obs, weekend: d.getDay()===0||d.getDay()===6, hol:!!hol});
+  });
+  maxT = Math.max(maxT, 1);
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Escala');
+  const cols = ['Data','Dia'];
+  for(let i=1;i<=maxT;i++) cols.push('Turno '+i);
+  cols.push('Observações');
+  mapaTitle(ws, 'Escala de turnos — '+label, mapaSubtitle(), cols.length);
+  mapaHeader(ws, cols);
+  linhas.forEach(l=>{
+    const vals = l.vals.concat(l.cells);
+    while(vals.length < 2+maxT) vals.push('');
+    vals.push(l.obs);
+    mapaRow(ws, vals, l.hol ? MAPA_SOFT : (l.weekend ? 'FFF3F6F8' : null));
+  });
+  ws.getColumn(1).width = 12; ws.getColumn(2).width = 15;
+  for(let i=0;i<maxT;i++) ws.getColumn(3+i).width = 20;
+  ws.getColumn(3+maxT).width = 32;
+  ws.views = [{state:'frozen', ySplit:4, xSplit:2}];
+  ws.pageSetup = {orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9};
+
+  const ws2 = wb.addWorksheet('Horas por TEF');
+  const c2 = ['TEF','Vínculo','Turnos previstos','Horas previstas'];
+  mapaTitle(ws2, 'Horas previstas — '+label, mapaSubtitle(), c2.length);
+  mapaHeader(ws2, c2);
+  let tt=0, th=0;
+  Object.keys(horas).filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt')).forEach(n=>{
+    mapaRow(ws2, [n, mapasVinculo(n), horas[n].turnos, horas[n].horas]); tt+=horas[n].turnos; th+=horas[n].horas;
+  });
+  mapaRow(ws2, ['Total','',tt,th], MAPA_SOFT, true);
+  [24,14,14,14].forEach((w,i)=> ws2.getColumn(i+1).width = w);
+  ws2.getColumn(4).numFmt = '0.0#';
+
+  await mapaDownload(wb, 'Escala_Sala_Lousada_'+MONTH_NAMES[mo.month]+'_'+mo.year+'.xlsx');
+  document.getElementById('mapasStatus').textContent = 'Escala de '+label+' gerada.';
+}
+
+document.getElementById('btnMapaMesCorrente').addEventListener('click', exportMapaMesCorrente);
+document.getElementById('btnMapaMesSeguinte').addEventListener('click', exportMapaMesSeguinte);
+updateMapasButtons();
 
 /* ---------------------------------------------------------------
    LIGAÇÃO AUTOMÁTICA A FICHEIRO (File System Access API)
