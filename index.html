@@ -4530,6 +4530,39 @@ function buildDisponibilidadeTableHtml(name){
   });
   return '<table class="disp-week-table"><thead><tr>'+headerCells+'</tr></thead><tbody>'+bodyRows+'</tbody></table>';
 }
+// Deteta uma mudança clara de tendência num tópico: as últimas notas (até 3)
+// são todas do mesmo tipo, e esse tipo contraria o que predominava antes.
+function analisarTendenciaGrupo(notasGrupo){
+  const ordenadas = notasGrupo.slice().sort((a,b)=> a.data.localeCompare(b.data));
+  if(ordenadas.length < 2) return null;
+  const recentes = ordenadas.slice(-3);
+  const tipoRecente = recentes[0].tipo;
+  if(!recentes.every(n=>n.tipo===tipoRecente)) return null;
+  const anteriores = ordenadas.slice(0, ordenadas.length - recentes.length);
+  if(anteriores.length===0) return null;
+  const nPosAnt = anteriores.filter(n=>n.tipo==='positivo').length;
+  const nNegAnt = anteriores.filter(n=>n.tipo==='negativo').length;
+  if(nPosAnt===nNegAnt) return null;
+  const dominanteAntes = nPosAnt>nNegAnt ? 'positivo' : 'negativo';
+  if(dominanteAntes===tipoRecente) return null;
+  return tipoRecente==='negativo'
+    ? '📉 Tendência recente: as últimas '+recentes.length+' notas foram negativas, depois de um histórico mais positivo.'
+    : '📈 Tendência recente: as últimas '+recentes.length+' notas foram positivas, depois de um histórico mais negativo.';
+}
+// Tópicos onde as Notas Rápidas (todo o histórico) têm mais negativas do que
+// positivas — sinal a vigiar, independente da pontuação formal da avaliação.
+function computeTopicosAVigiar(name){
+  const notas = QUICK_NOTES[name] || [];
+  const resultado = [];
+  EVAL_GROUPS.forEach(group=>{
+    const doGrupo = notas.filter(n=>n.grupo===group.name);
+    if(doGrupo.length===0) return;
+    const nPos = doGrupo.filter(n=>n.tipo==='positivo').length;
+    const nNeg = doGrupo.filter(n=>n.tipo==='negativo').length;
+    if(nNeg > nPos) resultado.push({grupo: group.name, nPos, nNeg, tendencia: analisarTendenciaGrupo(doGrupo)});
+  });
+  return resultado;
+}
 function buildPerfilComportamentoHtml(name){
   const notas = QUICK_NOTES[name] || [];
   if(notas.length===0) return '<p class="briefing-empty">Sem notas registadas ainda.</p>';
@@ -4539,8 +4572,11 @@ function buildPerfilComportamentoHtml(name){
     if(doGrupo.length===0) return;
     const nPos = doGrupo.filter(n=>n.tipo==='positivo').length;
     const nNeg = doGrupo.filter(n=>n.tipo==='negativo').length;
+    const aVigiar = nNeg > nPos;
+    const tendencia = analisarTendenciaGrupo(doGrupo);
     const ordenadas = doGrupo.slice().sort((a,b)=> b.data.localeCompare(a.data));
-    html += '<div class="briefing-secao"><h5>'+group.name+' — 👍 '+nPos+' · 👎 '+nNeg+'</h5>'+
+    html += '<div class="briefing-secao"><h5>'+group.name+' — 👍 '+nPos+' · 👎 '+nNeg+(aVigiar ? ' <span style="color:var(--rust);font-weight:700;">⚠️ A vigiar</span>' : '')+'</h5>'+
+      (tendencia ? '<p class="briefing-prompt" style="margin:2px 0 6px;">'+tendencia+'</p>' : '')+
       '<ul class="briefing-list">'+ordenadas.map(n=>'<li>'+(n.tipo==='positivo'?'👍':'👎')+' '+fmtDatePT(n.data)+' ('+escapeAttr(n.criterio)+'): '+escapeAttr(n.nota)+'</li>').join('')+'</ul></div>';
   });
   return html || '<p class="briefing-empty">Sem notas registadas ainda.</p>';
@@ -4726,6 +4762,10 @@ function gerarBriefingHtml(name){
 
   const mensagem = gerarMensagemMotivacional(name, scoresRef ? scoresRef.scores : null);
   const firstName = name.split(' ')[0];
+  const aVigiar = computeTopicosAVigiar(name);
+  const vigiarHtml = aVigiar.length
+    ? '<ul class="briefing-list">'+aVigiar.map(v=> '<li>'+v.grupo+' — 👍 '+v.nPos+' · 👎 '+v.nNeg+(v.tendencia ? '<br><span style="color:var(--ink-soft);">'+v.tendencia+'</span>' : '')+'</li>').join('')+'</ul>'
+    : '<p class="briefing-empty">Sem tópicos assinalados nas Notas Rápidas (todo o histórico).</p>';
 
   return ''+
     '<div class="briefing-secao"><h5>1. Abertura</h5>'+
@@ -4739,9 +4779,11 @@ function gerarBriefingHtml(name){
     '<div class="briefing-secao"><h5>4. Áreas a Desenvolver (prioridade)</h5>'+
       (lowAll.length ? '<ul class="briefing-list">'+lowAll.map(t=>'<li>'+t+'</li>').join('')+'</ul>' : '<p class="briefing-empty">Sem critérios Low Performer identificados nesta avaliação.</p>')+
       '<p class="briefing-prompt">Aborda estas áreas com exemplos concretos e sem julgamento — foca-te em como melhorar.</p></div>'+
-    '<div class="briefing-secao"><h5>5. Notas Rápidas do Período</h5>'+notasHtml+
+    '<div class="briefing-secao"><h5>5. Sinais das Notas Rápidas (histórico todo)</h5>'+vigiarHtml+
+      '<p class="briefing-prompt">Estes tópicos têm mais notas negativas do que positivas desde sempre — pode não coincidir com a pontuação formal, mas vale a pena cruzar.</p></div>'+
+    '<div class="briefing-secao"><h5>6. Notas Rápidas do Período</h5>'+notasHtml+
       '<p class="briefing-prompt">Usa estas notas como exemplos concretos de comportamentos observados.</p></div>'+
-    '<div class="briefing-secao"><h5>6. Mensagem e Fecho</h5>'+
+    '<div class="briefing-secao"><h5>7. Mensagem e Fecho</h5>'+
       '<p><em>'+escapeAttr(mensagem)+'</em></p>'+
       '<p class="briefing-prompt">Define em conjunto 1-2 objetivos claros para o próximo período e pergunta se há dúvidas ou preocupações.</p></div>';
 }
