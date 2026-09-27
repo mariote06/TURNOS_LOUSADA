@@ -702,10 +702,14 @@
       <button class="nav-btn" id="tecYearNext">›</button>
     </div>
 
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">
+      <input type="checkbox" id="tecMostrarInativos"> Mostrar técnicos que já saíram (inativos)
+    </label>
+
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="tecTable">
         <thead>
-          <tr><th>Cor</th><th>Técnico</th><th>Sexo</th><th>Vínculo</th><th>Horas no ano</th><th>Valor estimado</th><th></th></tr>
+          <tr><th>Cor</th><th>Técnico</th><th>Sexo</th><th>Vínculo</th><th>Horas no ano</th><th>Valor estimado</th><th>Estado</th><th></th></tr>
         </thead>
         <tbody id="tecTableBody"></tbody>
       </table>
@@ -2738,7 +2742,10 @@ function renderTecTab(){
   document.getElementById('tecYearNext').disabled = tecYear >= RANGE_END.getFullYear();
   const yearRange = getYearRange(new Date(tecYear, 0, 1));
   const budget = computeBudgetPerWorker(yearRange.start, yearRange.end);
-  const names = Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  const mostrarInativos = document.getElementById('tecMostrarInativos').checked;
+  const names = Object.keys(TECH_REGISTRY)
+    .filter(n=> mostrarInativos || TECH_REGISTRY[n].ativo !== false)
+    .sort((a,b)=>a.localeCompare(b,'pt'));
 
   const tbody = document.getElementById('tecTableBody');
   tbody.innerHTML = '';
@@ -2747,6 +2754,7 @@ function renderTecTab(){
 
   names.forEach(name=>{
     const entry = TECH_REGISTRY[name];
+    const inativo = entry.ativo === false;
     const b = budget[name] || {hours:0, value:0};
     const status = entry.status;
     if(status==='dependente'){ totalDepHours += b.hours; totalDepVal += b.value; }
@@ -2756,6 +2764,7 @@ function renderTecTab(){
 
     const tr = document.createElement('tr');
     if(!status) tr.className = 'unclassified';
+    if(inativo) tr.style.opacity = '0.55';
     const currentColor = colorForName(name).bg;
     const gender = entry.gender || 'H';
     tr.innerHTML =
@@ -2773,8 +2782,24 @@ function renderTecTab(){
       '</select></td>'+
       '<td class="hrs" data-label="Horas no período">'+fmtHours(b.hours)+' h</td>'+
       '<td class="val" data-label="Valor estimado">'+(status==='estagiario' ? '<span style="color:var(--ink-soft);font-style:italic;">não remunerado</span>' : (status ? fmtEUR(b.value) : '—'))+'</td>'+
+      '<td data-label="Estado"><button type="button" class="btn ghost tec-toggle-ativo" data-name="'+encodeURIComponent(name)+'" style="font-size:11.5px;padding:4px 10px;">'+(inativo ? '⏸ Inativo — reativar' : '✅ Ativo — marcar saído')+'</button></td>'+
       '<td data-label="Remover"><button class="rm-tec" title="Remover técnico" data-name="'+encodeURIComponent(name)+'">×</button></td>';
     tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.tec-toggle-ativo').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const name = decodeURIComponent(e.target.dataset.name);
+      const atualInativo = TECH_REGISTRY[name].ativo === false;
+      if(atualInativo){
+        TECH_REGISTRY[name].ativo = true;
+      } else {
+        if(!confirm('Marcar "'+name+'" como inativo (já não trabalha no Playlife)? Os turnos, avaliações e histórico ficam guardados — deixa só de aparecer nas listas de seleção do dia a dia.')) return;
+        TECH_REGISTRY[name].ativo = false;
+      }
+      saveTechRegistry(TECH_REGISTRY);
+      renderTecTab();
+    });
   });
 
   tbody.querySelectorAll('.tec-color-input').forEach(inp=>{
@@ -2852,6 +2877,7 @@ document.getElementById('btnAddRateInd').addEventListener('click', ()=>{
   document.getElementById('newRateValInd').value = '';
   renderTecTab();
 });
+document.getElementById('tecMostrarInativos').addEventListener('change', renderTecTab);
 document.getElementById('btnAddTec').addEventListener('click', ()=>{
   const input = document.getElementById('newTecName');
   const name = input.value.trim();
@@ -6777,7 +6803,23 @@ function computeSatisfacaoAgregada(){
 }
 function media(arr){ return arr.length ? (arr.reduce((s,v)=>s+v,0)/arr.length) : null; }
 function fmtMedia(v){ return v===null ? '—' : v.toFixed(1); }
+// Corrige, nos dados já guardados, nomes de "Profissional Avaliado" que não
+// batem exatamente com o nome registado do TEF (ex.: sem acento) — evita
+// linhas duplicadas na tabela "Por TEF" para a mesma pessoa.
+function limparNomesSatisfacao(){
+  const registeredNames = Object.keys(TECH_REGISTRY);
+  let mudou = false;
+  Object.keys(SATISFACAO).forEach(mKey=>{
+    (SATISFACAO[mKey].respostas||[]).forEach(r=>{
+      if(!r.profissionalArquivo) return;
+      const match = matchTefName(r.profissionalArquivo, registeredNames);
+      if(match && match !== r.profissionalArquivo){ r.profissionalArquivo = match; mudou = true; }
+    });
+  });
+  if(mudou) saveSatisfacao(SATISFACAO);
+}
 function renderSatisfacaoResumo(){
+  limparNomesSatisfacao();
   const container = document.getElementById('satisfacaoResumo');
   if(Object.keys(SATISFACAO).length===0){
     container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Ainda não importaste nenhum questionário.</p>';
@@ -6906,13 +6948,20 @@ async function handleSatisfacaoFile(e){
       e.target.value = '';
       return;
     }
+    const registeredNames = Object.keys(TECH_REGISTRY);
+    let nCorrigidos = 0;
+    parsed.forEach(r=>{
+      if(!r.profissionalArquivo) return;
+      const match = matchTefName(r.profissionalArquivo, registeredNames);
+      if(match && match !== r.profissionalArquivo){ r.profissionalArquivo = match; nCorrigidos++; }
+    });
     const porMes = {};
     parsed.forEach(r=>{ const mk = r.dataResposta.slice(0,7); (porMes[mk] = porMes[mk]||[]).push(r); });
     Object.keys(porMes).forEach(mk=>{
       SATISFACAO[mk] = {fileName: file.name, importedAt: nowISO(), respostas: porMes[mk]};
     });
     saveSatisfacao(SATISFACAO);
-    statusEl.textContent = parsed.length+' resposta(s) processada(s), em '+Object.keys(porMes).length+' mês(es).';
+    statusEl.textContent = parsed.length+' resposta(s) processada(s), em '+Object.keys(porMes).length+' mês(es).'+(nCorrigidos>0 ? ' '+nCorrigidos+' nome(s) de profissional corrigido(s) automaticamente.' : '');
     renderSatisfacaoResumo();
   }catch(err){
     console.error(err);
@@ -6959,7 +7008,7 @@ function getRelatorioAtual(){
 }
 function saveRelatorioAtual(){ saveRelatorios(RELATORIOS); }
 function relTecNames(){
-  return Object.keys(TECH_REGISTRY).sort((a,b)=>a.localeCompare(b,'pt'));
+  return Object.keys(TECH_REGISTRY).filter(n=> TECH_REGISTRY[n].ativo !== false).sort((a,b)=>a.localeCompare(b,'pt'));
 }
 function escapeAttr(v){
   return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
