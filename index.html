@@ -6754,7 +6754,7 @@ function computeSatisfacaoParaTef(name){
 }
 function computeSatisfacaoAgregada(){
   const porTef = {};
-  function ensure(name){ if(!porTef[name]) porTef[name] = {p1File:[], p1Tarefas:[], p2:[]}; return porTef[name]; }
+  function ensure(name){ if(!porTef[name]) porTef[name] = {p1File:[], p1Tarefas:[], p2:[], p5:[]}; return porTef[name]; }
   const detalhe = [];
   Object.keys(SATISFACAO).forEach(mKey=>{
     (SATISFACAO[mKey].respostas||[]).forEach(r=>{
@@ -6764,6 +6764,11 @@ function computeSatisfacaoAgregada(){
       if(r.p1!==null && viaTarefas) ensure(viaTarefas.responsavel).p1Tarefas.push(r.p1);
       if(r.p2!==null && salaTefs && salaTefs.length){
         salaTefs.forEach(name=> ensure(name).p2.push(r.p2));
+      }
+      if(r.p5!==null){
+        const tefsEnvolvidos = new Set(salaTefs || []);
+        if(r.profissionalArquivo) tefsEnvolvidos.add(r.profissionalArquivo);
+        tefsEnvolvidos.forEach(name=> ensure(name).p5.push(r.p5));
       }
       detalhe.push(Object.assign({}, r, {monthKey: mKey, viaTarefas, salaTefs}));
     });
@@ -6790,12 +6795,12 @@ function renderSatisfacaoResumo(){
   nomes.forEach(name=>{
     const e = porTef[name];
     const mF = media(e.p1File), mS = media(e.p2);
-    const geral = media([mF, mS].filter(v=>v!==null));
+    const geral = media(e.p5);
     html += '<tr>'+
       '<td data-label="TEF" style="font-weight:700;">'+name+'</td>'+
       '<td data-label="Aval./Presc. (Ficheiro)">'+fmtMedia(mF)+' <span style="color:var(--ink-soft);font-size:11px;">(n='+e.p1File.length+')</span></td>'+
       '<td data-label="Acompanh. em Sala">'+fmtMedia(mS)+' <span style="color:var(--ink-soft);font-size:11px;">(n='+e.p2.length+')</span></td>'+
-      '<td data-label="Satisfação Geral"><strong>'+fmtMedia(geral)+'</strong></td>'+
+      '<td data-label="Satisfação Geral"><strong>'+fmtMedia(geral)+'</strong> <span style="color:var(--ink-soft);font-size:11px;">(n='+e.p5.length+')</span></td>'+
     '</tr>';
   });
   html += '</tbody></table></div>'+
