@@ -580,8 +580,13 @@
 
     <h3 style="font-size:15px;margin:0 0 10px;">📥 Carregar Ficheiros do Mês</h3>
     <div class="panel" style="padding:14px 18px;margin-bottom:20px;">
+      <div class="tec-year-nav" style="margin-bottom:10px;">
+        <button class="nav-btn" id="inicioMesPrev">‹</button>
+        <span id="inicioMesAtual">Setembro 2026</span>
+        <button class="nav-btn" id="inicioMesNext">›</button>
+      </div>
       <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 12px;">
-        Os 4 ficheiros, todos aqui. Os 3 mensais usam o mês selecionado no separador Relatório: <strong id="inicioMesAtual"></strong>. Os Questionários de Satisfação podem ter respostas de vários meses de uma vez — repartem-se sozinhos.
+        Os 4 ficheiros, todos aqui. Os 3 mensais usam o mês escolhido acima (o mesmo do separador Relatório). Os Questionários de Satisfação podem ter respostas de vários meses de uma vez — repartem-se sozinhos.
       </p>
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div>
@@ -597,17 +602,41 @@
           <span id="inicioAcessosStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
         </div>
         <div>
-          <label class="btn ghost" style="cursor:pointer;display:inline-block;">🧘 Carregar Excel de Reservas de Aulas
-            <input type="file" id="inicioAulasFileInput" accept=".xlsx,.xls" style="display:none;">
-          </label>
-          <span id="inicioAulasStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
-        </div>
-        <div>
           <label class="btn ghost" style="cursor:pointer;display:inline-block;">💬 Carregar Questionários de Satisfação
             <input type="file" id="inicioSatisfacaoFileInput" accept=".xlsx,.xls" style="display:none;">
           </label>
           <span id="inicioSatisfacaoStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
         </div>
+        <div>
+          <label class="btn ghost" style="cursor:pointer;display:inline-block;">📅 Carregar Reservas de Aulas
+            <input type="file" id="aulasFileInput" accept=".xlsx,.xls" style="display:none;">
+          </label>
+          <span id="aulasFileStatus" style="font-size:12px;color:var(--ink-soft);margin-left:8px;"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:16px 18px;margin-bottom:20px;">
+      <h4 style="margin:0 0 8px;">Reservas de Aulas (Excel)</h4>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
+        Carrega o Excel de reservas de aulas para excluir, das contagens por TEF, o tempo exato em que cada cliente esteve numa aula (só linhas "Presente"). Se o cliente entrar entre <strong id="aulaBufPreLabel">30–60</strong> min antes da aula, ou sair entre <strong id="aulaBufPostLabel">45–60</strong> min depois, esse troço continua a contar para o turno de sala antes/depois.
+      </p>
+
+      <div id="aulaDuracoesPanel" style="margin-top:14px;"></div>
+
+      <div style="margin-top:14px;display:flex;gap:22px;flex-wrap:wrap;">
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">Incluir antes da aula entre
+          <input type="number" min="0" max="180" id="aulaBufPreMin" class="rel-input" style="width:60px;">
+          e
+          <input type="number" min="0" max="180" id="aulaBufPreMax" class="rel-input" style="width:60px;">
+          min antes
+        </label>
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">Incluir depois da aula entre
+          <input type="number" min="0" max="180" id="aulaBufPostMin" class="rel-input" style="width:60px;">
+          e
+          <input type="number" min="0" max="180" id="aulaBufPostMax" class="rel-input" style="width:60px;">
+          min depois
+        </label>
       </div>
     </div>
 
@@ -1098,12 +1127,8 @@
     </div>
 
     <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
-      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-        Carrega o Excel de Tarefas para preencher automaticamente, neste mês: as tarefas fechadas (Prescrição, Avaliação Física, Treino de Integração) e as tarefas abertas com prazo excedido.
-      </p>
-      <input type="file" id="ptTarefasFileInput" accept=".xlsx,.xls" style="display:none;">
-      <button class="btn primary" id="ptTarefasUploadBtn">📥 Carregar Excel de Tarefas</button>
-      <span id="ptTarefasFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
+      <p style="margin:0;color:var(--ink-soft);font-size:12.5px;">Este ficheiro carrega-se no separador <strong>Início</strong>.</p>
+      <span id="ptTarefasFileStatus" style="display:none;"></span>
     </div>
 
     <div class="panel" style="padding:0;overflow-x:auto;">
@@ -1201,36 +1226,8 @@
       Carrega o PDF de "Visitas Diárias" (entradas/saídas) exportado do sistema do ginásio. Cada visita é cruzada com os turnos desse dia e contam-se os clientes distintos por TEF — se uma visita atravessar dois turnos, conta para os dois técnicos.
     </p>
     <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
-      <input type="file" id="acessosFileInput" accept="application/pdf" style="display:none;">
-      <button class="btn primary" id="acessosUploadBtn">📄 Carregar PDF de Visitas Diárias</button>
-      <span id="acessosFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
-    </div>
-
-    <div class="panel" style="padding:16px 18px;margin-bottom:16px;">
-      <h4 style="margin:0 0 8px;">Reservas de Aulas (Excel)</h4>
-      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-        Carrega o Excel de reservas de aulas para excluir, das contagens por TEF, o tempo exato em que cada cliente esteve numa aula (só linhas "Presente"). Se o cliente entrar entre <strong id="aulaBufPreLabel">30–60</strong> min antes da aula, ou sair entre <strong id="aulaBufPostLabel">45–60</strong> min depois, esse troço continua a contar para o turno de sala antes/depois.
-      </p>
-      <input type="file" id="aulasFileInput" accept=".xlsx,.xls" style="display:none;">
-      <button class="btn primary" id="aulasUploadBtn">📅 Carregar Reservas de Aulas</button>
-      <span id="aulasFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
-
-      <div id="aulaDuracoesPanel" style="margin-top:14px;"></div>
-
-      <div style="margin-top:14px;display:flex;gap:22px;flex-wrap:wrap;">
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">Incluir antes da aula entre
-          <input type="number" min="0" max="180" id="aulaBufPreMin" class="rel-input" style="width:60px;">
-          e
-          <input type="number" min="0" max="180" id="aulaBufPreMax" class="rel-input" style="width:60px;">
-          min antes
-        </label>
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;">Incluir depois da aula entre
-          <input type="number" min="0" max="180" id="aulaBufPostMin" class="rel-input" style="width:60px;">
-          e
-          <input type="number" min="0" max="180" id="aulaBufPostMax" class="rel-input" style="width:60px;">
-          min depois
-        </label>
-      </div>
+      <p style="margin:0;color:var(--ink-soft);font-size:12.5px;">Este ficheiro carrega-se no separador <strong>Início</strong>.</p>
+      <span id="acessosFileStatus" style="display:none;"></span>
     </div>
 
     <div id="aulasResults"></div>
@@ -1321,11 +1318,9 @@
     <h3 style="font-size:15px;margin:26px 0 10px;">4. Tarefas Abertas / Pendentes</h3>
     <div class="panel" style="padding:14px 18px;">
       <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
-        Podes carregar um Excel com as tarefas (colunas: Tarefa, Responsável, Prazo, Estado) — a app separa automaticamente as que já passaram do prazo das restantes.
+        Podes carregar um Excel com as tarefas (colunas: Tarefa, Responsável, Prazo, Estado) — a app separa automaticamente as que já passaram do prazo das restantes. Este ficheiro carrega-se no separador <strong>Início</strong>.
       </p>
-      <input type="file" id="relTarefasFileInput" accept=".xlsx,.xls" style="display:none;">
-      <button type="button" class="btn primary" id="relTarefasUploadBtn">📥 Carregar Excel de Tarefas</button>
-      <span id="relTarefasFileStatus" style="margin-left:10px;color:var(--ink-soft);font-size:12.5px;"></span>
+      <span id="relTarefasFileStatus" style="display:none;"></span>
 
       <h4 style="font-size:13.5px;margin:18px 0 8px;color:var(--rust);">⏰ Com prazo excedido</h4>
       <div id="relAbertasOverdue"></div>
@@ -5723,9 +5718,6 @@ document.getElementById('ptCountMonthNext').addEventListener('click', ()=>{
   if(ptCountMonthIdx < MONTH_LIST.length-1){ ptCountMonthIdx++; renderPtCountTab(); }
 });
 
-document.getElementById('ptTarefasUploadBtn').addEventListener('click', ()=>{
-  document.getElementById('ptTarefasFileInput').click();
-});
 async function handlePtTarefasFile(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -5795,7 +5787,9 @@ async function handlePtTarefasFile(e){
   }
   e.target.value = '';
 }
-document.getElementById('ptTarefasFileInput').addEventListener('change', handlePtTarefasFile);
+// (o input/botão próprio deste separador foi removido — o carregamento
+// deste ficheiro passou a fazer-se só no separador Início, que chama
+// handlePtTarefasFile diretamente.)
 
 /* ---------------------------------------------------------------
    SUBSTITUIÇÕES — lista e exporta para Excel todas as substituições
@@ -6433,9 +6427,6 @@ function clientsInTimeWindow(visits, fromHHMM, toHHMM){
   return Object.values(byClient).sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name,'pt'));
 }
 
-document.getElementById('acessosUploadBtn').addEventListener('click', ()=>{
-  document.getElementById('acessosFileInput').click();
-});
 async function handleAcessosFile(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -6479,7 +6470,9 @@ async function handleAcessosFile(e){
   }
   e.target.value = '';
 }
-document.getElementById('acessosFileInput').addEventListener('change', handleAcessosFile);
+// (o input/botão próprio deste separador foi removido — o carregamento
+// deste ficheiro passou a fazer-se só no separador Início, que chama
+// handleAcessosFile diretamente.)
 
 // Resumo, rankings e filtros das reservas de aulas importadas, por mês —
 // independente de já haver ou não um PDF de Entradas/Saídas desse mês.
@@ -6611,9 +6604,6 @@ function fillAulaBufferInputs(){
   });
 })();
 
-document.getElementById('aulasUploadBtn').addEventListener('click', ()=>{
-  document.getElementById('aulasFileInput').click();
-});
 async function handleAulasFile(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -7586,9 +7576,6 @@ function renderRelCanceladasList(rel){
     '</tbody></table></div>';
 }
 
-document.getElementById('relTarefasUploadBtn').addEventListener('click', ()=>{
-  document.getElementById('relTarefasFileInput').click();
-});
 async function handleRelTarefasFile(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -7655,7 +7642,9 @@ async function handleRelTarefasFile(e){
   }
   e.target.value = '';
 }
-document.getElementById('relTarefasFileInput').addEventListener('change', handleRelTarefasFile);
+// (o input/botão próprio deste separador foi removido — o carregamento
+// deste ficheiro passou a fazer-se só no separador Início, que chama
+// handleRelTarefasFile diretamente.)
 
 function renderRelPrintsList(rel){
   const container = document.getElementById('relPrintsList');
@@ -8287,9 +8276,19 @@ document.getElementById('relFichaTefBtn').addEventListener('click', ()=>{
 --------------------------------------------------------------- */
 function renderInicioTab(){
   document.getElementById('inicioMesAtual').textContent = MONTH_NAMES[MONTH_LIST[relMonthIdx].month]+' '+MONTH_LIST[relMonthIdx].year;
+  document.getElementById('inicioMesPrev').disabled = relMonthIdx <= 0;
+  document.getElementById('inicioMesNext').disabled = relMonthIdx >= MONTH_LIST.length-1;
   renderInicioTurnosHoje();
   renderInicioAtencao();
+  renderAulaDuracoesPanel();
+  fillAulaBufferInputs();
 }
+document.getElementById('inicioMesPrev').addEventListener('click', ()=>{
+  if(relMonthIdx > 0){ relMonthIdx--; renderInicioTab(); }
+});
+document.getElementById('inicioMesNext').addEventListener('click', ()=>{
+  if(relMonthIdx < MONTH_LIST.length-1){ relMonthIdx++; renderInicioTab(); }
+});
 
 function renderInicioTurnosHoje(){
   const container = document.getElementById('inicioTurnosHoje');
@@ -8368,15 +8367,6 @@ document.getElementById('inicioAcessosFileInput').addEventListener('change', asy
   statusEl.textContent = 'A processar '+file.name+'…';
   await handleAcessosFile({target:{files:[file], value:''}});
   statusEl.textContent = 'Entradas/Saídas atualizadas.';
-  e.target.value = '';
-});
-document.getElementById('inicioAulasFileInput').addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const statusEl = document.getElementById('inicioAulasStatus');
-  statusEl.textContent = 'A processar '+file.name+'…';
-  await handleAulasFile({target:{files:[file], value:''}});
-  statusEl.textContent = 'Aulas atualizadas.';
   e.target.value = '';
 });
 document.getElementById('inicioSatisfacaoFileInput').addEventListener('change', async (e)=>{
@@ -8567,7 +8557,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='recrut') renderCandidates();
     if(tab==='ptcount') renderPtCountTab();
     if(tab==='substituicoes') renderSubstTecTab();
-    if(tab==='acessos'){ renderAcessosResults(); renderAulaDuracoesPanel(); fillAulaBufferInputs(); renderAulasResults(); }
+    if(tab==='acessos'){ renderAcessosResults(); renderAulasResults(); }
     if(tab==='satisfanalise') renderSatisfAnaliseTab();
     if(tab==='relatorio') renderRelatorioTab();
     if(tab==='ferias') renderFeriasTab();
