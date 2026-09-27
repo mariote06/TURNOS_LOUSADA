@@ -4615,6 +4615,7 @@ function buildPerfilComportamentoHtml(name){
   });
   return html || '<p class="briefing-empty">Sem notas registadas ainda.</p>';
 }
+let perfilSatisfMesAtual = 'total';
 function renderPerfilConteudo(name){
   const container = document.getElementById('perfilConteudo');
   const info = TECH_REGISTRY[name] || {};
@@ -4624,7 +4625,8 @@ function renderPerfilConteudo(name){
     .filter(r=> r.titular===name || r.substituto===name);
   const comoTitular = todasSubst.filter(r=>r.titular===name);
   const comoSubstituto = todasSubst.filter(r=>r.substituto===name);
-  const satisfacaoTef = computeSatisfacaoParaTef(name);
+  const mesesSatisf = Object.keys(SATISFACAO).sort().reverse();
+  const satisfacaoTef = computeSatisfacaoParaTef(name, perfilSatisfMesAtual);
 
   function agruparPorMes(lista){
     const porMes = {};
@@ -4679,6 +4681,13 @@ function renderPerfilConteudo(name){
     '</div>'+
     '<div class="panel" style="padding:14px 18px;margin-bottom:16px;">'+
       '<h4 style="margin:0 0 10px;font-size:13.5px;">5. Classificações de Satisfação</h4>'+
+      '<label style="font-size:12.5px;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;">Mês <select id="perfilSatisfMesSelect" class="rel-input" style="width:auto;">'+
+        '<option value="total"'+(perfilSatisfMesAtual==='total'?' selected':'')+'>Total (todos os meses)</option>'+
+        mesesSatisf.map(mk=>{
+          const [y,m] = mk.split('-').map(Number);
+          return '<option value="'+mk+'"'+(perfilSatisfMesAtual===mk?' selected':'')+'>'+MONTH_NAMES[m-1]+' '+y+'</option>';
+        }).join('')+
+      '</select></label>'+
       '<p style="margin:0 0 12px;"><strong>Satisfação Geral (clientes de sala e/ou avaliação): </strong>'+
         (satisfacaoTef.mediaGeral!==null ? satisfacaoTef.mediaGeral.toFixed(1)+' (n='+satisfacaoTef.nGeral+')' : '—')+'</p>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'+
@@ -4733,6 +4742,10 @@ function renderPerfilConteudo(name){
   }
   populateGrupo();
   setPerfilTipo('positivo');
+  document.getElementById('perfilSatisfMesSelect').addEventListener('change', (e)=>{
+    perfilSatisfMesAtual = e.target.value;
+    renderPerfilConteudo(name);
+  });
   document.getElementById('perfilNotaTipoPositivo').addEventListener('click', ()=> setPerfilTipo('positivo'));
   document.getElementById('perfilNotaTipoNegativo').addEventListener('click', ()=> setPerfilTipo('negativo'));
   document.getElementById('perfilNotaGrupoSelect').addEventListener('change', populateCriterio);
@@ -6754,9 +6767,10 @@ function turnosDoClienteNoMes(codigo, monthKey){
 // lista de notas de Avaliação/Prescrição de cada cliente a quem está
 // atribuído como "Profissional Avaliado", e a média de Satisfação Geral dos
 // clientes de qualquer um dos dois grupos (sala e/ou avaliação).
-function computeSatisfacaoParaTef(name){
+function computeSatisfacaoParaTef(name, filtroMes){
   const salaRatings = [], avalRatings = [], geralValores = [];
   Object.keys(SATISFACAO).forEach(mKey=>{
+    if(filtroMes && filtroMes!=='total' && mKey !== filtroMes) return;
     (SATISFACAO[mKey].respostas||[]).forEach(r=>{
       const salaTefs = salaTefsParaCliente(r.codigo, mKey) || [];
       const naSala = salaTefs.includes(name);
