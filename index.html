@@ -103,6 +103,11 @@
   .cell.outside:hover{box-shadow:none;transform:none;}
   .cell.today{outline:2px solid var(--accent);outline-offset:-2px;}
   .cell.exception{border-style:dashed;border-color:var(--rust);}
+  .cell.needs-subst{background:#fde8e4;border:2px solid #c0392b;}
+  .shift-chip.needs-subst{background:#c0392b !important;color:#fff !important;box-shadow:0 0 0 2px #fff inset;}
+  .need-flag{align-self:flex-end;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;background:#fff;color:#c0392b;margin-top:3px;}
+  .chip-nota{font-size:10px;font-style:italic;opacity:.9;margin-top:2px;}
+  .day-note{font-size:10.5px;line-height:1.3;background:#fff8dc;color:#6b5200;border-left:3px solid #d4a017;padding:3px 6px;border-radius:4px;margin:4px 0;white-space:pre-wrap;word-break:break-word;}
   .cell-top{display:flex;align-items:center;justify-content:space-between;}
   .daynum{font:700 14px 'Space Grotesk';}
   .weekday-mini{display:none;}
@@ -679,6 +684,8 @@
       <span><span class="dot" style="background:var(--muni-bg);border:1px solid var(--muni-ink)"></span>Feriado municipal (Lousada)</span>
       <span><span class="dot" style="background:var(--fac-bg);border:1px solid var(--fac-ink)"></span>Facultativo (Carnaval)</span>
       <span><span class="dot" style="background:#fff;border:1.5px dashed var(--rust)"></span>Dia com substituição pontual</span>
+      <span><span class="dot" style="background:#c0392b;border:1px solid #c0392b"></span>Turno a precisar de substituto</span>
+      <span><span class="dot" style="background:#fff8dc;border:1px solid #d4a017"></span>📝 Nota do dia</span>
       <span><span class="subst-box" style="position:static;">Nome</span>&nbsp;caixa com o nome de quem substitui (só aparece se preenchida)</span>
     </div>
 
@@ -1758,7 +1765,7 @@ function shiftsForDate(iso, dayKey){
   let result = base.map(slot=>{
     if(exc && exc.slotOverrides && exc.slotOverrides[slot.id]){
       const ov = exc.slotOverrides[slot.id];
-      return {id:slot.id, start:ov.start||slot.start, end:ov.end||slot.end, name:slot.name, substituteName:(ov.substituteName||'').trim(), payTitular:!!ov.payTitular, nota:(ov.nota||'').trim(), _subst:true};
+      return {id:slot.id, start:ov.start||slot.start, end:ov.end||slot.end, name:slot.name, substituteName:(ov.substituteName||'').trim(), payTitular:!!ov.payTitular, nota:(ov.nota||'').trim(), needsSubst: !!ov.needsSubst && !(ov.substituteName||'').trim(), _subst:true};
     }
     return slot;
   });
@@ -1770,6 +1777,8 @@ function shiftsForDate(iso, dayKey){
   }
   return result;
 }
+
+function escHtmlNota(t){ return String(t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function dayHasPontualStuff(iso){
   const exc = exceptions[iso];
@@ -1864,6 +1873,9 @@ function renderCalendar(){
     if(holiday) html += '<span class="badge '+holiday.type+'">'+ (holiday.type==='municipal' ? 'Municipal' : holiday.type==='facultativo' ? 'Facultativo' : 'Feriado') +'</span>';
     html += '</div>';
     if(holiday) html += '<div class="holiday-name">'+holiday.name+'</div>';
+    const dayExc = exceptions[iso];
+    if(dayExc && dayExc.note && dayExc.note.trim()) html += '<div class="day-note">📝 '+escHtmlNota(dayExc.note.trim())+'</div>';
+    if(shifts.some(s=>s.needsSubst)) cell.classList.add('needs-subst');
 
     if(shifts.length === 0){
       html += '<div class="empty-note" style="'+(holiday && !holiday.closed?'color:var(--rust);font-style:normal;font-weight:600;':'')+'">'+
@@ -1876,7 +1888,9 @@ function renderCalendar(){
         const subBox = s.substituteName ? '<div class="subst-box">'+s.substituteName+'</div>' : '';
         const onFerias = s.name && FERIAS_DIAS[s.name] && FERIAS_DIAS[s.name][iso] !== undefined;
         const feriasFlag = onFerias ? '<div class="ferias-flag">🌴 Férias'+(s.substituteName?'':' — sem substituto')+'</div>' : '';
-        html += '<div class="shift-chip'+(onFerias?' on-ferias':'')+'" style="background:'+c.bg+';color:'+c.fg+'"><div class="chip-main"><span class="t">'+s.start+'</span><span style="flex:1;text-align:right;font-weight:600;">'+ (s.name||'') +'</span></div>'+subBox+feriasFlag+'</div>';
+        const needFlag = s.needsSubst ? '<div class="need-flag">⚠️ Precisa de substituto</div>' : '';
+        const notaChip = (s.nota && (s.needsSubst || s.substituteName)) ? '<div class="chip-nota">'+escHtmlNota(s.nota)+'</div>' : '';
+        html += '<div class="shift-chip'+(onFerias?' on-ferias':'')+(s.needsSubst?' needs-subst':'')+'" style="background:'+c.bg+';color:'+c.fg+'"><div class="chip-main"><span class="t">'+s.start+'</span><span style="flex:1;text-align:right;font-weight:600;">'+ (s.name||'') +'</span></div>'+subBox+needFlag+notaChip+feriasFlag+'</div>';
       });
       html += '</div>';
     }
@@ -1999,6 +2013,7 @@ function openDayModal(iso, dayKey, dateObj){
       substituteName: override ? (override.substituteName||'') : '',
       payTitular: override ? !!override.payTitular : false,
       nota: override ? (override.nota||'') : '',
+      needsSubst: override ? (!!override.needsSubst && !(override.substituteName||'').trim()) : false,
       pontual: !!override || removedPontual,
       removed: removedPontual,
       isNew: false
@@ -2050,7 +2065,10 @@ function renderModalRows(){
       '<div class="row-edit-meta">'+
         (row.removed
           ? '<span class="hint subst">Turno removido — '+(row.pontual ? 'só neste dia' : 'a partir de '+fmtDatePT(editingIso)+' em diante')+'</span>'
-          : '<label><input type="checkbox" data-idx="'+idx+'" data-field="pontual" '+(row.pontual?'checked':'')+'> Substituição pontual (só este dia)</label>'
+          : '<label><input type="checkbox" data-idx="'+idx+'" data-field="pontual" '+(row.pontual?'checked':'')+'> Substituição pontual (só este dia)</label>'+
+            (!row.isNew && !(row.substituteName||'').trim()
+              ? '<label style="color:#c0392b;font-weight:600;"><input type="checkbox" data-idx="'+idx+'" data-field="needsSubst" '+(row.needsSubst?'checked':'')+'> ⚠️ Precisa de substituto</label>'
+              : '')
         ) +
         (row.removed ? '' : hintPerm) +
       '</div>';
@@ -2076,11 +2094,24 @@ function renderModalRows(){
       inp.addEventListener('blur', hideTecSuggestionsSoon);
     }
   });
+  modalRows.querySelectorAll('input[type=checkbox][data-field=needsSubst]').forEach(chk=>{
+    chk.addEventListener('change', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      editingRows[idx].needsSubst = e.target.checked;
+      if(e.target.checked) editingRows[idx].pontual = true;
+      renderModalRows();
+      if(e.target.checked){
+        const notaInput = modalRows.querySelector('input[data-idx="'+idx+'"][data-field="nota"]');
+        if(notaInput) notaInput.focus();
+      }
+    });
+  });
   modalRows.querySelectorAll('input[type=checkbox][data-field=pontual]').forEach(chk=>{
     chk.addEventListener('change', (e)=>{
       const idx = parseInt(e.target.dataset.idx,10);
       const checked = e.target.checked;
       editingRows[idx].pontual = checked;
+      if(!checked) editingRows[idx].needsSubst = false;
       renderModalRows();
       if(checked){
         const subInput = modalRows.querySelector('input[data-idx="'+idx+'"][data-field="substituteName"]');
@@ -2163,8 +2194,9 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
       const base = line ? resolveVersion(line, editingIso) : null;
       const timeChanged = base && (base.start!==row.start || base.end!==row.end);
       const hasSubstitute = row.substituteName && row.substituteName.trim().length>0;
-      if(timeChanged || hasSubstitute){
-        newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : '', payTitular: hasSubstitute ? !!row.payTitular : false, nota: hasSubstitute ? (row.nota||'').trim() : ''};
+      const needs = !!row.needsSubst && !hasSubstitute;
+      if(timeChanged || hasSubstitute || needs){
+        newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : '', payTitular: hasSubstitute ? !!row.payTitular : false, nota: (hasSubstitute || needs) ? (row.nota||'').trim() : '', needsSubst: needs};
       }
       // Substituição de um Dependente sem a caixa "recebe e paga" marcada:
       // o ginásio paga diretamente ao substituto, o que na prática significa
@@ -8373,6 +8405,23 @@ function renderInicioAtencao(){
     partes.push(html);
   }
 
+  // Turnos a precisar de substituto (de hoje até 45 dias)
+  const porSubstituir = [];
+  const dd = new Date(); dd.setHours(0,0,0,0);
+  for(let i=0;i<45;i++){
+    if(dd >= RANGE_START && dd <= RANGE_END){
+      const iso = isoDate(dd);
+      shiftsForDate(iso, dayKeyOf(dd)).forEach(s=>{
+        if(s.needsSubst) porSubstituir.push(fmtDatePT(iso)+' '+s.start+'–'+s.end+' · '+s.name+(s.nota?' ('+escHtmlNota(s.nota)+')':''));
+      });
+    }
+    dd.setDate(dd.getDate()+1);
+  }
+  if(porSubstituir.length){
+    partes.unshift('<div style="margin-bottom:12px;"><strong style="color:#c0392b;">⚠️ '+porSubstituir.length+' turno(s) a precisar de substituto</strong><br>'+
+      '<span style="color:var(--ink-soft);font-size:12px;">'+porSubstituir.join('<br>')+'</span></div>');
+  }
+
   container.innerHTML = partes.length ? partes.join('') : '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Nada a assinalar de momento. 🎉</p>';
 }
 
@@ -8814,6 +8863,7 @@ async function exportMapaMesCorrente(){
       if(s._holiday) tipo = 'Feriado';
       else if(s._adhoc) tipo = 'Turno extra';
       else if(sub) tipo = 'Substituição';
+      else if(s.needsSubst) tipo = 'Por substituir';
       const pagoPor = sub ? (s.payTitular ? 'Titular' : 'Ginásio') : '';
       const trabalhadorPago = (sub && !s.payTitular) ? sub : titular;
       turnos.push({k:iso+s.start, vals:[fmtDatePT(iso), dia, hol?hol.name:'', s.start, s.end, hrs, titular, quemFez, tipo, pagoPor, s.nota||''], tipo});
@@ -8868,7 +8918,7 @@ async function exportMapaMesCorrente(){
   const c2 = ['Data','Dia','Feriado','Início','Fim','Horas','TEF titular','Quem fez o turno','Tipo','Pago por','Nota'];
   mapaTitle(ws2, 'Turnos — '+label, mapaSubtitle(), c2.length);
   mapaHeader(ws2, c2);
-  const FILL = {'Substituição':'FFFFF2CC','Turno extra':'FFE2F0D9','Turno cancelado':'FFF8D7D0','Feriado':'FFDCEAF2'};
+  const FILL = {'Por substituir':'FFF4B6A6','Substituição':'FFFFF2CC','Turno extra':'FFE2F0D9','Turno cancelado':'FFF8D7D0','Feriado':'FFDCEAF2'};
   turnos.forEach(t=> mapaRow(ws2, t.vals, FILL[t.tipo]||null, t.tipo!=='Normal'));
   [12,16,20,8,8,7,20,20,15,10,28].forEach((w,i)=> ws2.getColumn(i+1).width = w);
   ws2.getColumn(6).numFmt = '0.0#';
@@ -8917,7 +8967,7 @@ async function exportMapaMesSeguinte(){
       horas[quem] = horas[quem] || {turnos:0, horas:0};
       horas[quem].turnos++; horas[quem].horas += hoursBetween(s.start, s.end);
       const extra = (s.substituteName && s.substituteName.trim()) ? ' (subst. '+s.name+')' : '';
-      return s.start+'–'+s.end+'\n'+quem+extra;
+      return s.start+'–'+s.end+'\n'+quem+extra+(s.needsSubst?'\n⚠️ por substituir':'');
     });
     maxT = Math.max(maxT, cells.length);
     let obs = hol ? (hol.closed ? hol.name+' — encerrado' : hol.name) : '';
