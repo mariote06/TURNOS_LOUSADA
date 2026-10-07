@@ -8797,8 +8797,17 @@ async function readLinkedFile(){
     const file = await linkedFileHandle.getFile();
     const text = await file.text();
     if(!text || !text.trim()) return {empty:true, modified:file.lastModified};
-    const data = JSON.parse(text);
-    Object.defineProperty(data, '__fileModified', {value:file.lastModified, enumerable:false});
+    let data, recovered = false;
+    try{ data = JSON.parse(text); }
+    catch(pe){
+      // ficheiro com "lixo" no fim (sobra de uma escrita anterior / conflito do OneDrive):
+      // o JSON válido é o início — recupera-o e o ficheiro é reescrito limpo a seguir.
+      const m = /position (\d+)/.exec(pe.message||'');
+      if(!m) throw pe;
+      data = JSON.parse(text.slice(0, parseInt(m[1],10)));
+      recovered = true;
+    }
+    Object.defineProperty(data, '__recovered', {value:recovered, enumerable:false});
     return data;
   }catch(e){ return {error:'leitura: '+e.message}; }
 }
@@ -8809,7 +8818,9 @@ async function writeLinkedFile(payload){
     const perm = await linkedFileHandle.queryPermission({mode:'readwrite'});
     if(perm !== 'granted') return false;
     const writable = await linkedFileHandle.createWritable();
-    await writable.write(JSON.stringify(payload, null, 2));
+    const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+    await writable.write(blob);
+    await writable.truncate(blob.size); // garante que não sobra conteúdo antigo no fim
     await writable.close();
     return true;
   }catch(e){ console.warn('Falha ao escrever no ficheiro ligado', e); setSyncDiag('Falha ao escrever no ficheiro: '+e.message); return false; }
@@ -8847,12 +8858,14 @@ async function syncFromLinkedFile(reconcile){
     const info = 'ficheiro: '+fe+' · este dispositivo: '+le;
     if(!localMeta.updatedAt || (remote.exportedAt && remote.exportedAt > localMeta.updatedAt)){
       applyImportedData(remote);
-      setSyncDiag('recebi dados do ficheiro ('+info+')');
+      if(remote.__recovered) await writeLinkedFile(buildExportPayload());
+      setSyncDiag('recebi dados do ficheiro'+(remote.__recovered?' (ficheiro estava danificado no fim — recuperado e reescrito)':'')+' ('+info+')');
     } else if(remote.exportedAt && remote.exportedAt < localMeta.updatedAt){
       const ok = await writeLinkedFile(buildExportPayload());
       setSyncDiag((ok?'enviei os dados deste dispositivo':'não consegui enviar')+' ('+info+')');
     } else {
-      setSyncDiag('tudo igual ('+info+')');
+      if(remote.__recovered) await writeLinkedFile(buildExportPayload());
+      setSyncDiag('tudo igual'+(remote.__recovered?' (ficheiro danificado reparado)':'')+' ('+info+')');
     }
   }
 }
