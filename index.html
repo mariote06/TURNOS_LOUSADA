@@ -8789,40 +8789,70 @@ function updateLinkUI(state){
 
 async function readLinkedFile(){
   if(!linkedFileHandle) return null;
+  let perm;
+  try{ perm = await linkedFileHandle.queryPermission({mode:'readwrite'}); }
+  catch(e){ return {error:'permissão: '+e.message}; }
+  if(perm !== 'granted') return {needsPermission:true};
   try{
-    const perm = await linkedFileHandle.queryPermission({mode:'readwrite'});
-    if(perm !== 'granted') return {needsPermission:true};
     const file = await linkedFileHandle.getFile();
     const text = await file.text();
-    if(!text || !text.trim()) return null; // ficheiro vazio (recém-criado)
-    return JSON.parse(text);
-  }catch(e){ return null; }
+    if(!text || !text.trim()) return {empty:true, modified:file.lastModified};
+    const data = JSON.parse(text);
+    Object.defineProperty(data, '__fileModified', {value:file.lastModified, enumerable:false});
+    return data;
+  }catch(e){ return {error:'leitura: '+e.message}; }
 }
 
 async function writeLinkedFile(payload){
-  if(!linkedFileHandle) return;
+  if(!linkedFileHandle) return false;
   try{
     const perm = await linkedFileHandle.queryPermission({mode:'readwrite'});
-    if(perm !== 'granted') return;
+    if(perm !== 'granted') return false;
     const writable = await linkedFileHandle.createWritable();
     await writable.write(JSON.stringify(payload, null, 2));
     await writable.close();
-  }catch(e){ console.warn('Falha ao escrever no ficheiro ligado', e); }
+    return true;
+  }catch(e){ console.warn('Falha ao escrever no ficheiro ligado', e); setSyncDiag('Falha ao escrever no ficheiro: '+e.message); return false; }
+}
+
+function setSyncDiag(msg){
+  let el = document.getElementById('linkDiag');
+  if(!el){
+    const st = document.getElementById('linkStatus');
+    if(!st) return;
+    el = document.createElement('div');
+    el.id = 'linkDiag';
+    el.style.cssText = 'font-size:12px;color:var(--ink-soft);margin:4px 0 8px;line-height:1.4;';
+    st.insertAdjacentElement('afterend', el);
+  }
+  const t = new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  el.textContent = t+' · '+msg;
 }
 
 async function syncFromLinkedFile(reconcile){
   const remote = await readLinkedFile();
-  if(remote && remote.needsPermission){ updateLinkUI('needs-permission'); return; }
-  if(!remote){
-    if(reconcile) await writeLinkedFile(buildExportPayload()); // ficheiro novo/vazio: inicializa com os dados locais
+  if(remote && remote.needsPermission){ updateLinkUI('needs-permission'); setSyncDiag('precisa de confirmação (toca em Reativar)'); return; }
+  if(remote && remote.error){ setSyncDiag('não consegui ler o ficheiro ('+remote.error+') — nada foi alterado'); return; }
+  if(!remote || remote.empty){
+    if(reconcile){
+      const ok = await writeLinkedFile(buildExportPayload()); // ficheiro novo/vazio: inicializa com os dados locais
+      setSyncDiag(ok ? 'ficheiro vazio — enviei os dados deste dispositivo' : 'ficheiro vazio e não consegui escrever');
+    }
     return;
   }
   if(reconcile){
     const localMeta = loadMeta();
+    const fe = remote.exportedAt ? fmtDateTimePT(remote.exportedAt) : '?';
+    const le = localMeta.updatedAt ? fmtDateTimePT(localMeta.updatedAt) : 'sem alterações';
+    const info = 'ficheiro: '+fe+' · este dispositivo: '+le;
     if(!localMeta.updatedAt || (remote.exportedAt && remote.exportedAt > localMeta.updatedAt)){
       applyImportedData(remote);
+      setSyncDiag('recebi dados do ficheiro ('+info+')');
     } else if(remote.exportedAt && remote.exportedAt < localMeta.updatedAt){
-      await writeLinkedFile(buildExportPayload());
+      const ok = await writeLinkedFile(buildExportPayload());
+      setSyncDiag((ok?'enviei os dados deste dispositivo':'não consegui enviar')+' ('+info+')');
+    } else {
+      setSyncDiag('tudo igual ('+info+')');
     }
   }
 }
