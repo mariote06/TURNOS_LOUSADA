@@ -8849,12 +8849,16 @@ document.getElementById('btnLinkExistingFile').addEventListener('click', async (
       excludeAcceptAllOption: false,
       multiple: false
     });
-    // showOpenFilePicker só concede leitura por omissão; pedir logo permissão de escrita
-    await handle.requestPermission({mode:'readwrite'});
+    // showOpenFilePicker só concede leitura por omissão; tentar permissão de escrita.
+    // No Android o clique já pode ter "expirado" depois do seletor — nesse caso não é
+    // um erro: o ficheiro fica ligado e o botão "Reativar" pede a permissão num novo toque.
+    let perm = 'prompt';
+    try{ perm = await handle.requestPermission({mode:'readwrite'}); }
+    catch(_){ try{ perm = await handle.queryPermission({mode:'readwrite'}); }catch(__){} }
     linkedFileHandle = handle;
     await idbSet('linkedFile', handle);
-    updateLinkUI();
-    await syncFromLinkedFile(true);
+    if(perm === 'granted'){ updateLinkUI(); await syncFromLinkedFile(true); }
+    else updateLinkUI('needs-permission');
   }catch(e){
     if(e.name !== 'AbortError') alert('Não foi possível ligar ao ficheiro: '+e.message);
   }
@@ -8865,7 +8869,7 @@ document.getElementById('btnReactivateLink').addEventListener('click', async ()=
   try{
     const perm = await linkedFileHandle.requestPermission({mode:'readwrite'});
     if(perm === 'granted'){ updateLinkUI(); await syncFromLinkedFile(true); }
-  }catch(e){}
+  }catch(e){ alert('Não foi possível reativar: '+e.message); }
 });
 
 document.getElementById('btnSyncNow').addEventListener('click', async ()=>{
