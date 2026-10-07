@@ -8808,6 +8808,7 @@ async function readLinkedFile(){
       recovered = true;
     }
     Object.defineProperty(data, '__recovered', {value:recovered, enumerable:false});
+    Object.defineProperty(data, '__fileModified', {value:file.lastModified, enumerable:false});
     return data;
   }catch(e){ return {error:'leitura: '+e.message}; }
 }
@@ -8822,6 +8823,7 @@ async function writeLinkedFile(payload){
     await writable.write(blob);
     await writable.truncate(blob.size); // garante que não sobra conteúdo antigo no fim
     await writable.close();
+    if(!window.__inSync) setSyncDiag('gravei no ficheiro ('+Math.round(blob.size/1024)+' KB)');
     return true;
   }catch(e){ console.warn('Falha ao escrever no ficheiro ligado', e); setSyncDiag('Falha ao escrever no ficheiro: '+e.message); return false; }
 }
@@ -8841,6 +8843,10 @@ function setSyncDiag(msg){
 }
 
 async function syncFromLinkedFile(reconcile){
+  window.__inSync = true;
+  try{ await syncFromLinkedFileInner(reconcile); } finally { window.__inSync = false; }
+}
+async function syncFromLinkedFileInner(reconcile){
   const remote = await readLinkedFile();
   if(remote && remote.needsPermission){ updateLinkUI('needs-permission'); setSyncDiag('precisa de confirmação (toca em Reativar)'); return; }
   if(remote && remote.error){ setSyncDiag('não consegui ler o ficheiro ('+remote.error+') — nada foi alterado'); return; }
@@ -8855,7 +8861,8 @@ async function syncFromLinkedFile(reconcile){
     const localMeta = loadMeta();
     const fe = remote.exportedAt ? fmtDateTimePT(remote.exportedAt) : '?';
     const le = localMeta.updatedAt ? fmtDateTimePT(localMeta.updatedAt) : 'sem alterações';
-    const info = 'ficheiro: '+fe+' · este dispositivo: '+le;
+    const fm = remote.__fileModified ? new Date(remote.__fileModified).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) : '?';
+    const info = 'ficheiro: '+fe+' (gravado no disco às '+fm+') · este dispositivo: '+le;
     if(!localMeta.updatedAt || (remote.exportedAt && remote.exportedAt > localMeta.updatedAt)){
       applyImportedData(remote);
       if(remote.__recovered) await writeLinkedFile(buildExportPayload());
@@ -8948,6 +8955,8 @@ async function restoreLinkedHandle(){
   }catch(e){ updateLinkUI(); }
 }
 
+window.addEventListener('focus', ()=>{ if(linkedFileHandle) syncFromLinkedFile(true); });
+window.addEventListener('pageshow', ()=>{ if(linkedFileHandle) syncFromLinkedFile(true); });
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible' && linkedFileHandle) syncFromLinkedFile(true);
 });
@@ -8959,7 +8968,7 @@ document.addEventListener('visibilitychange', ()=>{
 // mesmo tempo não façam a verificação exatamente no mesmo segundo — isso reduz a hipótese de
 // ambos tentarem escrever no ficheiro no mesmo instante (o que o OneDrive não consegue
 // reconciliar, e resolve criando um ficheiro novo/duplicado).
-const SYNC_POLL_INTERVAL_MS = 45000 + Math.floor(Math.random()*30000);
+const SYNC_POLL_INTERVAL_MS = 15000 + Math.floor(Math.random()*10000);
 setInterval(()=>{
   if(document.visibilityState === 'visible' && linkedFileHandle) syncFromLinkedFile(true);
 }, SYNC_POLL_INTERVAL_MS);
