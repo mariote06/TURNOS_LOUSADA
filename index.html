@@ -103,6 +103,9 @@
   .cell.outside:hover{box-shadow:none;transform:none;}
   .cell.today{outline:2px solid var(--accent);outline-offset:-2px;}
   .cell.exception{border-style:dashed;border-color:var(--rust);}
+  #tab-indice table{border-collapse:collapse;font-size:13px;}
+  #tab-indice th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap;font-size:12px;}
+  #tab-indice td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
   .cell.needs-subst{background:#fde8e4;border:2px solid #c0392b;}
   .shift-chip.needs-subst{background:#c0392b !important;color:#fff !important;box-shadow:0 0 0 2px #fff inset;}
   .need-flag{align-self:flex-end;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;background:#fff;color:#c0392b;margin-top:3px;}
@@ -543,6 +546,7 @@
     <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
     <button class="tab-btn" data-tab="ptcount" data-owner="equipa" style="display:none;">Treinos PT / Tarefas</button>
     <button class="tab-btn" data-tab="aval" data-owner="equipa" style="display:none;">Avaliação</button>
+    <button class="tab-btn" data-tab="indice" data-owner="equipa" style="display:none;">Índice TEF</button>
     <button class="tab-btn" data-tab="relatorio" data-owner="equipa" style="display:none;">Relatório</button>
     <button class="tab-btn" data-tab="acessos" data-owner="gestao" style="display:none;">Entradas/Saídas</button>
     <button class="tab-btn" data-tab="satisfanalise" data-owner="gestao" style="display:none;">Análise Satisfação</button>
@@ -1255,6 +1259,34 @@
   </div>
 
   <!-- RELATÓRIO MENSAL TAB -->
+  <div id="tab-indice" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Índice de Desempenho TEF (0–100): junta a observação do coordenador com os dados do mês. Cada componente compara o TEF com uma meta fixa; se faltar uma componente, o peso dela é repartido pelas restantes. A média dos últimos 3 meses é o valor de referência para a avaliação trimestral e o PDI.
+    </p>
+    <div class="tec-year-nav" style="margin-bottom:12px;">
+      <button class="nav-btn" id="indiceMesPrev">‹</button>
+      <span id="indiceMesAtual"></span>
+      <button class="nav-btn" id="indiceMesNext">›</button>
+      <button class="btn" id="btnIndiceExcel" style="margin-left:auto;">📊 Exportar para Excel</button>
+    </div>
+    <div class="panel" style="padding:12px 16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" id="indiceCfgToggle">
+        <strong style="font-size:14px;">⚙️ Pesos e metas</strong><span id="indiceCfgArrow" style="color:var(--ink-soft);">mostrar ▾</span>
+      </div>
+      <div id="indiceCfgBody" style="display:none;margin-top:12px;"></div>
+    </div>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="fin-table" style="width:100%;">
+        <thead><tr>
+          <th>TEF</th><th>Índice do mês</th><th>Média 3 meses</th><th>Classificação</th>
+          <th>Observação</th><th>Satisfação</th><th>Produtividade</th><th>Tarefas</th><th>PT</th><th>A melhorar</th>
+        </tr></thead>
+        <tbody id="indiceTableBody"></tbody>
+      </table>
+    </div>
+    <p id="indiceNota" style="color:var(--ink-soft);font-size:12px;margin-top:10px;"></p>
+  </div>
+
   <div id="tab-relatorio" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
       Relatório mensal de performance da equipa TEF — clientes por turno, tarefas realizadas e pendentes, e avaliação de desempenho. A avaliação vem automaticamente do separador Avaliação; o resto preenche-se aqui e fica guardado por mês.
@@ -8664,6 +8696,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-acessos').style.display = tab==='acessos' ? '' : 'none';
     document.getElementById('tab-satisfanalise').style.display = tab==='satisfanalise' ? '' : 'none';
     document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? '' : 'none';
+    document.getElementById('tab-indice').style.display = tab==='indice' ? '' : 'none';
     document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
     if(tab==='inicio') renderInicioTab();
     if(tab==='tpl') renderTplGrid();
@@ -8680,6 +8713,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='acessos'){ renderAcessosResults(); renderAulasResults(); }
     if(tab==='satisfanalise') renderSatisfAnaliseTab();
     if(tab==='relatorio') renderRelatorioTab();
+    if(tab==='indice') renderIndiceTab();
     if(tab==='ferias') renderFeriasTab();
   });
 });
@@ -9061,6 +9095,247 @@ document.getElementById('btnMapaMesSeguinte').addEventListener('click', exportMa
 updateMapasButtons();
 
 /* ---------------------------------------------------------------
+   ÍNDICE DE DESEMPENHO TEF (0-100)
+   Componentes (pesos editáveis): Observação do coordenador, Satisfação
+   dos clientes, Produtividade em sala (clientes distintos por hora de
+   turno), Cumprimento de tarefas (% sem atraso) e PT (sessões no mês).
+   Cada componente vale 0-100 face a uma meta fixa; componentes sem dados
+   saem do cálculo e o peso é repartido pelas restantes.
+--------------------------------------------------------------- */
+const STORE_INDICE = 'tef_turnos_indice_tef_v1';
+const INDICE_COMPONENTES = [
+  {key:'observacao', label:'Observação'},
+  {key:'satisfacao', label:'Satisfação'},
+  {key:'produtividade', label:'Produtividade'},
+  {key:'tarefas', label:'Tarefas'},
+  {key:'pt', label:'PT'}
+];
+function defaultIndiceCfg(){
+  return {
+    pesos:{observacao:25, satisfacao:30, produtividade:10, tarefas:15, pt:20},
+    metaClientesHora:4,      // clientes distintos por hora de turno que valem 100
+    metaTarefas:90,          // % de tarefas sem atraso que vale 100
+    metaPT:20,               // sessões de PT no mês que valem 100
+    minRespostas:3           // respostas mínimas de satisfação para contar
+  };
+}
+function loadIndiceCfg(){
+  try{ const raw = localStorage.getItem(STORE_INDICE); if(raw) return Object.assign(defaultIndiceCfg(), JSON.parse(raw)); }catch(e){}
+  return defaultIndiceCfg();
+}
+function saveIndiceCfg(){ localStorage.setItem(STORE_INDICE, JSON.stringify(INDICE_CFG)); touchMeta(); }
+let INDICE_CFG = loadIndiceCfg();
+let indiceMonthIdx = null;
+
+function indiceMonthKeyFromIdx(i){ const m = MONTH_LIST[i]; return m.year+'-'+pad(m.month+1); }
+function indiceShiftMonthKey(mk, delta){
+  const [y,m] = mk.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1);
+}
+function clamp100(v){ return Math.max(0, Math.min(100, v)); }
+
+// Horas de turno efetivamente feitas por cada TEF no mês (quem substitui conta).
+function indiceHorasPorTef(monthKey){
+  const [y, mo] = monthKey.split('-').map(Number);
+  const n = new Date(y, mo, 0).getDate();
+  const horas = {};
+  for(let d=1; d<=n; d++){
+    const dt = new Date(y, mo-1, d);
+    if(dt < RANGE_START || dt > RANGE_END) continue;
+    shiftsForReportDate(isoDate(dt), dayKeyOf(dt)).forEach(s=>{
+      const nome = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name;
+      if(!nome) return;
+      horas[nome] = (horas[nome]||0) + hoursBetween(s.start, s.end);
+    });
+  }
+  return horas;
+}
+
+function indiceComponentes(name, monthKey, horasMes){
+  const out = {};
+  const fimMes = monthKey+'-31';
+  // 1. Observação: a avaliação mais recente até ao fim do mês
+  let aval = null;
+  AVALIACOES.forEach(a=>{ if(a.tecnico===name && a.date && a.date<=fimMes && (!aval || a.date>aval.date)) aval = a; });
+  if(aval) out.observacao = {score: computeWeightedTotal(aval.scores), raw: 'avaliação de '+fmtDatePT(aval.date)};
+
+  // 2. Satisfação: média das respostas do mês (avaliação, sala, geral)
+  if(SATISFACAO[monthKey]){
+    const sat = computeSatisfacaoParaTef(name, monthKey);
+    const vals = sat.salaRatings.map(r=>r.valor).concat(sat.avalRatings.map(r=>r.valor));
+    if(vals.length >= (INDICE_CFG.minRespostas||1)){
+      const max = vals.some(v=>v>5) ? 10 : 5;
+      const m = vals.reduce((a,b)=>a+b,0)/vals.length;
+      out.satisfacao = {score: clamp100(m/max*100), raw: m.toFixed(1)+'/'+max+' (n='+vals.length+')'};
+    }
+  }
+
+  // 3. Produtividade: clientes distintos por hora de turno
+  const h = horasMes[name] || 0;
+  const ac = ACESSOS[monthKey] && ACESSOS[monthKey].perTef && ACESSOS[monthKey].perTef[name];
+  if(ac && h > 0){
+    const cph = ac.count / h;
+    out.produtividade = {score: clamp100(cph/(INDICE_CFG.metaClientesHora||1)*100), raw: cph.toFixed(1)+' cl/h ('+ac.count+' em '+fmtHours(h)+' h)'};
+  }
+
+  // 4. Tarefas: realizadas vs. em atraso
+  const rel = RELATORIOS[monthKey];
+  const t = rel && rel.tarefas && rel.tarefas[name];
+  const feitas = t ? ['avaliacoes_fisicas','reavaliacoes','integracao','prescricoes'].reduce((sum,k)=> sum + (parseInt(t[k],10)||0), 0) : 0;
+  const pc = PT_COUNTS[monthKey] && PT_COUNTS[monthKey][name];
+  const atraso = pc ? (pc.tarefas_atraso||0) : 0;
+  if(feitas + atraso > 0){
+    const taxa = feitas/(feitas+atraso)*100;
+    out.tarefas = {score: clamp100(taxa/(INDICE_CFG.metaTarefas||1)*100), raw: Math.round(taxa)+'% ('+feitas+' feitas, '+atraso+' em atraso)'};
+  }
+
+  // 5. PT: sessões no mês
+  if(pc){
+    const sess = (pc.internos||0)+(pc.externos||0);
+    out.pt = {score: clamp100(sess/(INDICE_CFG.metaPT||1)*100), raw: sess+' sessões'};
+  }
+  return out;
+}
+
+function indiceTotal(comp){
+  // Com menos de 2 componentes não há base suficiente para um índice.
+  if(INDICE_COMPONENTES.filter(c=>comp[c.key]).length < 2) return null;
+  let soma = 0, pesos = 0;
+  INDICE_COMPONENTES.forEach(c=>{
+    const w = Number(INDICE_CFG.pesos[c.key])||0;
+    if(comp[c.key] && w>0){ soma += comp[c.key].score*w; pesos += w; }
+  });
+  return pesos>0 ? Math.round(soma/pesos*10)/10 : null;
+}
+
+function indiceNomes(){
+  return Object.keys(TECH_REGISTRY)
+    .filter(n=> TECH_REGISTRY[n].ativo !== false && (TECH_REGISTRY[n].status||'') !== 'estagiario')
+    .sort((a,b)=>a.localeCompare(b,'pt'));
+}
+
+function computeIndiceMes(monthKey){
+  const horas = indiceHorasPorTef(monthKey);
+  const res = {};
+  indiceNomes().forEach(n=>{
+    const comp = indiceComponentes(n, monthKey, horas);
+    res[n] = {comp, total: indiceTotal(comp)};
+  });
+  return res;
+}
+
+function computeIndiceTabela(monthKey){
+  const mes = computeIndiceMes(monthKey);
+  const m1 = computeIndiceMes(indiceShiftMonthKey(monthKey,-1));
+  const m2 = computeIndiceMes(indiceShiftMonthKey(monthKey,-2));
+  return indiceNomes().map(n=>{
+    const vals = [mes[n].total, m1[n] && m1[n].total, m2[n] && m2[n].total].filter(v=>v!==null && v!==undefined);
+    const media3 = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : null;
+    let pior = null;
+    INDICE_COMPONENTES.forEach(c=>{ const x = mes[n].comp[c.key]; if(x && (!pior || x.score < pior.score)) pior = {label:c.label, score:x.score}; });
+    return {name:n, comp:mes[n].comp, total:mes[n].total, media3, nMeses: vals.length, pior};
+  }).sort((a,b)=>{
+    if(a.media3===null && b.media3===null) return a.name.localeCompare(b.name,'pt');
+    if(a.media3===null) return 1; if(b.media3===null) return -1;
+    return b.media3 - a.media3;
+  });
+}
+
+function indiceCor(v){
+  if(v===null || v===undefined) return 'var(--ink-soft)';
+  if(v>=80) return '#1e7a46'; if(v>=60) return '#2a6f8c'; if(v>=40) return '#b8860b'; return '#c0392b';
+}
+
+function renderIndiceCfg(){
+  const body = document.getElementById('indiceCfgBody');
+  const somaPesos = INDICE_COMPONENTES.reduce((s,c)=> s + (Number(INDICE_CFG.pesos[c.key])||0), 0);
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:14px 22px;font-size:12.5px;">';
+  INDICE_COMPONENTES.forEach(c=>{
+    html += '<label style="display:flex;align-items:center;gap:6px;">'+c.label+' <input type="number" min="0" max="100" class="rel-input indice-peso" data-key="'+c.key+'" value="'+(INDICE_CFG.pesos[c.key]||0)+'" style="width:60px;"> %</label>';
+  });
+  html += '<span style="font-weight:700;color:'+(somaPesos===100?'var(--accent)':'#c0392b')+';">Total: '+somaPesos+'%'+(somaPesos===100?'':' (deve somar 100)')+'</span></div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:14px 22px;font-size:12.5px;margin-top:12px;">'+
+    '<label style="display:flex;align-items:center;gap:6px;">Meta de produtividade <input type="number" min="0.1" step="0.1" class="rel-input indice-meta" data-key="metaClientesHora" value="'+INDICE_CFG.metaClientesHora+'" style="width:70px;"> clientes/hora</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;">Meta de tarefas <input type="number" min="1" max="100" class="rel-input indice-meta" data-key="metaTarefas" value="'+INDICE_CFG.metaTarefas+'" style="width:70px;"> % sem atraso</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;">Meta de PT <input type="number" min="1" class="rel-input indice-meta" data-key="metaPT" value="'+INDICE_CFG.metaPT+'" style="width:70px;"> sessões/mês</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;">Satisfação: mínimo de <input type="number" min="1" class="rel-input indice-meta" data-key="minRespostas" value="'+INDICE_CFG.minRespostas+'" style="width:60px;"> respostas</label>'+
+    '<button type="button" class="btn ghost" id="indiceCfgReset">Repor valores iniciais</button>'+
+  '</div>';
+  body.innerHTML = html;
+  body.querySelectorAll('.indice-peso').forEach(inp=> inp.addEventListener('change', e=>{
+    INDICE_CFG.pesos[e.target.dataset.key] = parseFloat(e.target.value)||0; saveIndiceCfg(); renderIndiceTab();
+  }));
+  body.querySelectorAll('.indice-meta').forEach(inp=> inp.addEventListener('change', e=>{
+    const v = parseFloat(e.target.value); if(!(v>0)) return;
+    INDICE_CFG[e.target.dataset.key] = v; saveIndiceCfg(); renderIndiceTab();
+  }));
+  document.getElementById('indiceCfgReset').addEventListener('click', ()=>{ INDICE_CFG = defaultIndiceCfg(); saveIndiceCfg(); renderIndiceTab(); });
+}
+
+function renderIndiceTab(){
+  if(indiceMonthIdx===null) indiceMonthIdx = relMonthIdx;
+  const mk = indiceMonthKeyFromIdx(indiceMonthIdx);
+  const mo = MONTH_LIST[indiceMonthIdx];
+  document.getElementById('indiceMesAtual').textContent = MONTH_NAMES[mo.month]+' '+mo.year;
+  document.getElementById('indiceMesPrev').disabled = indiceMonthIdx<=0;
+  document.getElementById('indiceMesNext').disabled = indiceMonthIdx>=MONTH_LIST.length-1;
+  renderIndiceCfg();
+
+  const rows = computeIndiceTabela(mk);
+  const tbody = document.getElementById('indiceTableBody');
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="10" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há TEF registados.</td></tr>'; return; }
+  const cell = (x)=> x ? '<strong style="color:'+indiceCor(x.score)+';">'+Math.round(x.score)+'</strong><br><span style="color:var(--ink-soft);font-size:11px;">'+escapeAttr(x.raw)+'</span>' : '<span style="color:var(--ink-soft);">—</span>';
+  tbody.innerHTML = rows.map(r=>{
+    const tier = r.media3!==null ? classifyAvalScore(r.media3).label : '—';
+    return '<tr>'+
+      '<td data-label="TEF" style="font-weight:700;">'+escapeAttr(r.name)+'</td>'+
+      '<td data-label="Índice do mês">'+(r.total!==null ? '<strong style="font-size:15px;color:'+indiceCor(r.total)+';">'+r.total.toFixed(1)+'</strong>' : '—')+'</td>'+
+      '<td data-label="Média 3 meses">'+(r.media3!==null ? '<strong style="font-size:15px;color:'+indiceCor(r.media3)+';">'+r.media3.toFixed(1)+'</strong><br><span style="color:var(--ink-soft);font-size:11px;">'+r.nMeses+' '+(r.nMeses===1?'mês':'meses')+'</span>' : '—')+'</td>'+
+      '<td data-label="Classificação">'+tier+'</td>'+
+      INDICE_COMPONENTES.map(c=>'<td data-label="'+c.label+'">'+cell(r.comp[c.key])+'</td>').join('')+
+      '<td data-label="A melhorar">'+(r.pior ? r.pior.label : '—')+'</td>'+
+    '</tr>';
+  }).join('');
+  const semDados = INDICE_COMPONENTES.filter(c=> !rows.some(r=>r.comp[c.key])).map(c=>c.label);
+  document.getElementById('indiceNota').textContent = semDados.length
+    ? 'Sem dados este mês para: '+semDados.join(', ')+'. Carrega os ficheiros do mês no separador Início para estas componentes entrarem no índice.'
+    : 'Classificação pela média de 3 meses: 80+ Excelente · 60+ Muito bom · 40+ Regular · 24+ Insatisfatório.';
+  document.getElementById('indiceNota').textContent += ' O índice só é calculado com pelo menos 2 componentes com dados.';
+}
+
+document.getElementById('indiceMesPrev').addEventListener('click', ()=>{ if(indiceMonthIdx>0){ indiceMonthIdx--; renderIndiceTab(); } });
+document.getElementById('indiceMesNext').addEventListener('click', ()=>{ if(indiceMonthIdx<MONTH_LIST.length-1){ indiceMonthIdx++; renderIndiceTab(); } });
+document.getElementById('indiceCfgToggle').addEventListener('click', ()=>{
+  const b = document.getElementById('indiceCfgBody'); const open = b.style.display==='none';
+  b.style.display = open ? '' : 'none';
+  document.getElementById('indiceCfgArrow').textContent = open ? 'esconder ▴' : 'mostrar ▾';
+});
+document.getElementById('btnIndiceExcel').addEventListener('click', async ()=>{
+  if(typeof ExcelJS === 'undefined'){ alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online).'); return; }
+  const mk = indiceMonthKeyFromIdx(indiceMonthIdx===null?relMonthIdx:indiceMonthIdx);
+  const mo = MONTH_LIST[indiceMonthIdx===null?relMonthIdx:indiceMonthIdx];
+  const rows = computeIndiceTabela(mk);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Índice TEF');
+  const label = MONTH_NAMES[mo.month]+' '+mo.year;
+  const cols = ['TEF','Índice do mês','Média 3 meses','Classificação'];
+  INDICE_COMPONENTES.forEach(c=>{ cols.push(c.label+' ('+(INDICE_CFG.pesos[c.key]||0)+'%)'); cols.push(c.label+' — dado'); });
+  cols.push('A melhorar');
+  mapaTitle(ws, 'Índice de Desempenho TEF — '+label, mapaSubtitle(), cols.length);
+  mapaHeader(ws, cols);
+  rows.forEach(r=>{
+    const v = [r.name, r.total, r.media3, r.media3!==null ? classifyAvalScore(r.media3).label : ''];
+    INDICE_COMPONENTES.forEach(c=>{ const x = r.comp[c.key]; v.push(x ? Math.round(x.score) : ''); v.push(x ? x.raw : 'sem dados'); });
+    v.push(r.pior ? r.pior.label : '');
+    mapaRow(ws, v);
+  });
+  ws.getColumn(1).width = 22;
+  for(let i=2;i<=cols.length;i++) ws.getColumn(i).width = 14;
+  await mapaDownload(wb, 'Indice_TEF_'+MONTH_NAMES[mo.month]+'_'+mo.year+'.xlsx');
+});
+
+/* ---------------------------------------------------------------
    LIGAÇÃO AUTOMÁTICA A FICHEIRO (File System Access API)
    ----------------------------------------------------------------
    Onde o browser suporta (Chrome/Edge no PC, e em versões recentes
@@ -9313,6 +9588,7 @@ function updateSyncStatusLabel(){
 
 function buildExportPayload(){
   return {
+    indiceTef: INDICE_CFG,
     template: TEMPLATE_LINES,
     exceptions: exceptions,
     tecnicos: TECH_REGISTRY,
@@ -9361,6 +9637,7 @@ function applyImportedData(data){
   if(data.pesosAvaliacao){ GROUP_WEIGHTS = data.pesosAvaliacao; localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(GROUP_WEIGHTS)); }
   if(data.relatorios){ RELATORIOS = data.relatorios; localStorage.setItem(STORE_RELATORIO, JSON.stringify(RELATORIOS)); }
   if(data.acessos){ ACESSOS = data.acessos; saveAcessos(ACESSOS); }
+  if(data.indiceTef){ INDICE_CFG = Object.assign(defaultIndiceCfg(), data.indiceTef); localStorage.setItem(STORE_INDICE, JSON.stringify(INDICE_CFG)); }
   if(data.notasRapidas){ QUICK_NOTES = data.notasRapidas; localStorage.setItem(STORE_QUICK_NOTES, JSON.stringify(QUICK_NOTES)); }
   if(data.avalFisicaLog){ AVAL_FISICA_LOG = data.avalFisicaLog; localStorage.setItem(STORE_AVAL_FISICA_LOG, JSON.stringify(AVAL_FISICA_LOG)); }
   if(data.satisfacao){ SATISFACAO = data.satisfacao; localStorage.setItem(STORE_SATISFACAO, JSON.stringify(SATISFACAO)); }
