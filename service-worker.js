@@ -1,44 +1,36 @@
-// Sempre que muda algo estrutural neste ficheiro (não no conteúdo da app), sobe este número.
-// Não é preciso mudar isto por cada atualização normal da app: com internet, a versão mais
-// recente do servidor é sempre usada (ver estratégia "network-first" em baixo).
-const CACHE_NAME = 'turnos-tef-shell-v3';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
-];
+// Service worker "rede primeiro": tenta sempre obter a versão mais recente do
+// GitHub Pages e só usa a cópia guardada quando não há ligação (modo offline).
+const CACHE = 'turnos-tef-cache-v2';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {})
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Network-first: com internet, vai sempre buscar a versão mais recente ao servidor
-// (e atualiza a cópia offline em segundo plano). Sem internet, usa a última cópia guardada.
-// cache:'no-store' é essencial aqui: sem isto, o próprio browser pode responder com uma
-// cópia antiga guardada na sua cache HTTP normal, sem sequer confirmar com o servidor.
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
   event.respondWith(
-    fetch(event.request, {cache: 'no-store'}).then((response) => {
-      if (response && response.status === 200) {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-      }
-      return response;
-    }).catch(() => caches.match(event.request))
+    fetch(req, { cache: 'no-store' })
+      .then(res => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() =>
+        caches.match(req).then(hit => hit || caches.match('./') || caches.match('index.html'))
+      )
   );
 });
