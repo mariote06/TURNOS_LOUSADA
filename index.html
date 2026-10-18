@@ -103,6 +103,14 @@
   .cell.outside:hover{box-shadow:none;transform:none;}
   .cell.today{outline:2px solid var(--accent);outline-offset:-2px;}
   .cell.exception{border-style:dashed;border-color:var(--rust);}
+  #tab-indice table{border-collapse:collapse;font-size:13px;}
+  #tab-indice th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap;font-size:12px;}
+  #tab-indice td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .cell.needs-subst{background:#fde8e4;border:2px solid #c0392b;}
+  .shift-chip.needs-subst{background:#c0392b !important;color:#fff !important;box-shadow:0 0 0 2px #fff inset;}
+  .need-flag{align-self:flex-end;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;background:#fff;color:#c0392b;margin-top:3px;}
+  .chip-nota{font-size:10px;font-style:italic;opacity:.9;margin-top:2px;}
+  .day-note{font-size:10.5px;line-height:1.3;background:#fff8dc;color:#6b5200;border-left:3px solid #d4a017;padding:3px 6px;border-radius:4px;margin:4px 0;white-space:pre-wrap;word-break:break-word;}
   .cell-top{display:flex;align-items:center;justify-content:space-between;}
   .daynum{font:700 14px 'Space Grotesk';}
   .weekday-mini{display:none;}
@@ -538,6 +546,7 @@
     <button class="tab-btn" data-tab="disp" data-owner="equipa" style="display:none;">Disponibilidade</button>
     <button class="tab-btn" data-tab="ptcount" data-owner="equipa" style="display:none;">Treinos PT / Tarefas</button>
     <button class="tab-btn" data-tab="aval" data-owner="equipa" style="display:none;">Avaliação</button>
+    <button class="tab-btn" data-tab="indice" data-owner="equipa" style="display:none;">Índice TEF</button>
     <button class="tab-btn" data-tab="relatorio" data-owner="equipa" style="display:none;">Relatório</button>
     <button class="tab-btn" data-tab="acessos" data-owner="gestao" style="display:none;">Entradas/Saídas</button>
     <button class="tab-btn" data-tab="satisfanalise" data-owner="gestao" style="display:none;">Análise Satisfação</button>
@@ -616,6 +625,18 @@
       </div>
     </div>
 
+    <h3 style="font-size:15px;margin:0 0 10px;">📤 Mapas de Trabalho para a Direção</h3>
+    <div class="panel" style="padding:14px 18px;margin-bottom:20px;">
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 12px;">
+        Usam o mês escolhido acima. O mapa do mês corrente segue até dia 20; a escala do mês seguinte segue até ao último dia do mês.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <button type="button" class="btn primary" id="btnMapaMesCorrente">Mapa de trabalho</button>
+        <button type="button" class="btn primary" id="btnMapaMesSeguinte">Escala do mês seguinte</button>
+      </div>
+      <p id="mapasStatus" style="color:var(--ink-soft);font-size:12px;margin:10px 0 0;"></p>
+    </div>
+
     <div class="panel" style="padding:16px 18px;margin-bottom:20px;">
       <h4 style="margin:0 0 8px;">Reservas de Aulas (Excel)</h4>
       <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 10px;">
@@ -667,6 +688,8 @@
       <span><span class="dot" style="background:var(--muni-bg);border:1px solid var(--muni-ink)"></span>Feriado municipal (Lousada)</span>
       <span><span class="dot" style="background:var(--fac-bg);border:1px solid var(--fac-ink)"></span>Facultativo (Carnaval)</span>
       <span><span class="dot" style="background:#fff;border:1.5px dashed var(--rust)"></span>Dia com substituição pontual</span>
+      <span><span class="dot" style="background:#c0392b;border:1px solid #c0392b"></span>Turno a precisar de substituto</span>
+      <span><span class="dot" style="background:#fff8dc;border:1px solid #d4a017"></span>📝 Nota do dia</span>
       <span><span class="subst-box" style="position:static;">Nome</span>&nbsp;caixa com o nome de quem substitui (só aparece se preenchida)</span>
     </div>
 
@@ -1242,6 +1265,34 @@
   </div>
 
   <!-- RELATÓRIO MENSAL TAB -->
+  <div id="tab-indice" style="display:none;">
+    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
+      Índice de Desempenho TEF (0–100): junta a observação do coordenador com os dados do mês. Cada componente compara o TEF com uma meta fixa; se faltar uma componente, o peso dela é repartido pelas restantes. A média dos últimos 3 meses é o valor de referência para a avaliação trimestral e o PDI.
+    </p>
+    <div class="tec-year-nav" style="margin-bottom:12px;">
+      <button class="nav-btn" id="indiceMesPrev">‹</button>
+      <span id="indiceMesAtual"></span>
+      <button class="nav-btn" id="indiceMesNext">›</button>
+      <button class="btn" id="btnIndiceExcel" style="margin-left:auto;">📊 Exportar para Excel</button>
+    </div>
+    <div class="panel" style="padding:12px 16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" id="indiceCfgToggle">
+        <strong style="font-size:14px;">⚙️ Pesos e metas</strong><span id="indiceCfgArrow" style="color:var(--ink-soft);">mostrar ▾</span>
+      </div>
+      <div id="indiceCfgBody" style="display:none;margin-top:12px;"></div>
+    </div>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table class="fin-table" style="width:100%;">
+        <thead><tr>
+          <th>TEF</th><th>Índice do mês</th><th>Média 3 meses</th><th>Classificação</th>
+          <th>Observação</th><th>Satisfação</th><th>Produtividade</th><th>Tarefas</th><th>PT</th><th>A melhorar</th>
+        </tr></thead>
+        <tbody id="indiceTableBody"></tbody>
+      </table>
+    </div>
+    <p id="indiceNota" style="color:var(--ink-soft);font-size:12px;margin-top:10px;"></p>
+  </div>
+
   <div id="tab-relatorio" style="display:none;">
     <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0;">
       Relatório mensal de performance da equipa TEF — clientes por turno, tarefas realizadas e pendentes, e avaliação de desempenho. A avaliação vem automaticamente do separador Avaliação; o resto preenche-se aqui e fica guardado por mês.
@@ -1752,7 +1803,7 @@ function shiftsForDate(iso, dayKey){
   let result = base.map(slot=>{
     if(exc && exc.slotOverrides && exc.slotOverrides[slot.id]){
       const ov = exc.slotOverrides[slot.id];
-      return {id:slot.id, start:ov.start||slot.start, end:ov.end||slot.end, name:slot.name, substituteName:(ov.substituteName||'').trim(), payTitular:!!ov.payTitular, nota:(ov.nota||'').trim(), _subst:true};
+      return {id:slot.id, start:ov.start||slot.start, end:ov.end||slot.end, name:slot.name, substituteName:(ov.substituteName||'').trim(), payTitular:!!ov.payTitular, nota:(ov.nota||'').trim(), needsSubst: !!ov.needsSubst && !(ov.substituteName||'').trim(), _subst:true};
     }
     return slot;
   });
@@ -1764,6 +1815,8 @@ function shiftsForDate(iso, dayKey){
   }
   return result;
 }
+
+function escHtmlNota(t){ return String(t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function dayHasPontualStuff(iso){
   const exc = exceptions[iso];
@@ -1858,6 +1911,9 @@ function renderCalendar(){
     if(holiday) html += '<span class="badge '+holiday.type+'">'+ (holiday.type==='municipal' ? 'Municipal' : holiday.type==='facultativo' ? 'Facultativo' : 'Feriado') +'</span>';
     html += '</div>';
     if(holiday) html += '<div class="holiday-name">'+holiday.name+'</div>';
+    const dayExc = exceptions[iso];
+    if(dayExc && dayExc.note && dayExc.note.trim()) html += '<div class="day-note">📝 '+escHtmlNota(dayExc.note.trim())+'</div>';
+    if(shifts.some(s=>s.needsSubst)) cell.classList.add('needs-subst');
 
     if(shifts.length === 0){
       html += '<div class="empty-note" style="'+(holiday && !holiday.closed?'color:var(--rust);font-style:normal;font-weight:600;':'')+'">'+
@@ -1870,7 +1926,9 @@ function renderCalendar(){
         const subBox = s.substituteName ? '<div class="subst-box">'+s.substituteName+'</div>' : '';
         const onFerias = s.name && FERIAS_DIAS[s.name] && FERIAS_DIAS[s.name][iso] !== undefined;
         const feriasFlag = onFerias ? '<div class="ferias-flag">🌴 Férias'+(s.substituteName?'':' — sem substituto')+'</div>' : '';
-        html += '<div class="shift-chip'+(onFerias?' on-ferias':'')+'" style="background:'+c.bg+';color:'+c.fg+'"><div class="chip-main"><span class="t">'+s.start+'</span><span style="flex:1;text-align:right;font-weight:600;">'+ (s.name||'') +'</span></div>'+subBox+feriasFlag+'</div>';
+        const needFlag = s.needsSubst ? '<div class="need-flag">⚠️ Precisa de substituto</div>' : '';
+        const notaChip = (s.nota && (s.needsSubst || s.substituteName)) ? '<div class="chip-nota">'+escHtmlNota(s.nota)+'</div>' : '';
+        html += '<div class="shift-chip'+(onFerias?' on-ferias':'')+(s.needsSubst?' needs-subst':'')+'" style="background:'+c.bg+';color:'+c.fg+'"><div class="chip-main"><span class="t">'+s.start+'</span><span style="flex:1;text-align:right;font-weight:600;">'+ (s.name||'') +'</span></div>'+subBox+needFlag+notaChip+feriasFlag+'</div>';
       });
       html += '</div>';
     }
@@ -1993,6 +2051,7 @@ function openDayModal(iso, dayKey, dateObj){
       substituteName: override ? (override.substituteName||'') : '',
       payTitular: override ? !!override.payTitular : false,
       nota: override ? (override.nota||'') : '',
+      needsSubst: override ? (!!override.needsSubst && !(override.substituteName||'').trim()) : false,
       pontual: !!override || removedPontual,
       removed: removedPontual,
       isNew: false
@@ -2044,7 +2103,10 @@ function renderModalRows(){
       '<div class="row-edit-meta">'+
         (row.removed
           ? '<span class="hint subst">Turno removido — '+(row.pontual ? 'só neste dia' : 'a partir de '+fmtDatePT(editingIso)+' em diante')+'</span>'
-          : '<label><input type="checkbox" data-idx="'+idx+'" data-field="pontual" '+(row.pontual?'checked':'')+'> Substituição pontual (só este dia)</label>'
+          : '<label><input type="checkbox" data-idx="'+idx+'" data-field="pontual" '+(row.pontual?'checked':'')+'> Substituição pontual (só este dia)</label>'+
+            (!row.isNew && !(row.substituteName||'').trim()
+              ? '<label style="color:#c0392b;font-weight:600;"><input type="checkbox" data-idx="'+idx+'" data-field="needsSubst" '+(row.needsSubst?'checked':'')+'> ⚠️ Precisa de substituto</label>'
+              : '')
         ) +
         (row.removed ? '' : hintPerm) +
       '</div>';
@@ -2070,11 +2132,24 @@ function renderModalRows(){
       inp.addEventListener('blur', hideTecSuggestionsSoon);
     }
   });
+  modalRows.querySelectorAll('input[type=checkbox][data-field=needsSubst]').forEach(chk=>{
+    chk.addEventListener('change', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      editingRows[idx].needsSubst = e.target.checked;
+      if(e.target.checked) editingRows[idx].pontual = true;
+      renderModalRows();
+      if(e.target.checked){
+        const notaInput = modalRows.querySelector('input[data-idx="'+idx+'"][data-field="nota"]');
+        if(notaInput) notaInput.focus();
+      }
+    });
+  });
   modalRows.querySelectorAll('input[type=checkbox][data-field=pontual]').forEach(chk=>{
     chk.addEventListener('change', (e)=>{
       const idx = parseInt(e.target.dataset.idx,10);
       const checked = e.target.checked;
       editingRows[idx].pontual = checked;
+      if(!checked) editingRows[idx].needsSubst = false;
       renderModalRows();
       if(checked){
         const subInput = modalRows.querySelector('input[data-idx="'+idx+'"][data-field="substituteName"]');
@@ -2157,8 +2232,9 @@ document.getElementById('btnSaveDay').addEventListener('click', ()=>{
       const base = line ? resolveVersion(line, editingIso) : null;
       const timeChanged = base && (base.start!==row.start || base.end!==row.end);
       const hasSubstitute = row.substituteName && row.substituteName.trim().length>0;
-      if(timeChanged || hasSubstitute){
-        newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : '', payTitular: hasSubstitute ? !!row.payTitular : false, nota: hasSubstitute ? (row.nota||'').trim() : ''};
+      const needs = !!row.needsSubst && !hasSubstitute;
+      if(timeChanged || hasSubstitute || needs){
+        newSlotOverrides[row.slotId] = {start:row.start, end:row.end, substituteName: hasSubstitute ? row.substituteName.trim() : '', payTitular: hasSubstitute ? !!row.payTitular : false, nota: (hasSubstitute || needs) ? (row.nota||'').trim() : '', needsSubst: needs};
       }
       // Substituição de um Dependente sem a caixa "recebe e paga" marcada:
       // o ginásio paga diretamente ao substituto, o que na prática significa
@@ -5956,18 +6032,46 @@ document.getElementById('btnExportSubstExcel').addEventListener('click', async (
 const STORE_ACESSOS = 'tef_turnos_acessos_v1';
 // { "YYYY-MM": { fileName, importedAt, totalVisits, totalDates, unmatched,
 //                perTef: { nome: {count, codes:[...]} } } }
+/* Dados grandes (acessos e reservas de aulas) ficam no IndexedDB, que
+   aguenta centenas de MB — o localStorage só tem ~5 MB por site e enchia
+   ao fim de poucos meses de PDFs de Entradas/Saídas. */
+function bigDbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open('tef_turnos_big_db', 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore('kv'); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function bigGet(key){
+  const db = await bigDbOpen();
+  return new Promise((resolve, reject)=>{
+    const r = db.transaction('kv','readonly').objectStore('kv').get(key);
+    r.onsuccess = ()=> resolve(r.result);
+    r.onerror = ()=> reject(r.error);
+  });
+}
+async function bigSet(key, val){
+  const db = await bigDbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('kv','readwrite');
+    tx.objectStore('kv').put(val, key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
 function loadAcessos(){
   try{ const raw = localStorage.getItem(STORE_ACESSOS); if(raw) return JSON.parse(raw); }catch(e){}
   return {};
 }
 function saveAcessos(a){
-  try{
-    localStorage.setItem(STORE_ACESSOS, JSON.stringify(a));
+  bigSet(STORE_ACESSOS, a).then(()=>{
+    try{ localStorage.removeItem(STORE_ACESSOS); }catch(e){}
     touchMeta();
-  }catch(err){
+  }).catch(err=>{
     console.error(err);
-    alert('Não foi possível guardar os dados de acessos (armazenamento cheio). Considera remover meses mais antigos no separador Entradas/Saídas.');
-  }
+    alert('Não foi possível guardar os dados de acessos neste dispositivo. Tenta outra vez ou exporta os dados (.json) como cópia de segurança.');
+  });
 }
 let ACESSOS = loadAcessos();
 
@@ -5980,10 +6084,26 @@ function loadAulas(){
   return {};
 }
 function saveAulas(a){
-  try{ localStorage.setItem(STORE_AULAS, JSON.stringify(a)); touchMeta(); }
-  catch(err){ console.error(err); alert('Não foi possível guardar as reservas de aulas (armazenamento cheio).'); }
+  bigSet(STORE_AULAS, a).then(()=>{
+    try{ localStorage.removeItem(STORE_AULAS); }catch(e){}
+    touchMeta();
+  }).catch(err=>{ console.error(err); alert('Não foi possível guardar as reservas de aulas neste dispositivo.'); });
 }
 let AULAS = loadAulas();
+
+// Ao abrir: lê do IndexedDB; se ainda estiver tudo no localStorage
+// (versão antiga), migra para o IndexedDB e liberta o localStorage.
+(async function migrateBigData(){
+  try{
+    const [a, b] = await Promise.all([bigGet(STORE_ACESSOS), bigGet(STORE_AULAS)]);
+    if(a){ ACESSOS = a; try{ localStorage.removeItem(STORE_ACESSOS); }catch(e){} }
+    else if(Object.keys(ACESSOS).length){ await bigSet(STORE_ACESSOS, ACESSOS); localStorage.removeItem(STORE_ACESSOS); }
+    if(b){ AULAS = b; try{ localStorage.removeItem(STORE_AULAS); }catch(e){} }
+    else if(Object.keys(AULAS).length){ await bigSet(STORE_AULAS, AULAS); localStorage.removeItem(STORE_AULAS); }
+    const t = document.getElementById('tab-acessos');
+    if(t && t.style.display !== 'none' && typeof renderAcessosResults==='function'){ renderAcessosResults(); renderAulasResults(); }
+  }catch(e){ console.error('Migração para IndexedDB falhou', e); }
+})();
 
 const STORE_AULA_DURACOES = 'tef_turnos_aula_duracoes_v1';
 // { "NOME DA ATIVIDADE": minutos }
@@ -8478,6 +8598,7 @@ function renderInicioTab(){
   document.getElementById('inicioMesAtual').textContent = MONTH_NAMES[MONTH_LIST[relMonthIdx].month]+' '+MONTH_LIST[relMonthIdx].year;
   document.getElementById('inicioMesPrev').disabled = relMonthIdx <= 0;
   document.getElementById('inicioMesNext').disabled = relMonthIdx >= MONTH_LIST.length-1;
+  updateMapasButtons();
   renderInicioTurnosHoje();
   renderInicioAtencao();
   renderAulaDuracoesPanel();
@@ -8544,6 +8665,23 @@ function renderInicioAtencao(){
     if(avaliacaoAntiga.length) html += '<span style="color:var(--ink-soft);font-size:12px;">Há mais de '+LIMITE_DIAS+' dias: '+avaliacaoAntiga.join(', ')+'</span>';
     html += '</div>';
     partes.push(html);
+  }
+
+  // Turnos a precisar de substituto (de hoje até 45 dias)
+  const porSubstituir = [];
+  const dd = new Date(); dd.setHours(0,0,0,0);
+  for(let i=0;i<45;i++){
+    if(dd >= RANGE_START && dd <= RANGE_END){
+      const iso = isoDate(dd);
+      shiftsForDate(iso, dayKeyOf(dd)).forEach(s=>{
+        if(s.needsSubst) porSubstituir.push(fmtDatePT(iso)+' '+s.start+'–'+s.end+' · '+s.name+(s.nota?' ('+escHtmlNota(s.nota)+')':''));
+      });
+    }
+    dd.setDate(dd.getDate()+1);
+  }
+  if(porSubstituir.length){
+    partes.unshift('<div style="margin-bottom:12px;"><strong style="color:#c0392b;">⚠️ '+porSubstituir.length+' turno(s) a precisar de substituto</strong><br>'+
+      '<span style="color:var(--ink-soft);font-size:12px;">'+porSubstituir.join('<br>')+'</span></div>');
   }
 
   container.innerHTML = partes.length ? partes.join('') : '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Nada a assinalar de momento. 🎉</p>';
@@ -8744,6 +8882,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     document.getElementById('tab-acessos').style.display = tab==='acessos' ? '' : 'none';
     document.getElementById('tab-satisfanalise').style.display = tab==='satisfanalise' ? '' : 'none';
     document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? '' : 'none';
+    document.getElementById('tab-indice').style.display = tab==='indice' ? '' : 'none';
     document.getElementById('tab-ferias').style.display = tab==='ferias' ? '' : 'none';
     if(tab==='inicio') renderInicioTab();
     if(tab==='tpl') renderTplGrid();
@@ -8760,6 +8899,7 @@ document.querySelectorAll('#subTabs .tab-btn').forEach(btn=>{
     if(tab==='acessos'){ renderAcessosResults(); renderAulasResults(); }
     if(tab==='satisfanalise') renderSatisfAnaliseTab();
     if(tab==='relatorio') renderRelatorioTab();
+    if(tab==='indice') renderIndiceTab();
     if(tab==='ferias') renderFeriasTab();
   });
 });
@@ -8867,6 +9007,518 @@ document.getElementById('btnExportYear').addEventListener('click', async ()=>{
   const {year, month} = MONTH_LIST[currentMonthIdx];
   const range = getYearRange(new Date(year, month, 1));
   await exportScheduleExcel(range.start, range.end, 'turnos_TEF_'+year+'.xlsx');
+});
+
+/* ---------------------------------------------------------------
+   MAPAS DE TRABALHO PARA A DIREÇÃO
+   - Mapa do mês corrente (enviar até dia 20): turnos feitos/previstos,
+     substituições, turnos cancelados e férias, com resumo por TEF.
+   - Escala do mês seguinte (enviar até ao fim do mês): turnos planeados.
+--------------------------------------------------------------- */
+function mapasMonth(offset){
+  const idx = Math.min(Math.max(relMonthIdx + (offset||0), 0), MONTH_LIST.length-1);
+  return MONTH_LIST[idx];
+}
+function mapasLabel(mo){ return MONTH_NAMES[mo.month]+' '+mo.year; }
+function updateMapasButtons(){
+  const cur = mapasMonth(0), nxt = mapasMonth(1);
+  const b1 = document.getElementById('btnMapaMesCorrente');
+  const b2 = document.getElementById('btnMapaMesSeguinte');
+  if(b1) b1.textContent = '📊 Mapa de trabalho — '+mapasLabel(cur);
+  if(b2){
+    b2.textContent = '🗓️ Escala — '+mapasLabel(nxt);
+    b2.disabled = relMonthIdx >= MONTH_LIST.length-1;
+  }
+}
+function mapasMonthDays(mo){
+  const days = [];
+  const d = new Date(mo.year, mo.month, 1);
+  while(d.getMonth() === mo.month){
+    if(d >= RANGE_START && d <= RANGE_END) days.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+function mapasVinculo(name){
+  const e = TECH_REGISTRY[name]; const st = e && e.status;
+  return st==='dependente' ? 'Dependente' : st==='independente' ? 'Independente' : st==='estagiario' ? 'Estagiário' : '';
+}
+// Turnos que foram retirados nesse dia (existiam no horário base e foram removidos)
+function mapasRemovedSlots(iso, dKey){
+  const exc = exceptions[iso];
+  if(HOLIDAY_MAP[iso] || !exc || !exc.removedSlotIds || !exc.removedSlotIds.length) return [];
+  return templateSlotsForDate(dKey, iso).filter(s => exc.removedSlotIds.indexOf(s.id) !== -1);
+}
+function mapasOnFerias(name, iso){
+  return !!(name && FERIAS_DIAS[name] && FERIAS_DIAS[name][iso] !== undefined);
+}
+
+const MAPA_NAVY = 'FF0B2D42', MAPA_CYAN = 'FF17A7E1', MAPA_SOFT = 'FFDCEAF2';
+const MAPA_BORDER = {style:'thin', color:{argb:'FFBCD0DA'}};
+function mapaTitle(ws, title, subtitle, ncols){
+  ws.mergeCells(1,1,1,ncols);
+  const t = ws.getCell(1,1); t.value = title;
+  t.font = {bold:true, size:14, color:{argb:MAPA_NAVY}};
+  ws.mergeCells(2,1,2,ncols);
+  const st = ws.getCell(2,1); st.value = subtitle;
+  st.font = {size:10, color:{argb:'FF6F8291'}};
+  ws.addRow([]);
+}
+function mapaHeader(ws, cols){
+  const r = ws.addRow(cols);
+  r.eachCell(c=>{
+    c.font = {bold:true, color:{argb:'FFFFFFFF'}};
+    c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:MAPA_NAVY}};
+    c.alignment = {vertical:'middle', wrapText:true};
+    c.border = {top:MAPA_BORDER, bottom:MAPA_BORDER, left:MAPA_BORDER, right:MAPA_BORDER};
+  });
+  r.height = 30;
+  return r;
+}
+function mapaRow(ws, vals, fill, bold){
+  const r = ws.addRow(vals);
+  r.eachCell({includeEmpty:true}, c=>{
+    c.border = {top:MAPA_BORDER, bottom:MAPA_BORDER, left:MAPA_BORDER, right:MAPA_BORDER};
+    c.alignment = {vertical:'top', wrapText:true};
+    if(fill) c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:fill}};
+    if(bold) c.font = {bold:true};
+  });
+  return r;
+}
+async function mapaDownload(wb, filename){
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function mapaSubtitle(){
+  const hoje = new Date();
+  return 'Sala de Exercício · Playlife Lousada · gerado a '+fmtDatePT(isoDate(hoje));
+}
+
+async function exportMapaMesCorrente(){
+  if(typeof ExcelJS === 'undefined'){ alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online).'); return; }
+  const mo = mapasMonth(0);
+  const label = mapasLabel(mo);
+  const days = mapasMonthDays(mo);
+  if(days.length===0){ alert('Este mês está fora do período da app.'); return; }
+  const monthKey = mo.year+'-'+pad(mo.month+1);
+
+  const turnos = [];      // linhas detalhadas
+  const resumo = {};      // por TEF
+  function R(n){
+    if(!resumo[n]) resumo[n] = {turnosTit:0, horasTit:0, feitos:0, horasFeitas:0, substFeitas:0, horasSubstFeitas:0, cedidos:0, horasCedidas:0, pagasTit:0, horasPagar:0, cancel:0, feriasDias:0, feriasHoras:0};
+    return resumo[n];
+  }
+
+  days.forEach(d=>{
+    const iso = isoDate(d), dKey = dayKeyOf(d);
+    const hol = HOLIDAY_MAP[iso];
+    const dia = LONG_WEEKDAY[d.getDay()];
+    shiftsForDate(iso, dKey).forEach(s=>{
+      const hrs = hoursBetween(s.start, s.end);
+      const titular = (s.name||'').trim();
+      const sub = (s.substituteName||'').trim();
+      const quemFez = sub || titular;
+      let tipo = 'Normal';
+      if(s._holiday) tipo = 'Feriado';
+      else if(s._adhoc) tipo = 'Turno extra';
+      else if(sub) tipo = 'Substituição';
+      else if(s.needsSubst) tipo = 'Por substituir';
+      const pagoPor = sub ? (s.payTitular ? 'Titular' : 'Ginásio') : '';
+      const trabalhadorPago = (sub && !s.payTitular) ? sub : titular;
+      turnos.push({k:iso+s.start, vals:[fmtDatePT(iso), dia, hol?hol.name:'', s.start, s.end, hrs, titular, quemFez, tipo, pagoPor, s.nota||''], tipo});
+      if(titular){ const t=R(titular); t.turnosTit++; t.horasTit+=hrs; }
+      if(quemFez){ const q=R(quemFez); q.feitos++; q.horasFeitas+=hrs; }
+      if(sub){
+        const q=R(sub); q.substFeitas++; q.horasSubstFeitas+=hrs;
+        if(titular){ const t=R(titular); t.cedidos++; t.horasCedidas+=hrs; if(s.payTitular) t.pagasTit++; }
+      }
+      if(trabalhadorPago) R(trabalhadorPago).horasPagar += hrs;
+    });
+    mapasRemovedSlots(iso, dKey).forEach(s=>{
+      const hrs = hoursBetween(s.start, s.end);
+      const motivo = mapasOnFerias(s.name, iso) ? 'Férias' : ((exceptions[iso] && exceptions[iso].note) || '');
+      turnos.push({k:iso+s.start, vals:[fmtDatePT(iso), dia, hol?hol.name:'', s.start, s.end, hrs, s.name, '—', 'Turno cancelado', '', motivo], tipo:'Turno cancelado'});
+      R(s.name).cancel++;
+    });
+  });
+
+  turnos.sort((x,y)=> x.k.localeCompare(y.k));
+  const ferias = [];
+  Object.keys(FERIAS_DIAS).forEach(name=>{
+    Object.keys(FERIAS_DIAS[name]||{}).filter(iso=>iso.slice(0,7)===monthKey).sort().forEach(iso=>{
+      const h = FERIAS_DIAS[name][iso]||0;
+      ferias.push([name, fmtDatePT(iso), LONG_WEEKDAY[new Date(iso+'T00:00:00').getDay()], h]);
+      const r = R(name); r.feriasDias++; r.feriasHoras += h;
+    });
+  });
+  ferias.sort((a,b)=> a[0].localeCompare(b[0],'pt'));
+
+  const wb = new ExcelJS.Workbook();
+
+  // 1. Resumo por TEF
+  const ws1 = wb.addWorksheet('Resumo por TEF');
+  const c1 = ['TEF','Vínculo','Turnos atribuídos (titular)','Horas atribuídas','Turnos feitos','Horas feitas','Substituições feitas','Turnos cedidos a substituto','dos quais pagos pelo titular','Turnos cancelados','Dias de férias','Horas de férias','Horas a pagar pelo ginásio'];
+  mapaTitle(ws1, 'Mapa de trabalho — '+label, mapaSubtitle(), c1.length);
+  mapaHeader(ws1, c1);
+  const tot = new Array(c1.length).fill(0);
+  Object.keys(resumo).sort((a,b)=>a.localeCompare(b,'pt')).forEach(n=>{
+    const r = resumo[n];
+    const vals = [n, mapasVinculo(n), r.turnosTit, r.horasTit, r.feitos, r.horasFeitas, r.substFeitas, r.cedidos, r.pagasTit, r.cancel, r.feriasDias, r.feriasHoras, mapasVinculo(n)==='Estagiário' ? 0 : r.horasPagar];
+    vals.forEach((v,i)=>{ if(i>=2) tot[i]+=v; });
+    mapaRow(ws1, vals);
+  });
+  const totRow = tot.map((v,i)=> i===0?'Total': i===1?'':v);
+  mapaRow(ws1, totRow, MAPA_SOFT, true);
+  ws1.columns.forEach((col,i)=>{ col.width = i===0?24 : i===1?14 : 13; });
+  [4,6,12,13].forEach(ci=> ws1.getColumn(ci).numFmt = '0.0#');
+
+  // 2. Turnos (dia a dia)
+  const ws2 = wb.addWorksheet('Turnos');
+  const c2 = ['Data','Dia','Feriado','Início','Fim','Horas','TEF titular','Quem fez o turno','Tipo','Pago por','Nota'];
+  mapaTitle(ws2, 'Turnos — '+label, mapaSubtitle(), c2.length);
+  mapaHeader(ws2, c2);
+  const FILL = {'Por substituir':'FFF4B6A6','Substituição':'FFFFF2CC','Turno extra':'FFE2F0D9','Turno cancelado':'FFF8D7D0','Feriado':'FFDCEAF2'};
+  turnos.forEach(t=> mapaRow(ws2, t.vals, FILL[t.tipo]||null, t.tipo!=='Normal'));
+  [12,16,20,8,8,7,20,20,15,10,28].forEach((w,i)=> ws2.getColumn(i+1).width = w);
+  ws2.getColumn(6).numFmt = '0.0#';
+  ws2.autoFilter = {from:{row:4,column:1}, to:{row:ws2.rowCount,column:c2.length}};
+  ws2.views = [{state:'frozen', ySplit:4}];
+
+  // 3. Substituições
+  const ws3 = wb.addWorksheet('Substituições');
+  const c3 = ['Data','Início','Fim','Horas','Titular','Substituto','Pago por','Nota'];
+  mapaTitle(ws3, 'Substituições — '+label, mapaSubtitle(), c3.length);
+  mapaHeader(ws3, c3);
+  const subs = turnos.filter(t=>t.tipo==='Substituição');
+  if(subs.length===0) mapaRow(ws3, ['Sem substituições neste mês.']);
+  subs.forEach(t=>{ const v=t.vals; mapaRow(ws3, [v[0],v[3],v[4],v[5],v[6],v[7],v[9],v[10]], v[9]==='Titular'?'FFF8D7D0':null); });
+  [12,8,8,7,22,22,10,30].forEach((w,i)=> ws3.getColumn(i+1).width = w);
+
+  // 4. Férias
+  const ws4 = wb.addWorksheet('Férias');
+  const c4 = ['TEF','Data','Dia','Horas'];
+  mapaTitle(ws4, 'Férias — '+label, mapaSubtitle(), c4.length);
+  mapaHeader(ws4, c4);
+  if(ferias.length===0) mapaRow(ws4, ['Sem férias marcadas neste mês.']);
+  ferias.forEach(f=> mapaRow(ws4, f));
+  [24,12,16,8].forEach((w,i)=> ws4.getColumn(i+1).width = w);
+
+  await mapaDownload(wb, 'Mapa_Trabalho_Sala_Lousada_'+MONTH_NAMES[mo.month]+'_'+mo.year+'.xlsx');
+  document.getElementById('mapasStatus').textContent = 'Mapa de trabalho de '+label+' gerado ('+turnos.length+' linhas de turnos, '+subs.length+' substituições, '+ferias.length+' dias de férias).';
+}
+
+async function exportMapaMesSeguinte(){
+  if(typeof ExcelJS === 'undefined'){ alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online).'); return; }
+  const mo = mapasMonth(1);
+  const label = mapasLabel(mo);
+  const days = mapasMonthDays(mo);
+  if(days.length===0){ alert('Este mês está fora do período da app.'); return; }
+
+  // grelha: uma linha por dia, uma coluna por turno (ordenado por hora)
+  const linhas = []; let maxT = 0;
+  const horas = {};
+  days.forEach(d=>{
+    const iso = isoDate(d), dKey = dayKeyOf(d);
+    const hol = HOLIDAY_MAP[iso];
+    const sh = shiftsForDate(iso, dKey).slice().sort((a,b)=> a.start.localeCompare(b.start));
+    const cells = sh.map(s=>{
+      const quem = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : (s.name||'').trim();
+      horas[quem] = horas[quem] || {turnos:0, horas:0};
+      horas[quem].turnos++; horas[quem].horas += hoursBetween(s.start, s.end);
+      const extra = (s.substituteName && s.substituteName.trim()) ? ' (subst. '+s.name+')' : '';
+      return s.start+'–'+s.end+'\n'+quem+extra+(s.needsSubst?'\n⚠️ por substituir':'');
+    });
+    maxT = Math.max(maxT, cells.length);
+    let obs = hol ? (hol.closed ? hol.name+' — encerrado' : hol.name) : '';
+    const emFerias = Object.keys(FERIAS_DIAS).filter(n=> mapasOnFerias(n, iso));
+    if(emFerias.length) obs = (obs?obs+' · ':'')+'Férias: '+emFerias.join(', ');
+    linhas.push({vals:[fmtDatePT(iso), LONG_WEEKDAY[d.getDay()]], cells, obs, weekend: d.getDay()===0||d.getDay()===6, hol:!!hol});
+  });
+  maxT = Math.max(maxT, 1);
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Escala');
+  const cols = ['Data','Dia'];
+  for(let i=1;i<=maxT;i++) cols.push('Turno '+i);
+  cols.push('Observações');
+  mapaTitle(ws, 'Escala de turnos — '+label, mapaSubtitle(), cols.length);
+  mapaHeader(ws, cols);
+  linhas.forEach(l=>{
+    const vals = l.vals.concat(l.cells);
+    while(vals.length < 2+maxT) vals.push('');
+    vals.push(l.obs);
+    mapaRow(ws, vals, l.hol ? MAPA_SOFT : (l.weekend ? 'FFF3F6F8' : null));
+  });
+  ws.getColumn(1).width = 12; ws.getColumn(2).width = 15;
+  for(let i=0;i<maxT;i++) ws.getColumn(3+i).width = 20;
+  ws.getColumn(3+maxT).width = 32;
+  ws.views = [{state:'frozen', ySplit:4, xSplit:2}];
+  ws.pageSetup = {orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9};
+
+  const ws2 = wb.addWorksheet('Horas por TEF');
+  const c2 = ['TEF','Vínculo','Turnos previstos','Horas previstas'];
+  mapaTitle(ws2, 'Horas previstas — '+label, mapaSubtitle(), c2.length);
+  mapaHeader(ws2, c2);
+  let tt=0, th=0;
+  Object.keys(horas).filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt')).forEach(n=>{
+    mapaRow(ws2, [n, mapasVinculo(n), horas[n].turnos, horas[n].horas]); tt+=horas[n].turnos; th+=horas[n].horas;
+  });
+  mapaRow(ws2, ['Total','',tt,th], MAPA_SOFT, true);
+  [24,14,14,14].forEach((w,i)=> ws2.getColumn(i+1).width = w);
+  ws2.getColumn(4).numFmt = '0.0#';
+
+  await mapaDownload(wb, 'Escala_Sala_Lousada_'+MONTH_NAMES[mo.month]+'_'+mo.year+'.xlsx');
+  document.getElementById('mapasStatus').textContent = 'Escala de '+label+' gerada.';
+}
+
+document.getElementById('btnMapaMesCorrente').addEventListener('click', exportMapaMesCorrente);
+document.getElementById('btnMapaMesSeguinte').addEventListener('click', exportMapaMesSeguinte);
+updateMapasButtons();
+
+/* ---------------------------------------------------------------
+   ÍNDICE DE DESEMPENHO TEF (0-100)
+   Componentes (pesos editáveis): Observação do coordenador, Satisfação
+   dos clientes, Produtividade em sala (clientes distintos por hora de
+   turno), Cumprimento de tarefas (% sem atraso) e PT (sessões no mês).
+   Cada componente vale 0-100 face a uma meta fixa; componentes sem dados
+   saem do cálculo e o peso é repartido pelas restantes.
+--------------------------------------------------------------- */
+const STORE_INDICE = 'tef_turnos_indice_tef_v1';
+const INDICE_COMPONENTES = [
+  {key:'observacao', label:'Observação'},
+  {key:'satisfacao', label:'Satisfação'},
+  {key:'produtividade', label:'Produtividade'},
+  {key:'tarefas', label:'Tarefas'},
+  {key:'pt', label:'PT'}
+];
+function defaultIndiceCfg(){
+  return {
+    pesos:{observacao:25, satisfacao:30, produtividade:10, tarefas:15, pt:20},
+    metaClientesHora:4,      // clientes distintos por hora de turno que valem 100
+    metaTarefas:90,          // % de tarefas sem atraso que vale 100
+    metaPT:20,               // sessões de PT no mês que valem 100
+    minRespostas:3           // respostas mínimas de satisfação para contar
+  };
+}
+function loadIndiceCfg(){
+  try{ const raw = localStorage.getItem(STORE_INDICE); if(raw) return Object.assign(defaultIndiceCfg(), JSON.parse(raw)); }catch(e){}
+  return defaultIndiceCfg();
+}
+function saveIndiceCfg(){ localStorage.setItem(STORE_INDICE, JSON.stringify(INDICE_CFG)); touchMeta(); }
+let INDICE_CFG = loadIndiceCfg();
+let indiceMonthIdx = null;
+
+function indiceMonthKeyFromIdx(i){ const m = MONTH_LIST[i]; return m.year+'-'+pad(m.month+1); }
+function indiceShiftMonthKey(mk, delta){
+  const [y,m] = mk.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1);
+}
+function clamp100(v){ return Math.max(0, Math.min(100, v)); }
+
+// Horas de turno efetivamente feitas por cada TEF no mês (quem substitui conta).
+function indiceHorasPorTef(monthKey){
+  const [y, mo] = monthKey.split('-').map(Number);
+  const n = new Date(y, mo, 0).getDate();
+  const horas = {};
+  for(let d=1; d<=n; d++){
+    const dt = new Date(y, mo-1, d);
+    if(dt < RANGE_START || dt > RANGE_END) continue;
+    shiftsForReportDate(isoDate(dt), dayKeyOf(dt)).forEach(s=>{
+      const nome = (s.substituteName && s.substituteName.trim()) ? s.substituteName.trim() : s.name;
+      if(!nome) return;
+      horas[nome] = (horas[nome]||0) + hoursBetween(s.start, s.end);
+    });
+  }
+  return horas;
+}
+
+function indiceComponentes(name, monthKey, horasMes){
+  const out = {};
+  const fimMes = monthKey+'-31';
+  // 1. Observação: a avaliação mais recente até ao fim do mês
+  let aval = null;
+  AVALIACOES.forEach(a=>{ if(a.tecnico===name && a.date && a.date<=fimMes && (!aval || a.date>aval.date)) aval = a; });
+  if(aval) out.observacao = {score: computeWeightedTotal(aval.scores), raw: 'avaliação de '+fmtDatePT(aval.date)};
+
+  // 2. Satisfação: média das respostas do mês (avaliação, sala, geral)
+  if(SATISFACAO[monthKey]){
+    const sat = computeSatisfacaoParaTef(name, monthKey);
+    const vals = sat.salaRatings.map(r=>r.valor).concat(sat.avalRatings.map(r=>r.valor));
+    if(vals.length >= (INDICE_CFG.minRespostas||1)){
+      const max = vals.some(v=>v>5) ? 10 : 5;
+      const m = vals.reduce((a,b)=>a+b,0)/vals.length;
+      out.satisfacao = {score: clamp100(m/max*100), raw: m.toFixed(1)+'/'+max+' (n='+vals.length+')'};
+    }
+  }
+
+  // 3. Produtividade: clientes distintos por hora de turno
+  const h = horasMes[name] || 0;
+  const ac = ACESSOS[monthKey] && ACESSOS[monthKey].perTef && ACESSOS[monthKey].perTef[name];
+  if(ac && h > 0){
+    const cph = ac.count / h;
+    out.produtividade = {score: clamp100(cph/(INDICE_CFG.metaClientesHora||1)*100), raw: cph.toFixed(1)+' cl/h ('+ac.count+' em '+fmtHours(h)+' h)'};
+  }
+
+  // 4. Tarefas: realizadas vs. em atraso
+  const rel = RELATORIOS[monthKey];
+  const t = rel && rel.tarefas && rel.tarefas[name];
+  const feitas = t ? ['avaliacoes_fisicas','reavaliacoes','integracao','prescricoes'].reduce((sum,k)=> sum + (parseInt(t[k],10)||0), 0) : 0;
+  const pc = PT_COUNTS[monthKey] && PT_COUNTS[monthKey][name];
+  const atraso = pc ? (pc.tarefas_atraso||0) : 0;
+  if(feitas + atraso > 0){
+    const taxa = feitas/(feitas+atraso)*100;
+    out.tarefas = {score: clamp100(taxa/(INDICE_CFG.metaTarefas||1)*100), raw: Math.round(taxa)+'% ('+feitas+' feitas, '+atraso+' em atraso)'};
+  }
+
+  // 5. PT: sessões no mês
+  if(pc){
+    const sess = (pc.internos||0)+(pc.externos||0);
+    out.pt = {score: clamp100(sess/(INDICE_CFG.metaPT||1)*100), raw: sess+' sessões'};
+  }
+  return out;
+}
+
+function indiceTotal(comp){
+  // Com menos de 2 componentes não há base suficiente para um índice.
+  if(INDICE_COMPONENTES.filter(c=>comp[c.key]).length < 2) return null;
+  let soma = 0, pesos = 0;
+  INDICE_COMPONENTES.forEach(c=>{
+    const w = Number(INDICE_CFG.pesos[c.key])||0;
+    if(comp[c.key] && w>0){ soma += comp[c.key].score*w; pesos += w; }
+  });
+  return pesos>0 ? Math.round(soma/pesos*10)/10 : null;
+}
+
+function indiceNomes(){
+  return Object.keys(TECH_REGISTRY)
+    .filter(n=> TECH_REGISTRY[n].ativo !== false && (TECH_REGISTRY[n].status||'') !== 'estagiario')
+    .sort((a,b)=>a.localeCompare(b,'pt'));
+}
+
+function computeIndiceMes(monthKey){
+  const horas = indiceHorasPorTef(monthKey);
+  const res = {};
+  indiceNomes().forEach(n=>{
+    const comp = indiceComponentes(n, monthKey, horas);
+    res[n] = {comp, total: indiceTotal(comp)};
+  });
+  return res;
+}
+
+function computeIndiceTabela(monthKey){
+  const mes = computeIndiceMes(monthKey);
+  const m1 = computeIndiceMes(indiceShiftMonthKey(monthKey,-1));
+  const m2 = computeIndiceMes(indiceShiftMonthKey(monthKey,-2));
+  return indiceNomes().map(n=>{
+    const vals = [mes[n].total, m1[n] && m1[n].total, m2[n] && m2[n].total].filter(v=>v!==null && v!==undefined);
+    const media3 = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : null;
+    let pior = null;
+    INDICE_COMPONENTES.forEach(c=>{ const x = mes[n].comp[c.key]; if(x && (!pior || x.score < pior.score)) pior = {label:c.label, score:x.score}; });
+    return {name:n, comp:mes[n].comp, total:mes[n].total, media3, nMeses: vals.length, pior};
+  }).sort((a,b)=>{
+    if(a.media3===null && b.media3===null) return a.name.localeCompare(b.name,'pt');
+    if(a.media3===null) return 1; if(b.media3===null) return -1;
+    return b.media3 - a.media3;
+  });
+}
+
+function indiceCor(v){
+  if(v===null || v===undefined) return 'var(--ink-soft)';
+  if(v>=80) return '#1e7a46'; if(v>=60) return '#2a6f8c'; if(v>=40) return '#b8860b'; return '#c0392b';
+}
+
+function renderIndiceCfg(){
+  const body = document.getElementById('indiceCfgBody');
+  const somaPesos = INDICE_COMPONENTES.reduce((s,c)=> s + (Number(INDICE_CFG.pesos[c.key])||0), 0);
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:14px 22px;font-size:12.5px;">';
+  INDICE_COMPONENTES.forEach(c=>{
+    html += '<label style="display:flex;align-items:center;gap:6px;">'+c.label+' <input type="number" min="0" max="100" class="rel-input indice-peso" data-key="'+c.key+'" value="'+(INDICE_CFG.pesos[c.key]||0)+'" style="width:60px;"> %</label>';
+  });
+  html += '<span style="font-weight:700;color:'+(somaPesos===100?'var(--accent)':'#c0392b')+';">Total: '+somaPesos+'%'+(somaPesos===100?'':' (deve somar 100)')+'</span></div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:14px 22px;font-size:12.5px;margin-top:12px;">'+
+    '<label style="display:flex;align-items:center;gap:6px;">Meta de produtividade <input type="number" min="0.1" step="0.1" class="rel-input indice-meta" data-key="metaClientesHora" value="'+INDICE_CFG.metaClientesHora+'" style="width:70px;"> clientes/hora</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;">Meta de tarefas <input type="number" min="1" max="100" class="rel-input indice-meta" data-key="metaTarefas" value="'+INDICE_CFG.metaTarefas+'" style="width:70px;"> % sem atraso</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;">Meta de PT <input type="number" min="1" class="rel-input indice-meta" data-key="metaPT" value="'+INDICE_CFG.metaPT+'" style="width:70px;"> sessões/mês</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;">Satisfação: mínimo de <input type="number" min="1" class="rel-input indice-meta" data-key="minRespostas" value="'+INDICE_CFG.minRespostas+'" style="width:60px;"> respostas</label>'+
+    '<button type="button" class="btn ghost" id="indiceCfgReset">Repor valores iniciais</button>'+
+  '</div>';
+  body.innerHTML = html;
+  body.querySelectorAll('.indice-peso').forEach(inp=> inp.addEventListener('change', e=>{
+    INDICE_CFG.pesos[e.target.dataset.key] = parseFloat(e.target.value)||0; saveIndiceCfg(); renderIndiceTab();
+  }));
+  body.querySelectorAll('.indice-meta').forEach(inp=> inp.addEventListener('change', e=>{
+    const v = parseFloat(e.target.value); if(!(v>0)) return;
+    INDICE_CFG[e.target.dataset.key] = v; saveIndiceCfg(); renderIndiceTab();
+  }));
+  document.getElementById('indiceCfgReset').addEventListener('click', ()=>{ INDICE_CFG = defaultIndiceCfg(); saveIndiceCfg(); renderIndiceTab(); });
+}
+
+function renderIndiceTab(){
+  if(indiceMonthIdx===null) indiceMonthIdx = relMonthIdx;
+  const mk = indiceMonthKeyFromIdx(indiceMonthIdx);
+  const mo = MONTH_LIST[indiceMonthIdx];
+  document.getElementById('indiceMesAtual').textContent = MONTH_NAMES[mo.month]+' '+mo.year;
+  document.getElementById('indiceMesPrev').disabled = indiceMonthIdx<=0;
+  document.getElementById('indiceMesNext').disabled = indiceMonthIdx>=MONTH_LIST.length-1;
+  renderIndiceCfg();
+
+  const rows = computeIndiceTabela(mk);
+  const tbody = document.getElementById('indiceTableBody');
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="10" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há TEF registados.</td></tr>'; return; }
+  const cell = (x)=> x ? '<strong style="color:'+indiceCor(x.score)+';">'+Math.round(x.score)+'</strong><br><span style="color:var(--ink-soft);font-size:11px;">'+escapeAttr(x.raw)+'</span>' : '<span style="color:var(--ink-soft);">—</span>';
+  tbody.innerHTML = rows.map(r=>{
+    const tier = r.media3!==null ? classifyAvalScore(r.media3).label : '—';
+    return '<tr>'+
+      '<td data-label="TEF" style="font-weight:700;">'+escapeAttr(r.name)+'</td>'+
+      '<td data-label="Índice do mês">'+(r.total!==null ? '<strong style="font-size:15px;color:'+indiceCor(r.total)+';">'+r.total.toFixed(1)+'</strong>' : '—')+'</td>'+
+      '<td data-label="Média 3 meses">'+(r.media3!==null ? '<strong style="font-size:15px;color:'+indiceCor(r.media3)+';">'+r.media3.toFixed(1)+'</strong><br><span style="color:var(--ink-soft);font-size:11px;">'+r.nMeses+' '+(r.nMeses===1?'mês':'meses')+'</span>' : '—')+'</td>'+
+      '<td data-label="Classificação">'+tier+'</td>'+
+      INDICE_COMPONENTES.map(c=>'<td data-label="'+c.label+'">'+cell(r.comp[c.key])+'</td>').join('')+
+      '<td data-label="A melhorar">'+(r.pior ? r.pior.label : '—')+'</td>'+
+    '</tr>';
+  }).join('');
+  const semDados = INDICE_COMPONENTES.filter(c=> !rows.some(r=>r.comp[c.key])).map(c=>c.label);
+  document.getElementById('indiceNota').textContent = semDados.length
+    ? 'Sem dados este mês para: '+semDados.join(', ')+'. Carrega os ficheiros do mês no separador Início para estas componentes entrarem no índice.'
+    : 'Classificação pela média de 3 meses: 80+ Excelente · 60+ Muito bom · 40+ Regular · 24+ Insatisfatório.';
+  document.getElementById('indiceNota').textContent += ' O índice só é calculado com pelo menos 2 componentes com dados.';
+}
+
+document.getElementById('indiceMesPrev').addEventListener('click', ()=>{ if(indiceMonthIdx>0){ indiceMonthIdx--; renderIndiceTab(); } });
+document.getElementById('indiceMesNext').addEventListener('click', ()=>{ if(indiceMonthIdx<MONTH_LIST.length-1){ indiceMonthIdx++; renderIndiceTab(); } });
+document.getElementById('indiceCfgToggle').addEventListener('click', ()=>{
+  const b = document.getElementById('indiceCfgBody'); const open = b.style.display==='none';
+  b.style.display = open ? '' : 'none';
+  document.getElementById('indiceCfgArrow').textContent = open ? 'esconder ▴' : 'mostrar ▾';
+});
+document.getElementById('btnIndiceExcel').addEventListener('click', async ()=>{
+  if(typeof ExcelJS === 'undefined'){ alert('Não foi possível carregar a biblioteca de Excel (precisas de estar online).'); return; }
+  const mk = indiceMonthKeyFromIdx(indiceMonthIdx===null?relMonthIdx:indiceMonthIdx);
+  const mo = MONTH_LIST[indiceMonthIdx===null?relMonthIdx:indiceMonthIdx];
+  const rows = computeIndiceTabela(mk);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Índice TEF');
+  const label = MONTH_NAMES[mo.month]+' '+mo.year;
+  const cols = ['TEF','Índice do mês','Média 3 meses','Classificação'];
+  INDICE_COMPONENTES.forEach(c=>{ cols.push(c.label+' ('+(INDICE_CFG.pesos[c.key]||0)+'%)'); cols.push(c.label+' — dado'); });
+  cols.push('A melhorar');
+  mapaTitle(ws, 'Índice de Desempenho TEF — '+label, mapaSubtitle(), cols.length);
+  mapaHeader(ws, cols);
+  rows.forEach(r=>{
+    const v = [r.name, r.total, r.media3, r.media3!==null ? classifyAvalScore(r.media3).label : ''];
+    INDICE_COMPONENTES.forEach(c=>{ const x = r.comp[c.key]; v.push(x ? Math.round(x.score) : ''); v.push(x ? x.raw : 'sem dados'); });
+    v.push(r.pior ? r.pior.label : '');
+    mapaRow(ws, v);
+  });
+  ws.getColumn(1).width = 22;
+  for(let i=2;i<=cols.length;i++) ws.getColumn(i).width = 14;
+  await mapaDownload(wb, 'Indice_TEF_'+MONTH_NAMES[mo.month]+'_'+mo.year+'.xlsx');
 });
 
 /* ---------------------------------------------------------------
@@ -9178,6 +9830,7 @@ function updateSyncStatusLabel(){
 
 function buildExportPayload(){
   return {
+    indiceTef: INDICE_CFG,
     template: TEMPLATE_LINES,
     exceptions: exceptions,
     tecnicos: TECH_REGISTRY,
@@ -9225,7 +9878,8 @@ function applyImportedData(data){
   if(data.feriasDias){ FERIAS_DIAS = data.feriasDias; localStorage.setItem(STORE_FERIAS_DIAS, JSON.stringify(FERIAS_DIAS)); }
   if(data.pesosAvaliacao){ GROUP_WEIGHTS = data.pesosAvaliacao; localStorage.setItem(STORE_GROUP_WEIGHTS, JSON.stringify(GROUP_WEIGHTS)); }
   if(data.relatorios){ RELATORIOS = data.relatorios; localStorage.setItem(STORE_RELATORIO, JSON.stringify(RELATORIOS)); }
-  if(data.acessos){ ACESSOS = data.acessos; localStorage.setItem(STORE_ACESSOS, JSON.stringify(ACESSOS)); }
+  if(data.acessos){ ACESSOS = data.acessos; saveAcessos(ACESSOS); }
+  if(data.indiceTef){ INDICE_CFG = Object.assign(defaultIndiceCfg(), data.indiceTef); localStorage.setItem(STORE_INDICE, JSON.stringify(INDICE_CFG)); }
   if(data.notasRapidas){ QUICK_NOTES = data.notasRapidas; localStorage.setItem(STORE_QUICK_NOTES, JSON.stringify(QUICK_NOTES)); }
   if(data.avalFisicaLog){ AVAL_FISICA_LOG = data.avalFisicaLog; localStorage.setItem(STORE_AVAL_FISICA_LOG, JSON.stringify(AVAL_FISICA_LOG)); }
   if(data.satisfacao){ SATISFACAO = data.satisfacao; localStorage.setItem(STORE_SATISFACAO, JSON.stringify(SATISFACAO)); }
