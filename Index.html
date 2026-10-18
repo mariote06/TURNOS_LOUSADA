@@ -6249,14 +6249,27 @@ function applyAcessosToRelatorio(monthKey, perTef){
   if(relMonthKey()===monthKey) renderRelatorioTab();
 }
 
+let acessosMonthSel = null; // null = mês mais recente; 'all' = todos
 function renderAcessosResults(){
   const container = document.getElementById('acessosResults');
   container.innerHTML = '';
-  const keys = Object.keys(ACESSOS).sort().reverse();
-  if(keys.length===0){
+  const allKeys = Object.keys(ACESSOS).sort().reverse();
+  if(allKeys.length===0){
     container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;">Ainda não carregaste nenhum ficheiro de visitas.</p>';
     return;
   }
+  if(acessosMonthSel!=='all' && !allKeys.includes(acessosMonthSel)) acessosMonthSel = allKeys[0];
+  const keys = acessosMonthSel==='all' ? allKeys : [acessosMonthSel];
+  const selBar = document.createElement('div');
+  selBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px;';
+  selBar.innerHTML = '<label for="acessosMonthSel" style="font-weight:700;font-size:13px;align-self:center;">Mês:</label>'+
+    '<select id="acessosMonthSel" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font:inherit;">'+
+    allKeys.map(k=>{ const my=k.split('-').map(Number); return '<option value="'+k+'">'+MONTH_NAMES[my[1]-1]+' '+my[0]+'</option>'; }).join('')+
+    (allKeys.length>1 ? '<option value="all">Todos os meses</option>' : '')+'</select>';
+  container.appendChild(selBar);
+  const selEl = selBar.querySelector('select');
+  selEl.value = acessosMonthSel;
+  selEl.addEventListener('change', e=>{ acessosMonthSel = e.target.value; renderAcessosResults(); });
   keys.forEach(monthKey=>{
     const data = ACESSOS[monthKey];
     const my = monthKey.split('-').map(Number);
@@ -6907,11 +6920,12 @@ function computeSatisfacaoParaTef(name, filtroMes){
   });
   return {salaRatings, avalRatings, mediaGeral: media(geralValores), nGeral: geralValores.length};
 }
-function computeSatisfacaoAgregada(){
+function computeSatisfacaoAgregada(filtroMes){
   const porTef = {};
   function ensure(name){ if(!porTef[name]) porTef[name] = {p1File:[], p1Tarefas:[], p2:[], p5:[]}; return porTef[name]; }
   const detalhe = [];
   Object.keys(SATISFACAO).forEach(mKey=>{
+    if(filtroMes && filtroMes!=='all' && mKey!==filtroMes) return;
     (SATISFACAO[mKey].respostas||[]).forEach(r=>{
       const viaTarefas = avaliacaoViaTarefasParaCliente(r.cliente);
       const salaTefs = salaTefsParaCliente(r.codigo, mKey);
@@ -6947,6 +6961,7 @@ function limparNomesSatisfacao(){
   });
   if(mudou) saveSatisfacao(SATISFACAO);
 }
+let satisfTefMes = 'all';
 function renderSatisfacaoResumo(){
   limparNomesSatisfacao();
   const container = document.getElementById('satisfacaoResumo');
@@ -6954,13 +6969,26 @@ function renderSatisfacaoResumo(){
     container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Ainda não importaste nenhum questionário.</p>';
     return;
   }
-  const {porTef, detalhe} = computeSatisfacaoAgregada();
+  const mesesTef = Object.keys(SATISFACAO).sort().reverse();
+  if(satisfTefMes!=='all' && !mesesTef.includes(satisfTefMes)) satisfTefMes = 'all';
+  const seletorMes = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;">'+
+    '<label for="satisfTefMesSel" style="font-weight:700;font-size:13px;align-self:center;">Período:</label>'+
+    '<select id="satisfTefMesSel" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font:inherit;">'+
+    '<option value="all"'+(satisfTefMes==='all'?' selected':'')+'>Geral (todos os meses)</option>'+
+    mesesTef.map(k=>{ const my=k.split('-').map(Number); return '<option value="'+k+'"'+(satisfTefMes===k?' selected':'')+'>'+MONTH_NAMES[my[1]-1]+' '+my[0]+'</option>'; }).join('')+
+    '</select></div>';
+  function ligarSeletor(){
+    const el = document.getElementById('satisfTefMesSel');
+    if(el) el.addEventListener('change', e=>{ satisfTefMes = e.target.value; renderSatisfacaoResumo(); });
+  }
+  const {porTef, detalhe} = computeSatisfacaoAgregada(satisfTefMes);
   const nomes = Object.keys(porTef).sort((a,b)=>a.localeCompare(b,'pt'));
   if(nomes.length===0){
-    container.innerHTML = '<p style="color:var(--ink-soft);font-style:italic;margin:0;">Sem correspondências encontradas ainda.</p>';
+    container.innerHTML = seletorMes+'<p style="color:var(--ink-soft);font-style:italic;margin:0;">Sem correspondências encontradas neste período.</p>';
+    ligarSeletor();
     return;
   }
-  let html = '<div class="panel" style="padding:0;overflow-x:auto;"><table class="tec-table"><thead><tr>'+
+  let html = seletorMes+'<div class="panel" style="padding:0;overflow-x:auto;"><table class="tec-table"><thead><tr>'+
     '<th>TEF</th><th>Aval./Presc. (Ficheiro)</th><th>Acompanh. em Sala</th><th>Satisfação Geral</th>'+
     '</tr></thead><tbody>';
   nomes.forEach(name=>{
@@ -6980,6 +7008,7 @@ function renderSatisfacaoResumo(){
     '</div>'+
     '<div id="satisfacaoDetalheContainer" style="display:none;overflow-x:auto;"></div>';
   container.innerHTML = html;
+  ligarSeletor();
 
   document.getElementById('satisfacaoToggleDetalhe').addEventListener('click', (e)=>{
     const box = document.getElementById('satisfacaoDetalheContainer');
