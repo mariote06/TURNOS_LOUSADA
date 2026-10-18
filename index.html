@@ -1156,12 +1156,19 @@
         <button type="button" class="btn ghost" id="ptClearTarefasMes">🧹 Limpar tarefas do mês</button>
         <span style="color:var(--ink-soft);font-size:12px;margin-left:8px;">Apaga só as tarefas do mês selecionado; os treinos PT internos/externos mantêm-se.</span>
       </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+        <label class="btn ghost" style="cursor:pointer;display:inline-block;">🔁 Verificar atrasos +15 dias (carregar Excel atual)
+          <input type="file" id="ptAtraso15FileInput" accept=".xlsx,.xls" style="display:none;">
+        </label>
+        <span style="color:var(--ink-soft);font-size:12px;margin-left:8px;">Carrega o Excel de tarefas atual, cerca de 15 dias depois da importação do mês. Conta quantas das tarefas em atraso deste mês continuam em atraso.</span>
+        <div id="ptAtraso15Status" style="font-size:12.5px;margin-top:8px;color:var(--ink-soft);"></div>
+      </div>
     </div>
 
     <div class="panel" style="padding:0;overflow-x:auto;">
       <table class="tec-table" id="ptCountTable">
         <thead>
-          <tr><th>PT</th><th>PT Interno</th><th>PT Externo</th><th>Treinos vendidos</th><th>Marcar 1ª Avaliação Física</th><th>1ª Avaliação Física</th><th>Marcar Reavaliação Física</th><th>Reavaliação Física</th><th>Treinos de Integração</th><th>Prescrição de Treino</th><th>Tarefas em Atraso</th></tr>
+          <tr><th>PT</th><th>PT Interno</th><th>PT Externo</th><th>Treinos vendidos</th><th>Marcar 1ª Avaliação Física</th><th>1ª Avaliação Física</th><th>Marcar Reavaliação Física</th><th>Reavaliação Física</th><th>Treinos de Integração</th><th>Prescrição de Treino</th><th>Tarefas em Atraso</th><th title="Das tarefas em atraso deste mês, quantas continuam em atraso na última verificação (+15 dias)">Em Atraso +15 dias</th></tr>
         </thead>
         <tbody id="ptCountTableBody"></tbody>
         <tfoot>
@@ -1177,6 +1184,7 @@
             <td data-label="Treinos de Integração" id="ptCountTotalIntegracao">0</td>
             <td data-label="Prescrição de Treino" id="ptCountTotalPrescricao">0</td>
             <td data-label="Tarefas em Atraso" id="ptCountTotalAtraso">0</td>
+            <td data-label="Em Atraso +15 dias" id="ptCountTotalAtraso15">0</td>
           </tr>
         </tfoot>
       </table>
@@ -1215,6 +1223,10 @@
       <div class="pt-ranking-col">
         <h4>⏰ Tarefas em Atraso</h4>
         <div id="rankAtraso"></div>
+      </div>
+      <div class="pt-ranking-col">
+        <h4>🔁 Em Atraso +15 dias</h4>
+        <div id="rankAtraso15"></div>
       </div>
     </div>
 
@@ -5629,8 +5641,24 @@ const PT_TASK_FIELDS = [
   {key:'reavaliacao_fisica', label:'Reavaliação Física', rankTarget:'rankReavaliacao', totalId:'ptCountTotalReavaliacao'},
   {key:'treino_integracao', label:'Treinos de Integração', rankTarget:'rankIntegracao', totalId:'ptCountTotalIntegracao'},
   {key:'prescricao', label:'Prescrição de Treino', rankTarget:'rankPrescricao', totalId:'ptCountTotalPrescricao'},
-  {key:'tarefas_atraso', label:'Tarefas em Atraso', rankTarget:'rankAtraso', totalId:'ptCountTotalAtraso'}
+  {key:'tarefas_atraso', label:'Tarefas em Atraso', rankTarget:'rankAtraso', totalId:'ptCountTotalAtraso'},
+  {key:'tarefas_atraso_15', label:'Em Atraso +15 dias', rankTarget:'rankAtraso15', totalId:'ptCountTotalAtraso15'}
 ];
+
+// Nota por baixo de "Em Atraso +15 dias": quantas das tarefas em atraso deste
+// mês já foram resolvidas na última verificação, e a data dessa verificação.
+function atraso15Note(entry){
+  if(!entry || !entry.atraso15Em) return '';
+  const total = (entry.tarefasAtrasoDetalhe||[]).length;
+  if(!total) return '';
+  const aberto = entry.tarefas_atraso_15||0;
+  const resolvidas = Math.max(0, total-aberto);
+  return '<div style="font-size:10.5px;color:var(--ink-soft);margin-top:3px;">'+resolvidas+'/'+total+' resolvidas · '+fmtDatePT(entry.atraso15Em)+'</div>';
+}
+function atraso15Key(t){
+  const n = x=> normalizeNameForMatch ? normalizeNameForMatch(String(x||'')) : String(x||'').toLowerCase().trim();
+  return n(t.tipo || t.tarefa)+'|'+n(t.cliente)+'|'+(t.prazo||'');
+}
 
 function renderPtCountTab(){
   const tbody = document.getElementById('ptCountTableBody');
@@ -5645,7 +5673,7 @@ function renderPtCountTab(){
   document.getElementById('ptCountMonthNext').disabled = ptCountMonthIdx >= MONTH_LIST.length-1;
 
   if(names.length === 0){
-    tbody.innerHTML = '<tr><td colspan="11" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="color:var(--ink-soft);font-style:italic;padding:14px;">Ainda não há técnicos registados — adiciona-os no separador Técnicos primeiro.</td></tr>';
     updatePtCountTotals();
     return;
   }
@@ -5655,7 +5683,8 @@ function renderPtCountTab(){
     let taskCells = '';
     PT_TASK_FIELDS.forEach(f=>{
       taskCells += '<td data-label="'+f.label+'"><input type="number" min="0" inputmode="numeric" class="pt-count-input" data-name="'+encodeURIComponent(name)+'" data-field="'+f.key+'" '+
-        'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry[f.key]>0?entry[f.key]:'')+'" placeholder="0"></td>';
+        'style="width:64px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:5px 4px;" value="'+(entry[f.key]>0?entry[f.key]:'')+'" placeholder="0">'+
+        (f.key==='tarefas_atraso_15' ? atraso15Note(entry) : '')+'</td>';
     });
     const tr = document.createElement('tr');
     tr.innerHTML =
@@ -5743,7 +5772,7 @@ function limparNomesOrfaosPtCounts(mKey){
   const monthData = PT_COUNTS[mKey];
   if(!monthData) return 0;
   const registeredNames = Object.keys(TECH_REGISTRY);
-  const taskFields = ['prescricao','avaliacao_fisica','marcar_avaliacao_fisica','reavaliacao_fisica','marcar_reavaliacao_fisica','treino_integracao','tarefas_atraso'];
+  const taskFields = ['prescricao','avaliacao_fisica','marcar_avaliacao_fisica','reavaliacao_fisica','marcar_reavaliacao_fisica','treino_integracao','tarefas_atraso','tarefas_atraso_15'];
   let alterados = 0;
   Object.keys(monthData).forEach(name=>{
     if(registeredNames.includes(name)) return;
@@ -5771,7 +5800,7 @@ function limparNomesOrfaosPtCounts(mKey){
 
 function updatePtCountTotals(){
   let totalInternos = 0, totalExternos = 0;
-  const taskTotals = {prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0};
+  const taskTotals = {prescricao:0, avaliacao_fisica:0, marcar_avaliacao_fisica:0, reavaliacao_fisica:0, marcar_reavaliacao_fisica:0, treino_integracao:0, tarefas_atraso:0, tarefas_atraso_15:0};
   const monthData = PT_COUNTS[ptCountMonthKey()] || {};
   const names = Array.from(new Set(Object.keys(TECH_REGISTRY).concat(Object.keys(monthData))));
 
@@ -5787,6 +5816,7 @@ function updatePtCountTotals(){
     taskTotals.marcar_reavaliacao_fisica += e.marcar_reavaliacao_fisica || 0;
     taskTotals.treino_integracao += e.treino_integracao || 0;
     taskTotals.tarefas_atraso += e.tarefas_atraso || 0;
+    taskTotals.tarefas_atraso_15 += e.tarefas_atraso_15 || 0;
   });
 
   document.getElementById('ptCountTotalInternos').textContent = totalInternos;
@@ -5806,6 +5836,51 @@ function updatePtCountTotals(){
   });
 }
 
+// "Em Atraso +15 dias": compara o detalhe das tarefas em atraso guardado na
+// importação do mês com um Excel mais recente. Uma tarefa conta como ainda em
+// atraso se continua pendente no ficheiro novo (mesmo tipo, cliente e prazo).
+document.getElementById('ptAtraso15FileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('ptAtraso15Status');
+  const mKey = ptCountMonthKey();
+  const m = MONTH_LIST[ptCountMonthIdx];
+  const label = MONTH_NAMES[m.month]+' '+m.year;
+  try{
+    const monthData = PT_COUNTS[mKey] || {};
+    const nSnap = Object.keys(monthData).reduce((s,n)=> s + ((monthData[n].tarefasAtrasoDetalhe||[]).length), 0);
+    if(nSnap === 0){
+      statusEl.textContent = 'Não há tarefas em atraso guardadas em '+label+'. Importa primeiro o Excel desse mês (separador Início).';
+      e.target.value=''; return;
+    }
+    statusEl.textContent = 'A processar '+file.name+'…';
+    const rawParsed = parseTarefasWorkbook(await file.arrayBuffer());
+    if(rawParsed.length===0){ statusEl.textContent = 'Não foi possível reconhecer tarefas neste ficheiro.'; e.target.value=''; return; }
+    const parsed = resolveTarefasResponsaveis(rawParsed).items;
+    const today = isoDate(new Date());
+    const abertas = new Set();
+    parsed.forEach(p=>{ if(p.bucket==='pendente' && p.prazo && p.prazo < today) abertas.add(atraso15Key(p)); });
+    let ainda=0;
+    Object.keys(monthData).forEach(name=>{
+      const en = monthData[name];
+      const det = en.tarefasAtrasoDetalhe || [];
+      if(!det.length){ return; }
+      const n = det.filter(t=> abertas.has(atraso15Key(t))).length;
+      en.tarefas_atraso_15 = n;
+      en.atraso15Em = today;
+      ainda += n;
+    });
+    savePtCounts(PT_COUNTS);
+    const res = nSnap-ainda;
+    statusEl.textContent = label+': das '+nSnap+' tarefas em atraso, '+res+' foram resolvidas ('+Math.round(100*res/nSnap)+'%) e '+ainda+' continuam em atraso.';
+    renderPtCountTab();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'Erro ao processar o ficheiro: '+(err && err.message ? err.message : err);
+  }
+  e.target.value = '';
+});
+
 // Limpa apenas as tarefas do mês selecionado (contagens por TEF, detalhe das
 // tarefas em atraso e o registo de avaliações físicas desse mês). Os treinos
 // PT internos/externos e os outros meses não são tocados.
@@ -5816,7 +5891,7 @@ document.getElementById('ptClearTarefasMes').addEventListener('click', ()=>{
   const monthData = PT_COUNTS[mKey] || {};
   const nTarefas = Object.keys(monthData).reduce((s,n)=>{
     const e = monthData[n];
-    return s + (e.prescricao||0)+(e.avaliacao_fisica||0)+(e.marcar_avaliacao_fisica||0)+(e.reavaliacao_fisica||0)+(e.marcar_reavaliacao_fisica||0)+(e.treino_integracao||0)+(e.tarefas_atraso||0);
+    return s + (e.prescricao||0)+(e.avaliacao_fisica||0)+(e.marcar_avaliacao_fisica||0)+(e.reavaliacao_fisica||0)+(e.marcar_reavaliacao_fisica||0)+(e.treino_integracao||0)+(e.tarefas_atraso||0)+(e.tarefas_atraso_15||0);
   }, 0);
   if(nTarefas === 0 && !(AVAL_FISICA_LOG[mKey]||[]).length){
     alert('Não há tarefas registadas em '+label+'.');
@@ -5826,7 +5901,7 @@ document.getElementById('ptClearTarefasMes').addEventListener('click', ()=>{
   Object.keys(monthData).forEach(name=>{
     const en = monthData[name];
     en.prescricao = 0; en.avaliacao_fisica = 0; en.marcar_avaliacao_fisica = 0;
-    en.reavaliacao_fisica = 0; en.marcar_reavaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0;
+    en.reavaliacao_fisica = 0; en.marcar_reavaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0; en.tarefas_atraso_15 = 0; delete en.atraso15Em;
     en.tarefasAtrasoDetalhe = [];
   });
   savePtCounts(PT_COUNTS);
@@ -5863,7 +5938,7 @@ async function handlePtTarefasFile(e){
     Object.keys(PT_COUNTS[mKey]).forEach(name=>{
       const en = PT_COUNTS[mKey][name];
       en.prescricao = 0; en.avaliacao_fisica = 0; en.marcar_avaliacao_fisica = 0;
-      en.reavaliacao_fisica = 0; en.marcar_reavaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0;
+      en.reavaliacao_fisica = 0; en.marcar_reavaliacao_fisica = 0; en.treino_integracao = 0; en.tarefas_atraso = 0; en.tarefas_atraso_15 = 0; delete en.atraso15Em;
       en.tarefasAtrasoDetalhe = [];
     });
     const today = isoDate(new Date());
