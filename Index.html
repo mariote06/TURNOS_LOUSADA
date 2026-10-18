@@ -6296,6 +6296,8 @@ function renderAcessosResults(){
         '</div>'+
       '</div>'+
 
+      afluenciaBlockHtml(data.visits||[])+
+
       '<div style="margin-top:16px;">'+
         '<h5 style="margin:0 0 6px;font-size:13px;">🔍 Pesquisar cliente</h5>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
@@ -6417,6 +6419,108 @@ function computeTurnoLotacao(visits){
   });
   return Object.keys(perTurno).map(key=>({turno:key, visits:perTurno[key].visits, clientes:perTurno[key].clients.size}))
     .sort((a,b)=> b.clientes - a.clientes);
+}
+
+// Afluência ao ginásio: nº médio de clientes presentes em simultâneo, por dia da
+// semana e hora (amostrado de 30 em 30 min), e nº médio de clientes distintos
+// por turno (dia da semana + horário) — para ver quando o ginásio está mais cheio.
+const AFL_DIAS = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+function computeAfluencia(visits){
+  const byDate = {};
+  visits.forEach(v=>{ (byDate[v.date] = byDate[v.date]||[]).push(v); });
+  const sum = AFL_DIAS.map(()=> new Array(24).fill(0));
+  const cnt = AFL_DIAS.map(()=> 0);
+  const turnoAgg = {};
+  Object.keys(byDate).forEach(iso=>{
+    const p = iso.split('-').map(Number);
+    const dt = new Date(p[0], p[1]-1, p[2]);
+    const wd = (dt.getDay()+6)%7;
+    const dKey = dayKeyOf(dt);
+    const iv = byDate[iso].map(v=>{
+      const a = timeToMinutes(v.in); let b = timeToMinutes(v.out);
+      if(b < a) b += 1440;
+      return {a:a, b:b, code:v.code};
+    });
+    cnt[wd]++;
+    for(let h=0; h<24; h++){
+      let s = 0;
+      [h*60, h*60+30].forEach(t=>{ iv.forEach(x=>{ if(x.a<=t && t<x.b) s++; }); });
+      sum[wd][h] += s/2;
+    }
+    const perKey = {};
+    shiftsForReportDate(iso, dKey).forEach(s=>{
+      const key = s.start+'–'+s.end;
+      if(perKey[key]) return;
+      const sa = timeToMinutes(s.start), sb = timeToMinutes(s.end);
+      const set = new Set();
+      iv.forEach(x=>{ if(x.a < sb && x.b > sa) set.add(x.code); });
+      perKey[key] = set.size;
+    });
+    Object.keys(perKey).forEach(key=>{
+      const k = wd+'|'+key;
+      if(!turnoAgg[k]) turnoAgg[k] = {label: AFL_DIAS[wd]+' '+key, total:0, n:0, wd:wd, start:key};
+      turnoAgg[k].total += perKey[key]; turnoAgg[k].n++;
+    });
+  });
+  const heat = sum.map((row,wd)=> row.map(v=> cnt[wd] ? v/cnt[wd] : 0));
+  const totalDays = cnt.reduce((a,b)=>a+b,0);
+  const hourly = new Array(24).fill(0);
+  for(let h=0; h<24; h++){
+    let s = 0; for(let wd=0; wd<7; wd++) s += sum[wd][h];
+    hourly[h] = totalDays ? s/totalDays : 0;
+  }
+  const turnos = Object.keys(turnoAgg).map(k=>({label:turnoAgg[k].label, avg:turnoAgg[k].total/turnoAgg[k].n, n:turnoAgg[k].n}))
+    .filter(t=> t.n>=2).sort((a,b)=> b.avg - a.avg);
+  return {heat, hourly, turnos, totalDays};
+}
+
+function afluenciaBlockHtml(visits){
+  if(!visits || visits.length===0) return '';
+  const a = computeAfluencia(visits);
+  // intervalo de horas com movimento
+  let h0 = 24, h1 = -1;
+  a.hourly.forEach((v,h)=>{ if(v>=0.5){ if(h<h0) h0=h; if(h>h1) h1=h; } });
+  if(h1<0) return '';
+  const hours = []; for(let h=h0; h<=h1; h++) hours.push(h);
+  let max = 0;
+  a.heat.forEach(r=> hours.forEach(h=>{ if(r[h]>max) max=r[h]; }));
+  const maxH = Math.max.apply(null, hours.map(h=>a.hourly[h]));
+  const peakH = hours.find(h=> a.hourly[h]===maxH);
+  // gráfico de barras por hora
+  const bars = hours.map(h=>{
+    const v = a.hourly[h];
+    const pct = maxH ? Math.round(v/maxH*100) : 0;
+    const isPeak = h===peakH;
+    return '<div title="'+h+':00 — média de '+Math.round(v)+' clientes presentes" style="flex:1 1 0;min-width:22px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:150px;">'+
+      '<span style="font-size:10.5px;color:var(--ink-soft);">'+Math.round(v)+'</span>'+
+      '<div style="width:100%;max-width:30px;height:'+pct+'%;min-height:2px;background:'+(isPeak?'var(--rust)':'#3b7dd8')+';border-radius:3px 3px 0 0;"></div>'+
+      '<span style="font-size:10.5px;color:var(--ink-soft);margin-top:2px;">'+h+'h</span></div>';
+  }).join('');
+  // mapa de calor dia da semana x hora
+  const head = '<tr><th style="font-size:11px;padding:2px 4px;"></th>'+hours.map(h=>'<th style="font-size:10.5px;padding:2px 0;font-weight:600;color:var(--ink-soft);text-align:center;">'+h+'h</th>').join('')+'</tr>';
+  const rows = AFL_DIAS.map((d,wd)=>{
+    return '<tr><td style="font-size:12px;font-weight:700;padding:2px 6px 2px 0;">'+d+'</td>'+hours.map(h=>{
+      const v = a.heat[wd][h];
+      const al = max ? v/max : 0;
+      const bg = 'rgba(30,100,200,'+(0.08+al*0.92).toFixed(2)+')';
+      const col = al>0.5 ? '#fff' : 'inherit';
+      return '<td title="'+d+' '+h+':00 — média de '+Math.round(v)+' clientes presentes" style="background:'+bg+';color:'+col+';text-align:center;font-size:11px;padding:5px 0;min-width:30px;border:1px solid rgba(255,255,255,.6);">'+Math.round(v)+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+  const top = a.turnos.slice(0,5).map(t=>({label:t.label, value:'média '+Math.round(t.avg)+' clientes ('+t.n+' dias)'}));
+  const low = a.turnos.slice(-5).reverse().map(t=>({label:t.label, value:'média '+Math.round(t.avg)+' clientes ('+t.n+' dias)'}));
+  return '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);">'+
+    '<h5 style="margin:0 0 4px;font-size:13px;">📈 Afluência ao longo do dia</h5>'+
+    '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">Nº médio de clientes presentes ao mesmo tempo no ginásio (todos os dias do mês). Hora de maior afluência: <strong>'+peakH+':00</strong> (~'+Math.round(maxH)+' clientes).</p>'+
+    '<div style="display:flex;align-items:flex-end;gap:2px;overflow-x:auto;padding-bottom:4px;">'+bars+'</div>'+
+    '<h5 style="margin:16px 0 6px;font-size:13px;">🗓️ Mapa de calor: dia da semana × hora</h5>'+
+    '<div style="overflow-x:auto;"><table style="border-collapse:collapse;min-width:'+(60+hours.length*32)+'px;">'+head+rows+'</table></div>'+
+    '<p style="color:var(--ink-soft);font-size:11.5px;margin:4px 0 0;">Cor mais escura = mais clientes em simultâneo (média desse dia da semana e hora).</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:22px;margin-top:14px;">'+
+      '<div style="flex:1 1 260px;"><h5 style="margin:0 0 6px;font-size:13px;">🔥 Turnos mais cheios</h5>'+renderRankingListHtml(top)+'</div>'+
+      '<div style="flex:1 1 260px;"><h5 style="margin:0 0 6px;font-size:13px;">🧊 Turnos mais vazios</h5>'+renderRankingListHtml(low)+'</div>'+
+    '</div>'+
+  '</div>';
 }
 
 // Todas as visitas de um cliente (por nome ou código) no mês, com o(s) TEF(s)
