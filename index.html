@@ -45,6 +45,18 @@
   }
   h1,h2,h3,.brand,.daynum-big{font-family:'Space Grotesk',system-ui,sans-serif;}
   .app{max-width:1180px;margin:0 auto;padding:28px 20px 80px;}
+  /* Ecrãs de PC: aproveita a largura disponível em vez de ficar limitado a 1180px */
+  @media (min-width:1280px){
+    .app{max-width:min(1800px, 96vw);padding-left:28px;padding-right:28px;}
+  }
+  /* Tabela Treinos PT / Tarefas: 12 colunas, cabe sem deslocamento lateral */
+  @media (min-width:821px){
+    #ptCountTable{table-layout:auto;}
+    #ptCountTable th{padding:10px 8px;font-size:10.5px;line-height:1.25;vertical-align:bottom;white-space:normal;}
+    #ptCountTable td{padding:8px 8px;}
+    #ptCountTable td .pt-count-input{width:54px !important;}
+    #ptCountTable td[data-label="PT"]{white-space:nowrap;}
+  }
 
   /* header */
   .topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px;}
