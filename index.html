@@ -6548,6 +6548,7 @@ function renderAcessosResults(){
         '</div>'+
       '</div>'+
 
+      entradasChartsHtml(data.visits||[], monthKey)+
       afluenciaBlockHtml(data.visits||[])+
 
       '<div style="margin-top:16px;">'+
@@ -6724,6 +6725,133 @@ function computeAfluencia(visits){
   const turnos = Object.keys(turnoAgg).map(k=>({label:turnoAgg[k].label, avg:turnoAgg[k].total/turnoAgg[k].n, n:turnoAgg[k].n}))
     .filter(t=> t.n>=2).sort((a,b)=> b.avg - a.avg);
   return {heat, hourly, turnos, totalDays};
+}
+
+// ---- Gráficos de entradas: por dia do mês e por turno ----
+// "Entrada" = um registo de entrada no ginásio (um cliente que entra duas vezes
+// no mesmo dia conta duas entradas). Os turnos são os do horário da sala; cada
+// entrada conta no turno em cujo intervalo calha a hora de entrada.
+const ENT_LETRAS = ['D','S','T','Q','Q','S','S']; // getDay(): 0=domingo
+function entNiceAxis(max){
+  // passo "redondo" para ~4 divisões; devolve {step, top}
+  if(max<=0) return {step:1, top:1};
+  const raw = max/4;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw/mag;
+  const step = (f<=1 ? 1 : f<=2 ? 2 : f<=2.5 ? 2.5 : f<=5 ? 5 : 10)*mag;
+  return {step:step, top:Math.ceil(max/step)*step};
+}
+function computeEntradasPorDia(visits){
+  const perDay = {};
+  visits.forEach(v=>{ perDay[v.date] = (perDay[v.date]||0) + 1; });
+  const dates = Object.keys(perDay).sort();
+  if(!dates.length) return null;
+  const first = dates[0].split('-').map(Number);
+  const last = dates[dates.length-1].split('-').map(Number);
+  const out = [];
+  for(let d=1; d<=last[2]; d++){
+    const iso = first[0]+'-'+pad(first[1])+'-'+pad(d);
+    const dt = new Date(first[0], first[1]-1, d);
+    out.push({iso:iso, day:d, wd:dt.getDay(), n:perDay[iso]||0});
+  }
+  return out;
+}
+function computeEntradasPorTurno(visits){
+  const byDate = {};
+  visits.forEach(v=>{ (byDate[v.date] = byDate[v.date]||[]).push(v); });
+  const agg = {};
+  let fora = 0;
+  Object.keys(byDate).forEach(iso=>{
+    const parts = iso.split('-').map(Number);
+    const dKey = dayKeyOf(new Date(parts[0], parts[1]-1, parts[2]));
+    const shifts = shiftsForReportDate(iso, dKey);
+    const seen = {};
+    const ivs = [];
+    shifts.forEach(sh=>{
+      const key = sh.start+'–'+sh.end;
+      if(seen[key]) return; seen[key] = true;
+      ivs.push({key:key, a:timeToMinutes(sh.start), b:timeToMinutes(sh.end)});
+      if(!agg[key]) agg[key] = {key:key, start:timeToMinutes(sh.start), end:timeToMinutes(sh.end), total:0, dias:0};
+      agg[key].dias++;
+    });
+    byDate[iso].forEach(v=>{
+      const m = timeToMinutes(v.in);
+      const hit = ivs.find(x=> m >= x.a && m < x.b);
+      if(hit) agg[hit.key].total++; else fora++;
+    });
+  });
+  const list = Object.keys(agg).map(k=>agg[k]).sort((a,b)=> a.start-b.start || a.end-b.end);
+  return {list:list, fora:fora};
+}
+function entradasChartsHtml(visits, monthKey){
+  if(!visits || visits.length===0) return '';
+  const dias = computeEntradasPorDia(visits);
+  if(!dias) return '';
+  const total = visits.length;
+  const diasComDados = dias.filter(d=>d.n>0);
+  const media = diasComDados.length ? total/diasComDados.length : 0;
+  const maxN = Math.max.apply(null, dias.map(d=>d.n));
+  const minN = Math.min.apply(null, diasComDados.map(d=>d.n));
+  const axis = entNiceAxis(maxN);
+  const top = axis.top;
+  const maxDia = dias.find(d=>d.n===maxN);
+  const minDia = diasComDados.find(d=>d.n===minN);
+  const CH = 160; // altura da área de barras (px)
+  const BLUE = '#3b7dd8';
+  let gridHtml = '';
+  for(let val=0; val<=top+1e-9; val+=axis.step){
+    const y = Math.round(CH*(1-val/top));
+    gridHtml += '<div style="position:absolute;left:38px;right:0;top:'+y+'px;border-top:1px '+(val===0?'solid':'dashed')+' var(--line);"></div>'+
+      '<span style="position:absolute;left:0;width:34px;text-align:right;top:'+(y-7)+'px;font-size:10px;color:var(--ink-soft);">'+Math.round(val).toLocaleString('pt-PT')+'</span>';
+  }
+  const grid = gridHtml;
+  const bars = dias.map(d=>{
+    const h = top ? Math.max(d.n>0?2:0, Math.round(d.n/top*CH)) : 0;
+    const weekend = d.wd===0 || d.wd===6;
+    const isMax = d===maxDia, isMin = d===minDia && minN!==maxN;
+    const lab = (isMax||isMin) ? '<span style="position:absolute;bottom:'+(30+h+2)+'px;left:50%;transform:translateX(-50%);font-size:10.5px;font-weight:700;color:var(--ink);white-space:nowrap;">'+d.n+'</span>' : '';
+    const tip = d.day+' '+MONTH_NAMES[parseInt(monthKey.split('-')[1],10)-1]+' ('+AFL_DIAS[(d.wd+6)%7]+'): '+d.n+' entradas';
+    return '<div title="'+tip+'" aria-label="'+tip+'" style="flex:1 1 0;min-width:11px;position:relative;height:'+(CH+30)+'px;">'+
+      '<div style="position:absolute;left:0;right:0;top:0;height:'+CH+'px;display:flex;align-items:flex-end;justify-content:center;">'+
+        '<div style="width:70%;max-width:22px;height:'+h+'px;background:'+(isMax?'var(--rust)':BLUE)+';border-radius:3px 3px 0 0;'+(weekend?'opacity:.55;':'')+'"></div>'+
+      '</div>'+lab+
+      '<div style="position:absolute;top:'+(CH+4)+'px;left:0;right:0;text-align:center;font-size:10px;line-height:1.25;color:var(--ink-soft);'+(weekend?'font-weight:700;':'')+'">'+d.day+'<br>'+ENT_LETRAS[d.wd]+'</div>'+
+    '</div>';
+  }).join('');
+  const chartDia =
+    '<h5 style="margin:0 0 4px;font-size:13px;">📅 Entradas por dia</h5>'+
+    '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;"><strong>'+total.toLocaleString('pt-PT')+'</strong> entradas em '+diasComDados.length+' dias · média de <strong>'+Math.round(media)+'</strong> por dia · dia mais cheio: <strong>'+maxDia.day+'</strong> ('+AFL_DIAS[(maxDia.wd+6)%7]+', '+maxDia.n+')'+
+      (minDia ? ' · mais vazio: <strong>'+minDia.day+'</strong> ('+AFL_DIAS[(minDia.wd+6)%7]+', '+minDia.n+')' : '')+'. Fins de semana a tom mais claro.</p>'+
+    '<div style="overflow-x:auto;"><div style="position:relative;min-width:'+(dias.length*13+40)+'px;padding:8px 0 0 38px;">'+
+      '<div style="position:absolute;left:0;right:0;top:8px;height:'+CH+'px;">'+grid+'</div>'+
+      '<div style="position:relative;display:flex;gap:2px;">'+bars+'</div>'+
+    '</div></div>';
+
+  const pt = computeEntradasPorTurno(visits);
+  const maxT = Math.max.apply(null, pt.list.map(t=>t.total).concat([1]));
+  const totalTurnos = pt.list.reduce((a,t)=>a+t.total,0);
+  const peakT = pt.list.find(t=>t.total===maxT);
+  const rowsT = pt.list.map(t=>{
+    const w = Math.round(t.total/maxT*100);
+    const avg = t.dias ? Math.round(t.total/t.dias) : 0;
+    const pct = totalTurnos ? Math.round(t.total/totalTurnos*100) : 0;
+    const tip = 'Turno '+t.key+': '+t.total+' entradas em '+t.dias+' dias (média de '+avg+' por dia)';
+    return '<div title="'+tip+'" aria-label="'+tip+'" style="display:flex;align-items:center;gap:10px;margin:0 0 4px;">'+
+      '<span style="flex:0 0 96px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;">'+t.key+'</span>'+
+      '<div style="flex:1 1 auto;background:#f1efe9;border-radius:0 3px 3px 0;height:20px;">'+
+        '<div style="width:'+w+'%;min-width:2px;height:100%;background:'+(t===peakT?'var(--rust)':BLUE)+';border-radius:0 3px 3px 0;"></div>'+
+      '</div>'+
+      '<span style="flex:0 0 150px;font-size:12px;font-variant-numeric:tabular-nums;"><strong>'+t.total.toLocaleString('pt-PT')+'</strong> <span style="color:var(--ink-soft);">· '+pct+'% · ~'+avg+'/dia</span></span>'+
+    '</div>';
+  }).join('');
+  const chartTurno =
+    '<h5 style="margin:0 0 4px;font-size:13px;">🕒 Entradas por turno</h5>'+
+    '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;">Entradas cuja hora de chegada cai dentro de cada turno, somadas no mês. "~/dia" é a média por dia em que o turno existe.'+
+      (pt.fora>0 ? ' '+pt.fora.toLocaleString('pt-PT')+' entradas fora do horário dos turnos não estão incluídas.' : '')+'</p>'+
+    (rowsT || '<p style="color:var(--ink-soft);font-style:italic;">Sem turnos para este mês.</p>');
+
+  return '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);">'+chartDia+
+    '<div style="margin-top:18px;">'+chartTurno+'</div></div>';
 }
 
 function afluenciaBlockHtml(visits){
