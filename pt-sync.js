@@ -235,9 +235,19 @@
     let l = []; try { l = PTSync.listarClientes() || []; } catch (e) {}
     return l.filter(n => !st.clientes.some(c => { const a = norm(c.nome), b = norm(n); return a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0; }));
   }
+  function tipoCli(c) {
+    let i = null; try { i = typeof PTSync.infoCliente === 'function' ? PTSync.infoCliente(c.nome) : null; } catch (e) {}
+    if (!c.ativo || (i && i.susp)) return 'susp';
+    return (i && !i.pt) ? 'normal' : 'pt';
+  }
   function vClientes() {
     const falta = faltamAcesso();
+    const cont = { pt: 0, normal: 0, susp: 0 }; st.clientes.forEach(c => cont[tipoCli(c)]++);
+    const f = st.listaF || '';
+    const lista = st.clientes.filter(c => !f || tipoCli(c) === f);
+    const chip = (v, l) => `<button class="pts-btn mini ${f === v ? '' : 'sec'}" data-lf="${v}">${l}</button>`;
     return `
+      <div class="pts-row" style="margin-bottom:10px">${chip('', 'Todos (' + st.clientes.length + ')')}${chip('pt', 'Clientes PT (' + cont.pt + ')')}${chip('normal', 'Clientes (' + cont.normal + ')')}${chip('susp', 'Clientes suspensos (' + cont.susp + ')')}</div>
       ${falta.length ? `<div class="pts-card"><h3>Clientes da CICLO sem acesso (${falta.length})</h3>
         <p class="pts-sub">Clientes PT com ciclo que ainda não têm código para a app do cliente.</p>
         ${falta.map(n => `<div class="pts-row" style="margin-top:6px"><span class="f">${esc(n)}</span><button class="pts-btn sec mini" data-criar="${esc(n)}">Criar acesso</button></div>`).join('')}
@@ -247,7 +257,7 @@
         <button class="pts-btn" data-a="criar">Criar código</button></div>
         <p class="pts-sub">Cada cliente recebe um código pessoal para entrar na página de treinos.</p>
       </div>
-      ${st.clientes.map(c => {
+      ${lista.map(c => {
         const link = linkCliente(c.codigo);
         const msg = `Olá ${c.nome.split(' ')[0]}! Já podes ver o teu plano e registar os teus treinos aqui: ${link || '(link)'}\nO teu código é ${c.codigo}`;
         return `<div class="pts-card" style="${c.ativo ? '' : 'opacity:.55'}">
@@ -317,9 +327,10 @@
 
   /* ---------- eventos ---------- */
   ov.addEventListener('click', async e => {
-    const el = e.target.closest('[data-a],[data-aba],[data-det],[data-copiar],[data-ativo],[data-plano],[data-apagar],[data-criar],[data-elim]');
+    const el = e.target.closest('[data-a],[data-aba],[data-det],[data-copiar],[data-ativo],[data-plano],[data-apagar],[data-criar],[data-elim],[data-lf]');
     if (!el) return;
     const d = el.dataset;
+    if (d.lf !== undefined) { st.listaF = d.lf; return render(); }
     if (d.elim) {
       const c = st.clientes.find(x => x.codigo === d.elim);
       if (!c || !confirm(`Eliminar o acesso de ${c.nome} (${c.codigo})?\nO cliente deixa de entrar na app e o plano publicado é apagado. Os treinos que já registou ficam guardados na folha.`)) return;
