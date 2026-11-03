@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PlayRide">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-maskable-192.png">
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;1,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -31,6 +31,11 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;height:100%;}
+/* sem "arrastar para baixo para atualizar": evita sair do treino sem querer */
+html,body{overscroll-behavior-y:none;}
+html.in-class,html.in-class body{overflow:hidden;overscroll-behavior:none;}
+html.in-class body{position:fixed;inset:0;width:100%;}
+html.in-class .body{overscroll-behavior:contain;}
 body{
   background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;
   min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;overscroll-behavior:none;
@@ -112,32 +117,58 @@ body:has(#liveScreen.active) .legal{display:none;}
 .progress-seg.done{opacity:1;}
 .progress-marker{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 6px rgba(255,255,255,.8);}
 
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 0;flex-shrink:0;}
-.chips{display:flex;gap:6px;}
-.chip{
-  font-size:12px;padding:5px 9px;border-radius:999px;border:1px solid var(--border);background:var(--surface);
-  color:var(--muted);display:flex;align-items:center;gap:5px;
+.topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 12px 0;flex-shrink:0;}
+.chips{display:contents;}   /* os botões e o GRAVAR & SAIR partilham as mesmas linhas */
+.topbar{justify-content:flex-start;gap:7px;}
+/* cabeçalho numa só linha: [ᛒ menu] [✎ menu] [⚠] posição ... GRAVAR & SAIR */
+.topbar{flex-wrap:nowrap;align-items:center;position:relative;z-index:40;}
+#rankEl:empty{display:none;}
+#rankEl{white-space:nowrap;}
+.tb-menu{position:relative;}
+.mbtn{width:48px;height:46px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:#fff;display:grid;place-items:center;position:relative;padding:0;}
+.mbtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+.mbtn[aria-expanded="true"]{border-color:var(--accent);background:rgba(232,114,44,.15);}
+.mdots{position:absolute;bottom:4px;right:5px;display:flex;gap:3px;}
+.mdots i{width:7px;height:7px;border-radius:50%;background:#5B6472;}
+.mdots i.on{background:var(--ok);box-shadow:0 0 5px var(--ok);}
+.tb-pop{display:none;position:absolute;top:calc(100% + 8px);left:0;min-width:190px;background:#12161D;border:1px solid #2F3846;border-radius:14px;padding:8px;box-shadow:0 14px 40px rgba(0,0,0,.6);flex-direction:column;gap:8px;z-index:60;}
+.tb-pop.on{display:flex;}
+.tb-pop .chip{width:100%;justify-content:flex-start;cursor:pointer;}
+.tb-pop .chip.ftpchip{align-items:flex-start;padding:6px 14px;}
+
+@media (max-width:380px){
+  .topbar{gap:5px;padding-left:10px;padding-right:10px;}
+  .chip{font-size:14px;padding:7px 10px;}
+  #chipSafety{padding:7px 9px;}
+  .leave-btn{font-size:13px;padding:9px 10px;}
 }
-.chip .dot{width:7px;height:7px;border-radius:50%;background:#5B6472;}
+.chip{
+  font-size:15px;font-weight:600;padding:8px 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);
+  color:var(--muted);display:flex;align-items:center;gap:6px;min-height:40px;
+}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:#5B6472;}
 .chip.on{color:#fff;}
 .chip.on .dot{background:var(--ok);box-shadow:0 0 6px var(--ok);}
 .rank{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:#fff;}
 .rank small{font-size:13px;color:var(--muted);font-family:'Inter',sans-serif;font-weight:500;}
 .leave-btn{
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
-  color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;
+  background:#3DD45C;border:none;color:#06210d;padding:10px 13px;border-radius:10px;
+  font-size:14px;font-weight:800;letter-spacing:.2px;min-height:42px;margin-left:auto;white-space:nowrap;
+  box-shadow:0 4px 14px rgba(61,212,92,.25);
 }
+.leave-btn:active{transform:scale(.97);}
 
 .body{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
   text-align:center;padding:10px 16px 14px;transition:background .4s ease;min-height:0;overflow:auto;
 }
 .class-name{color:rgba(255,255,255,.4);font-size:12px;margin-bottom:6px;}
+#className{display:none;}
 .blockline{font-size:clamp(14px,4vw,18px);color:rgba(255,255,255,.7);}
 .blockline .zone{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.35em;}
 .technique{
-  color:rgba(255,255,255,.85);font-size:13px;font-weight:600;margin-top:6px;
-  padding:4px 12px;border:1px solid rgba(255,255,255,.2);border-radius:999px;display:inline-block;
+  color:#fff;font-size:clamp(18px,5.4vw,22px);font-weight:800;margin-top:8px;letter-spacing:.2px;
+  padding:6px 18px;border:2px solid rgba(255,255,255,.35);border-radius:999px;display:inline-block;background:rgba(255,255,255,.06);
 }
 .technique:empty{display:none;}
 .feel{color:rgba(255,255,255,.55);font-size:12px;font-style:italic;margin-top:6px;max-width:320px;line-height:1.35;}
@@ -146,9 +177,17 @@ body:has(#liveScreen.active) .legal{display:none;}
   font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(66px,21vw,112px);
   line-height:1;color:#fff;font-variant-numeric:tabular-nums;margin-top:6px;
 }
-.timer.warn{color:#FFD27A;}
-.target{font-size:14px;color:rgba(255,255,255,.75);margin-top:2px;}
+.timer.t-warn{color:#FFD27A;}
+.target{font-size:15px;color:rgba(255,255,255,.8);margin-top:6px;width:100%;max-width:420px;}
 .target b{color:#fff;}
+/* alvo do bloco em cartões grandes, logo por baixo do tempo */
+.tg-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;width:100%;}
+.tg{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);border-top:4px solid var(--zc,#3A4353);border-radius:12px;padding:6px 4px 8px;min-width:0;}
+.tg-l{display:block;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:1px;}
+.tg b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(21px,6.6vw,34px);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:clip;}
+.tg b.lng{font-size:clamp(18px,5.4vw,28px);}
+.tg small{display:block;font-size:12px;color:rgba(255,255,255,.6);font-weight:600;margin-top:1px;}
+.tg-note{margin-top:6px;font-size:14px;color:#FFD27A;font-weight:600;}
 
 .me{width:100%;max-width:420px;margin-top:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;}
 .me-w{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(88px,31vw,150px);line-height:.95;font-variant-numeric:tabular-nums;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;border-radius:14px;}
@@ -181,8 +220,61 @@ body:has(#liveScreen.active) .legal{display:none;}
 .nosensor-msg{display:none;font-size:13px;color:var(--muted);line-height:1.45;}
 .me.nosensor .nosensor-msg{display:block;}
 
-.next{margin-top:auto;padding-top:14px;color:rgba(255,255,255,.6);font-size:13px;}
+.next{margin-top:auto;padding-top:14px;color:rgba(255,255,255,.6);font-size:13px;width:100%;max-width:420px;}
 .next b{color:rgba(255,255,255,.9);}
+/* cartão "a seguir": escondido; aparece por magia nos últimos 15 s, sobe e explode nos últimos 3 s */
+.nx-float{position:fixed;contain:layout;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));width:min(560px,calc(100% - 24px));z-index:60;pointer-events:none;transform:translateX(-50%);}
+.nx-float:empty{display:none;}
+body:not(:has(#liveScreen.active)) .nx-float,body:not(:has(#liveScreen.active)) .nx-burst{display:none !important;}
+.nx{border-radius:16px;text-align:left;padding:8px 14px 10px;box-shadow:0 -6px 24px rgba(0,0,0,.45);border:2px solid color-mix(in srgb,var(--nc) 55%,transparent);border-left:10px solid var(--nc);
+  background:linear-gradient(120deg,color-mix(in srgb,var(--nc) 32%,#12161D),#12161D 75%);position:relative;overflow:hidden;
+  visibility:hidden;opacity:0;}
+.nx-top{display:flex;justify-content:space-between;align-items:baseline;}
+.nx-lbl{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.8);}
+.nx-in{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 0 12px var(--nc);}
+.nx-main{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-top:4px;}
+.nx-zone{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(22px,6.8vw,30px);text-transform:uppercase;letter-spacing:.5px;line-height:1.1;background:var(--nc);border-radius:10px;padding:2px 12px;}
+.nx-tec{font-weight:800;font-size:17px;color:#fff;}
+.nx-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;color:#fff;}
+.nx-meta{margin-top:4px;font-size:15px;color:rgba(255,255,255,.75);}
+.nx-meta b{color:#fff;font-size:18px;}
+/* aparecer "por magia" */
+.nx.show{visibility:visible;opacity:1;animation:nxMagic .9s cubic-bezier(.2,1.4,.4,1) both;}
+.nx.show::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);transform:translateX(-120%);animation:nxShine 1.1s .35s ease-out both;}
+@keyframes nxMagic{0%{opacity:0;transform:translateY(40px) scale(.55);filter:blur(14px) brightness(2.2);}60%{opacity:1;filter:blur(0) brightness(1.4);}100%{opacity:1;transform:none;filter:none;}}
+@keyframes nxShine{to{transform:translateX(120%);}}
+.nx.show.shine2::after{animation:nxShine2 1.1s ease-out both;}
+@keyframes nxShine2{from{transform:translateX(-120%);}to{transform:translateX(120%);}}
+/* subir ao meio e explodir (3 s) */
+.nx.boom{visibility:visible;opacity:1;animation:nxBoom 3s cubic-bezier(.3,.1,.3,1) both;border-color:var(--nc);}
+.nx.boom .nx-in{font-size:40px;}
+@keyframes nxBoom{
+  0%{transform:none;}
+  35%{transform:translateY(calc(-50vh + 110px)) scale(1);box-shadow:0 0 40px color-mix(in srgb,var(--nc) 70%,transparent);}
+  45%,55%,65%,75%{transform:translateY(calc(-50vh + 110px)) rotate(-1.2deg);}
+  50%,60%,70%{transform:translateY(calc(-50vh + 110px)) rotate(1.2deg);}
+  78%{transform:translateY(calc(-50vh + 110px)) scale(.94);opacity:1;filter:brightness(1.3);}
+  100%{transform:translateY(calc(-50vh + 110px)) scale(2.2);opacity:0;filter:brightness(3) blur(6px);}}
+.nx-burst{position:fixed;inset:0;z-index:59;pointer-events:none;display:none;overflow:hidden;}
+.nx-burst.on{display:block;}
+.nx-burst .ring{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:radial-gradient(circle,#fff 0,var(--nc) 35%,color-mix(in srgb,var(--nc) 40%,transparent) 65%,transparent 72%);
+  animation:nxRing .9s 2.35s ease-out both;}
+@keyframes nxRing{0%{transform:scale(0);opacity:1;}60%{opacity:.9;}100%{transform:scale(60);opacity:0;}}
+.nx-burst i{position:absolute;left:50%;top:50%;width:var(--s);height:var(--s);margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);border-radius:50%;background:var(--nc);box-shadow:0 0 10px var(--nc);opacity:0;
+  animation:nxPart 1s calc(2.35s + var(--d)) cubic-bezier(.1,.8,.3,1) both;}
+@keyframes nxPart{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--x),var(--y)) scale(.2);opacity:0;}}
+/* enquanto o cartão está à vista, o ecrã encolhe para nada ficar tapado por baixo dele */
+.body .timer,.body .me-w{transition:font-size .45s ease;}
+.body.nx-on{padding-bottom:calc(var(--nxh,120px) + 14px);}
+.body.nx-on .feel{display:none;}
+.body.nx-on .timer{font-size:clamp(52px,16vw,90px);}
+.body.nx-on .me-w{font-size:clamp(68px,23vw,116px);}
+@media (max-height:760px){.body.nx-on .timer{font-size:clamp(44px,13vw,64px);}.body.nx-on .me-w{font-size:clamp(56px,18vw,92px);}}
+.nx-seg{margin-top:8px;padding-top:0;}
+.nx-seg:empty{display:none;}
+.body.blk-in #activeBlock{animation:blkIn .6s ease-out;}
+@keyframes blkIn{0%{transform:translateY(18px) scale(.97);opacity:.3;}100%{transform:none;opacity:1;}}
+@media (prefers-reduced-motion:reduce){.nx.show,.nx.show::after,.nx.show.shine2::after,.body.blk-in #activeBlock{animation:none;}}
 
 .finished{display:none;flex-direction:column;align-items:center;gap:8px;margin-top:20px;width:100%;max-width:420px;}
 .finished.active{display:flex;}
@@ -196,7 +288,23 @@ body:has(#liveScreen.active) .legal{display:none;}
 .acct-p{color:var(--muted);font-size:13px;line-height:1.45;margin:0;}
 .acct-links{display:flex;justify-content:space-between;font-size:13px;}
 .acct-links a{color:var(--accent);text-decoration:none;}
-.acct-line{font-size:13px;color:var(--muted);max-width:320px;line-height:1.4;}
+.acct-line{font-size:13px;color:var(--muted);max-width:340px;line-height:1.4;}
+/* "Criar conta" em destaque */
+.btn-reg{border:none;border-radius:12px;padding:12px 16px;font-weight:800;font-size:15px;color:#06210F;background:linear-gradient(120deg,#3DD45C,#7FE38F);box-shadow:0 6px 18px rgba(61,212,92,.28);cursor:pointer;}
+.btn-reg:active{transform:scale(.98);}
+.reg-cta{display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);text-align:center;}
+.reg-cta span{font-size:14px;color:var(--muted);}
+.reg-cta .btn-reg{width:100%;padding:14px;font-size:17px;}
+.reg-box{width:100%;background:linear-gradient(120deg,rgba(61,212,92,.16),var(--surface) 70%);border:1.5px solid rgba(61,212,92,.55);border-radius:14px;padding:12px 14px;text-align:left;color:var(--text);font-size:13.5px;line-height:1.4;}
+.reg-box b{display:block;color:#fff;font-size:15.5px;margin-bottom:2px;}
+.reg-box .reg-row{display:flex;align-items:center;gap:12px;margin-top:10px;}
+.reg-box .btn-reg{flex:1;}
+.reg-box a{color:var(--muted);font-size:13px;white-space:nowrap;}
+.reg-home{width:100%;max-width:420px;display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:12px 14px;border-radius:14px;text-align:left;background:linear-gradient(120deg,rgba(61,212,92,.16),var(--surface) 70%);border:1.5px solid rgba(61,212,92,.55);}
+.reg-home div{flex:1;min-width:0;}
+.reg-home b{display:block;color:#fff;font-size:15.5px;}
+.reg-home span{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px;}
+.reg-home .btn-reg{flex-shrink:0;}
 .acct-line b{color:#7FD3A6;}
 .acct-line a{color:var(--accent);}
 .acct-head{display:flex;justify-content:space-between;align-items:center;text-align:left;}
@@ -210,6 +318,12 @@ body:has(#liveScreen.active) .legal{display:none;}
 .tr-item{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left;cursor:pointer;}
 .tr-item b{display:block;font-size:14px;}
 .tr-item span{color:var(--muted);font-size:12px;}
+.tr-item .tr-emo{display:block;font-style:normal;font-size:16px;margin-top:3px;color:var(--muted);}
+.tr-emos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 4px;}
+.tr-emos div{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center;}
+.tr-emos i{display:block;font-style:normal;font-size:30px;line-height:1.1;}
+.tr-emos b{display:block;font-size:13px;color:#fff;margin-top:4px;text-transform:capitalize;}
+.tr-emos span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
 .tr-item .kj{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;white-space:nowrap;}
 .tr-item .kj small{font-size:12px;color:var(--muted);font-family:'Inter',sans-serif;}
 .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px;margin:10px 0;}
@@ -229,8 +343,52 @@ body:has(#liveScreen.active) .legal{display:none;}
 .pr-logo .pr-sub{font-style:normal;font-weight:600;font-size:.42em;letter-spacing:3px;color:#E8722C;margin-left:.1em;padding-bottom:.12em;}
 
 /* ---------- Menu inicial ---------- */
-.home{justify-content:flex-start;padding-top:max(36px, env(safe-area-inset-top, 0px));}
-.home-hello{color:var(--muted);font-size:14px;margin:-6px 0 4px;min-height:18px;}
+.home{justify-content:flex-start;padding-top:max(36px, env(safe-area-inset-top, 0px));padding-bottom:calc(36px + env(safe-area-inset-bottom, 0px));}
+.home-hello{margin:2px 0 6px;min-height:18px;text-align:center;line-height:1.05;}
+.home-hello .hh-g{display:block;color:var(--muted);font-size:19px;font-weight:600;}
+.home-hello .hh-n{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(34px,10vw,44px);color:#fff;letter-spacing:.3px;margin-top:2px;}
+/* ===== menu inicial ===== */
+.home{padding-top:max(22px, env(safe-area-inset-top, 0px)) !important;}
+.home .pr-logo{font-size:36px !important;}
+.home .pr-logo .pr-mark{height:36px;}
+.home .home-hello{margin:4px 0 0;}
+.home .home-hello .hh-g{font-size:18px;}
+.home .home-hello .hh-n{font-size:clamp(32px,10vw,44px);}
+.screen p.home-msg{max-width:390px;margin:10px auto 18px;text-align:center;font-size:clamp(19px,5.6vw,23px);line-height:1.35;color:rgba(255,255,255,.95);font-weight:600;min-height:2.7em;}
+.home .home-grid{gap:10px;}
+.home .tile:not(.go){min-height:0;padding:13px 13px 14px;gap:6px 9px;border-radius:15px;display:grid;grid-template-columns:auto 1fr;align-items:center;align-content:start;}
+.home .tile:not(.go) span{grid-column:1 / -1;}
+.home .tile:not(.go) svg{width:24px;height:24px;}
+.home .tile:not(.go) b{font-size:20px;}
+.home .tile:not(.go) span{font-size:12px;line-height:1.3;}
+/* cartão "como te sentes hoje?" */
+.mood{width:100%;max-width:420px;margin-top:14px;background:linear-gradient(160deg,rgba(163,92,255,.16),var(--surface) 60%);border:1px solid var(--border);border-radius:18px;padding:14px 14px 14px;text-align:left;}
+.mood-h{font-weight:800;font-size:17px;color:#fff;margin:0 0 10px;}
+.mood-opts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.mood-opts button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 7px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted);font-size:clamp(9.5px,2.9vw,11px);white-space:nowrap;letter-spacing:-.1px;font-weight:600;transition:transform .15s ease,background .2s ease,border-color .2s ease;}
+.mood-opts button i{font-style:normal;font-size:27px;line-height:1;}
+.mood-opts button:active{transform:scale(.94);}
+.mood-opts button.on{border-color:var(--mc,#A35CFF);background:color-mix(in srgb,var(--mc,#A35CFF) 22%,transparent);color:#fff;}
+.mood-r{margin-top:11px;font-size:14.5px;line-height:1.45;color:rgba(255,255,255,.9);animation:moodIn .35s ease-out;}
+.mood-r:empty{display:none;}
+.mood-r b{color:#fff;}
+@keyframes moodIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.bora-btn{display:inline-block;margin-top:13px;padding:10px 18px;border-radius:999px;border:1.5px solid var(--mc,#A35CFF);background:color-mix(in srgb,var(--mc,#A35CFF) 25%,transparent);color:#fff;font-weight:800;font-size:16px;}
+.bora-btn:active{transform:scale(.97);}
+/* folha "Como queres pedalar hoje?" */
+.go-sheet{position:fixed;inset:0;z-index:120;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .25s ease;}
+.go-sheet.on{opacity:1;pointer-events:auto;}
+.go-panel{width:100%;max-width:480px;background:#10141B;border:1px solid #2A3240;border-bottom:none;border-radius:22px 22px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom, 0px));transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.9,.3,1);}
+.go-sheet.on .go-panel{transform:none;}
+.go-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.go-head b{font-family:'Barlow Condensed',sans-serif;font-size:25px;font-weight:800;color:#fff;}
+.go-x{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:transparent;color:#fff;font-size:16px;}
+.go-list{display:flex;flex-direction:column;gap:10px;}
+.tile.go{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;row-gap:2px;align-items:center;min-height:0;padding:15px 16px;width:100%;}
+.tile.go svg{grid-row:1 / 3;width:34px;height:34px;color:var(--tc);}
+.tile.go b{font-size:24px;}
+.tile.go span{font-size:13px;}
+@media (prefers-reduced-motion:reduce){.go-panel,.go-sheet{transition:none;}}
 .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:420px;}
 .tile{display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 14px;color:#fff;min-height:128px;position:relative;overflow:hidden;}
 .tile svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
@@ -250,11 +408,43 @@ body:has(#liveScreen.active) .legal{display:none;}
 .lib-prof{display:flex;align-items:flex-end;gap:1px;height:34px;}
 .lib-prof i{display:block;border-radius:2px 2px 0 0;min-width:2px;}
 .lib-sec{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:10px 0 0;align-self:flex-start;}
-.solo-ctl{display:none;gap:6px;}
-body.solo .solo-ctl{display:flex;}
+.lib-sec.g{display:flex;align-items:center;gap:8px;color:#fff;font-weight:800;letter-spacing:.8px;font-size:13px;margin-top:14px;}
+.lib-sec.g i{width:10px;height:10px;border-radius:3px;background:var(--gc);}
+.lib-sec.g small{color:var(--muted);font-weight:600;}
+.lib-chips{display:flex;gap:7px;overflow-x:auto;width:100%;max-width:520px;padding:2px 0 8px;scrollbar-width:none;}
+.lib-chips::-webkit-scrollbar{display:none;}
+.lib-chips:empty{display:none;}
+.lib-chips button{flex-shrink:0;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.lib-chips button i{width:8px;height:8px;border-radius:50%;background:var(--gc,#8A93A3);}
+.lib-chips button.on{border-color:var(--gc,var(--accent));background:color-mix(in srgb,var(--gc,#E8722C) 24%,var(--surface));}
+.lib-item .li-by{font-size:11px;color:var(--muted);}
+.solo-bar{display:none;position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:70;transform:translateX(-50%);gap:18px;align-items:center;padding:10px 20px;background:rgba(10,13,18,.92);border:1px solid #262D39;border-radius:999px;box-shadow:0 12px 34px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:transform .28s ease, opacity .28s ease;}
+body.solo #liveScreen.active .solo-bar.on{display:flex;}
+.solo-bar.esc{transform:translate(-50%, calc(100% + 40px));opacity:0;pointer-events:none;}
+.sb-btn{width:52px;height:52px;border-radius:50%;border:1px solid #2E3746;background:#1B212B;color:#fff;display:flex;align-items:center;justify-content:center;padding:0;}
+.sb-btn svg{width:22px;height:22px;fill:currentColor;}
+.sb-btn.play{width:64px;height:64px;background:var(--accent);border-color:var(--accent);color:#140B04;}
+.sb-btn.play svg{width:28px;height:28px;}
+.sb-btn:active{transform:scale(.94);}
+.sb-handle{display:none;position:fixed;left:50%;bottom:calc(4px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);z-index:69;width:120px;height:26px;border:none;background:none;padding:0;}
+.sb-handle::after{content:'';position:absolute;left:32px;right:32px;top:12px;height:5px;border-radius:3px;background:rgba(255,255,255,.35);}
+body.solo #liveScreen.active .sb-handle.on{display:block;}
+body.sb-on .nx-float{bottom:calc(100px + env(safe-area-inset-bottom, 0px));}
+#liveScreen.sb-auto{cursor:none;}
 body.solo-livre #progress{display:none;}
 .solo-btn{background:var(--accent);border:none;color:#140B04;font-weight:700;padding:6px 14px;border-radius:8px;font-size:13px;}
 .solo-btn.ghost{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#fff;font-weight:500;}
+
+/* ---------- ligar a bike e a cinta (ecrã antes de entrar) ---------- */
+#setupScreen .form{max-width:400px;}
+#setupScreen .sensor{padding:16px 16px;border-radius:14px;min-height:76px;}
+#setupScreen .sensor .s-name{font-size:19px;font-weight:800;}
+#setupScreen .sensor .s-status{font-size:15px;font-weight:600;margin-top:4px;}
+#setupScreen .sensor .s-status.on{font-weight:800;}
+#setupScreen .sensor button{font-size:16px;font-weight:700;padding:12px 18px;border-radius:10px;}
+#setupScreen .bt-all{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.28);color:#fff;border-radius:12px;padding:13px 14px;font-size:15px;font-weight:700;text-align:center;}
+#setupScreen .bt-all:hover{border-color:var(--accent);}
+#setupScreen #bikeHelp{font-size:14px;line-height:1.45;}
 
 /* ---------- Ficha do aluno ---------- */
 .ficha{max-width:420px;width:100%;text-align:left;display:flex;flex-direction:column;gap:14px;}
@@ -270,6 +460,8 @@ body.solo-livre #progress{display:none;}
 .f-out span{font-size:12px;color:var(--muted);}
 .f-chips{display:flex;flex-wrap:wrap;gap:6px;}
 .f-chips button{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:999px;padding:8px 12px;font-size:13px;}
+.ficha-upd{display:flex;flex-direction:column;gap:2px;width:100%;max-width:420px;text-align:left;background:rgba(255,214,10,.1);border:1px solid rgba(255,214,10,.5);border-radius:14px;padding:12px 14px;color:var(--text);font-size:14px;line-height:1.4;margin:4px 0 2px;cursor:pointer;}
+.ficha-upd > b{font-size:16px;color:#FFD60A;}
 .f-chips button.on{background:rgba(232,114,44,.18);border-color:var(--accent);color:#fff;font-weight:600;}
 .f-q{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;line-height:1.4;padding:8px 0;border-bottom:1px solid var(--border);}
 .f-q:last-child{border-bottom:none;}
@@ -292,8 +484,130 @@ body.solo-livre #progress{display:none;}
 .safety-banner{position:absolute;left:12px;right:12px;top:54px;z-index:30;max-width:none;box-shadow:0 10px 30px rgba(0,0,0,.5);background:#2A1215;display:none;}
 .safety-banner.on{display:flex;}
 .safety-banner button{margin-left:auto;background:none;border:none;color:#fff;font-size:18px;padding:0 4px;align-self:flex-start;}
-.chip.warnchip{color:#FF8A8A;border-color:rgba(255,59,59,.4);}
+.chip{min-height:46px;padding:6px 12px;}
+.chip.ftpchip{color:#fff;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:4px 12px;border-radius:14px;line-height:1.05;}
+.chip.ftpchip .cl{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);}
+.chip.ftpchip b{font-family:'Barlow Condensed',sans-serif;font-size:21px;}
+.ae{width:1em;height:1em;display:inline-block;vertical-align:-.12em;object-fit:contain;}
+.mood-opts button i .ae{width:30px;height:30px;}
+.rate-ov{position:fixed;inset:0;z-index:310;background:rgba(5,7,10,.82);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px;}
+.rate-ov.on{display:flex;}
+.rate-card{width:100%;max-width:420px;background:#12161D;border:1px solid #2A3240;border-radius:22px;padding:20px 16px 14px;text-align:center;animation:rateIn .35s cubic-bezier(.2,1.3,.4,1);}
+@keyframes rateIn{from{opacity:0;transform:translateY(24px) scale(.96);}to{opacity:1;transform:none;}}
+.rate-top{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;color:#fff;margin-bottom:6px;}
+.rate-q{font-weight:800;font-size:16px;color:#fff;margin:14px 0 9px;text-align:left;}
+.rate-opts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.rate-opts button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 2px 7px;border-radius:13px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted);font-size:clamp(9.5px,2.9vw,11px);font-weight:600;white-space:nowrap;transition:transform .15s ease,background .2s ease,border-color .2s ease;}
+.rate-opts button .ae{width:38px;height:38px;}
+.rate-opts button i{font-style:normal;font-size:32px;line-height:1;}
+.rate-opts button:active{transform:scale(.93);}
+.rate-opts button.on{border-color:var(--mc);background:color-mix(in srgb,var(--mc) 24%,transparent);color:#fff;transform:scale(1.06);}
+.rate-ok{width:100%;margin-top:18px;border:none;border-radius:14px;padding:14px;font-weight:800;font-size:17px;background:var(--accent);color:#140B04;}
+.rate-ok:disabled{opacity:.4;}
+.rate-skip{background:none;border:none;color:var(--muted);font-size:13px;margin-top:8px;padding:8px;text-decoration:underline;}
+.pr-toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top, 0px));transform:translate(-50%,-140%);z-index:400;background:#1E7A3A;color:#fff;font-weight:800;font-size:16px;padding:12px 20px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.2,1.3,.4,1);pointer-events:none;white-space:nowrap;}
+.pr-toast.on{transform:translate(-50%,0);}
+.ftp-edit{position:fixed;inset:0;z-index:300;background:rgba(5,7,10,.8);display:none;align-items:center;justify-content:center;padding:18px;}
+.ftp-edit.on{display:flex;}
+.fe-card{width:100%;max-width:360px;background:#12161D;border:1px solid #262D39;border-radius:18px;padding:20px 18px 16px;text-align:center;}
+.fe-card h3{margin:0 0 4px;font-family:'Barlow Condensed',sans-serif;font-size:28px;}
+.fe-card p{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.4;}
+.fe-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;}
+.fe-row input{width:150px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:700;background:#1B212B;border:1px solid #2F3846;border-radius:12px;color:#fff;padding:4px 8px;}
+.fe-row span{font-family:'Barlow Condensed',sans-serif;font-size:24px;color:var(--muted);}
+.fe-msg{min-height:0;font-size:14px;line-height:1.45;margin-bottom:10px;}
+.fe-msg.err{color:#FF8A8A;}
+.fe-msg.good{color:#7FD3A6;}
+.fe-msg.joke{color:#FFD27A;background:rgba(255,214,10,.08);border:1px solid rgba(255,214,10,.35);border-radius:12px;padding:10px;}
+.fe-msg.joke b{display:block;font-size:16px;margin-bottom:4px;}
+.fe-acts{display:flex;gap:8px;}
+.fe-acts button{flex:1;margin:0;}
+.ftp-result{margin-top:8px;max-width:420px;background:rgba(255,214,10,.08);border:1px solid rgba(255,214,10,.4);border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.4;}
+.bg-warn{display:none;position:relative;margin-top:8px;max-width:420px;background:rgba(255,59,59,.12);border:1px solid rgba(255,59,59,.5);border-radius:12px;padding:10px 34px 10px 12px;font-size:14px;line-height:1.4;text-align:left;}
+.bg-warn.on{display:block;}
+.bg-warn button{position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);font-size:16px;padding:4px;}
+.fin-ftp{font-size:15px;line-height:1.45;margin:0 0 8px;max-width:420px;}
+.fin-ftp:empty{display:none;}
+.fin-ftp b{color:#FFD60A;}
+.chip.occhip{width:40px;min-height:40px;height:40px;padding:0;justify-content:center;font-size:17px;align-self:center;}
+.chip.occhip.on{background:rgba(155,92,255,.22);border-color:rgba(155,92,255,.6);}
+body.solo .chip.occhip{display:none;}
+@keyframes warnPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,59,0)}50%{box-shadow:0 0 0 6px rgba(255,59,59,.35)}}
+.chip.warnchip.pulse{animation:warnPulse 1.2s ease-in-out 4;}
+.oc-tag{display:none;align-self:center;margin:4px auto 0;font-size:12px;font-weight:700;color:#C9A8FF;background:rgba(155,92,255,.14);border:1px solid rgba(155,92,255,.4);border-radius:999px;padding:3px 10px;}
+body.oculto:not(.solo) .oc-tag{display:inline-block;}
+.chip.warnchip{color:#FF8A8A;border-color:rgba(255,59,59,.4);width:40px;min-height:40px;height:40px;padding:0;justify-content:center;font-size:14px;align-self:center;}
 #liveScreen{position:relative;}
+/* lâmpada: acende com a eletricidade gerada (kJ ÷ 3,6 × 80% de um gerador) */
+.lamp{position:absolute;top:var(--lt,6px);right:var(--lr,8px);z-index:5;display:flex;flex-direction:column;align-items:center;gap:1px;pointer-events:none;--lv:0;}
+.lamp svg{width:var(--lw,40px);height:auto;overflow:visible;filter:drop-shadow(0 0 calc(2px + 26px * var(--lv)) rgba(255,205,70,calc(var(--lv) * .95)));transition:filter .8s ease;}
+.lamp .lg{fill:rgba(255,214,90,calc(.06 + .9 * var(--lv)));stroke:color-mix(in srgb,#FFD86B calc(var(--lv) * 100%),#5B6472);stroke-width:2.2;transition:fill .8s ease;}
+.lamp .lf{fill:none;stroke:color-mix(in srgb,#FFF4C2 calc(var(--lv) * 100%),#8A93A1);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.lamp .lb{fill:#8A93A1;}
+.lamp .lr{stroke:#FFD86B;stroke-width:2.6;stroke-linecap:round;opacity:calc(var(--lv) * 1.4 - .4);}
+.lamp.on .lg{animation:lampFlick 2.4s ease-in-out infinite;}
+@keyframes lampFlick{0%,100%{opacity:1;}50%{opacity:.86;}}
+.lamp .leur{font-size:calc(var(--lfs,15px) * .72);font-weight:700;color:#9FE3B8;white-space:nowrap;line-height:1.1;font-variant-numeric:tabular-nums;}
+.lamp .lwh{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:var(--lfs,15px);line-height:1;color:color-mix(in srgb,#FFE08A calc(var(--lv) * 100%),#AEB6C2);white-space:nowrap;font-variant-numeric:tabular-nums;}
+@media (prefers-reduced-motion:reduce){.lamp.on .lg{animation:none;}}
+.body{position:relative;}
+#myLamp{--lt:14px;--lr:10px;}
+/* pilha / powerbank: carrega com a energia gerada (Wh ÷ 3,7 V = Ah) */
+.batt{position:absolute;top:var(--lt,6px);left:var(--lr,8px);z-index:5;display:flex;flex-direction:column;align-items:center;gap:1px;pointer-events:none;transform-origin:top left;}
+.batt svg{width:calc(var(--lw,40px) * .62);height:auto;overflow:visible;filter:drop-shadow(0 0 calc(3px + 14px * var(--bv,0)) rgba(61,212,92,calc(.25 + .6 * var(--bv,0))));}
+.batt .bt-cap{fill:#8A93A1;}
+.batt .bt-body{fill:rgba(255,255,255,.04);stroke:#8A93A1;stroke-width:2.6;}
+.batt .bt-fill{fill:url(#btGrad);transition:y .8s ease, height .8s ease;}
+.batt .bt-bolt{fill:#fff;opacity:.92;}
+.batt .bt-shine{fill:rgba(255,255,255,.35);opacity:0;}
+.batt.on .bt-shine{animation:btShine 1.8s linear infinite;}
+.batt.on .bt-bolt{animation:btBolt 1.2s ease-in-out infinite;}
+@keyframes btShine{0%{opacity:0;transform:translateY(60px);}20%{opacity:.9;}100%{opacity:0;transform:translateY(-6px);}}
+@keyframes btBolt{0%,100%{opacity:.6;}50%{opacity:1;}}
+.batt .bx{position:absolute;top:-4px;right:-10px;font-size:11px;font-weight:800;color:#0A0D12;background:#3DD45C;border-radius:999px;padding:0 5px;line-height:16px;}
+.batt .bx:empty{display:none;}
+.batt .bmah{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:var(--lfs,15px);line-height:1;color:#B8F5C8;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.batt .bpb{font-size:calc(var(--lfs,15px) * .72);font-weight:700;color:#9FE3B8;white-space:nowrap;line-height:1.1;font-variant-numeric:tabular-nums;}
+@media (prefers-reduced-motion:reduce){.batt.on .bt-shine,.batt.on .bt-bolt{animation:none;}}
+
+#myBatt{--lt:14px;--lr:10px;}
+/* Strava */
+.btn-strava{display:block;width:100%;max-width:320px;margin:0 auto 10px;background:#FC4C02;color:#fff;border:none;border-radius:12px;padding:13px 16px;font-size:16px;font-weight:800;text-align:center;text-decoration:none;box-sizing:border-box;}
+.strava-ov{position:fixed;inset:0;z-index:300;background:rgba(5,7,10,.85);display:none;align-items:center;justify-content:center;padding:18px;}
+.strava-ov.on{display:flex;}
+.strava-card{width:100%;max-width:420px;background:#12161D;border:1px solid #262D39;border-radius:18px;padding:22px 20px 14px;color:#EDEFF2;text-align:left;}
+.strava-card h3{margin:0 0 10px;font-size:22px;}
+.strava-card .ok{color:#9FE3B8;font-size:14px;margin:0 0 12px;}
+.strava-card .ok b{color:#fff;word-break:break-all;}
+.strava-card ol{padding-left:20px;margin:0 0 14px;font-size:14px;line-height:1.45;color:#C9CED6;}
+.strava-card li{margin-bottom:6px;}
+.strava-card .btn-outline{width:100%;margin-bottom:6px;}
+.strava-card .btn-link{display:block;margin:4px auto 0;}
+#myBatt .bpb{display:none;}
+/* a frase do bloco não passa por baixo da pilha nem da lâmpada */
+#liveScreen .body .feel{padding-left:64px;padding-right:64px;box-sizing:border-box;}
+/* km/h e km maiores */
+.me-sd{font-size:clamp(30px,9.5vw,42px);margin-top:6px;}
+.me-sd small{font-size:15px;}
+/* células que trocam de unidade ao tocar */
+.me-grid .tap{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.me-grid .tap .l::after{content:' ⇄';opacity:.5;font-size:.9em;}
+.fin-wh{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;color:#FFE08A;margin:-4px 0 10px;}
+.fin-wh small{display:block;font-family:inherit;font-size:16px;color:rgba(255,255,255,.7);font-weight:600;}
+.fin-wh:empty{display:none;}
+/* cabeçalho escondido durante o treino: abre-se a deslizar para baixo na seta */
+.topbar{transition:transform .32s cubic-bezier(.2,.9,.3,1),opacity .25s ease;}
+#liveScreen.hdr-hide .topbar{position:absolute;top:10px;left:0;right:0;transform:translateY(calc(-100% - 14px));opacity:0;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(5,7,10,.97),rgba(5,7,10,.93));padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 12px 30px rgba(0,0,0,.55);}
+#liveScreen.hdr-hide.hdr-open .topbar{transform:none;opacity:1;pointer-events:auto;}
+.hdr-handle{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:41;width:92px;height:34px;padding:0;border:1px solid rgba(255,255,255,.18);border-top:none;
+  border-radius:0 0 16px 16px;background:rgba(18,22,29,.92);color:#fff;place-items:center;touch-action:none;-webkit-tap-highlight-color:transparent;cursor:pointer;}
+.hdr-handle svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;animation:hdrNudge 1.6s ease-in-out infinite;}
+.hdr-handle.alert{border-color:var(--bad,#FF5A5A);color:var(--bad,#FF5A5A);}
+#liveScreen.hdr-hide:not(.hdr-open) .hdr-handle{display:grid;}
+#liveScreen.hdr-hide .body{padding-top:42px;}
+@keyframes hdrNudge{0%,100%{transform:translateY(-2px);opacity:.75;}50%{transform:translateY(4px);opacity:1;}}
+@media (prefers-reduced-motion:reduce){.hdr-handle svg{animation:none;}}
 .f-alert{display:none;}
 .f-alert.on{display:flex;}
 
@@ -330,12 +644,35 @@ body.solo-livre #progress{display:none;}
 <div id="homeScreen" class="screen home active">
   <h1 class="pr-logo" style="font-size:42px" aria-label="PlayRide"><svg class="pr-mark" height="42" viewBox="0 0 200 130" aria-hidden="true"><g transform="skewX(-14)"><rect x="34" y="96" width="22" height="34" rx="4" fill="#A35CFF"/><rect x="62" y="78" width="22" height="52" rx="4" fill="#1FA8F0"/><rect x="90" y="58" width="22" height="72" rx="4" fill="#3DD45C"/><rect x="118" y="38" width="22" height="92" rx="4" fill="#FFD60A"/><rect x="146" y="16" width="22" height="114" rx="4" fill="#FF8A1F"/><rect x="174" y="0" width="22" height="130" rx="4" fill="#FF3B3B"/></g></svg><span>PlayRide</span></h1>
   <div class="home-hello" id="homeHello"></div>
+  <p class="home-msg" id="moodPhrase"></p>
+  <button class="ficha-upd" id="fichaUpd" style="display:none"><b>📋 Atualiza a tua ficha</b><span>Acrescentámos o campo <b>Sexo</b>. Toca aqui para o indicar (30 segundos).</span></button>
+  <div class="reg-home" id="regHome" style="display:none"><div><b>Cria a tua conta grátis</b><span>Guarda todos os teus treinos e acompanha a tua evolução.</span></div><button type="button" class="btn-reg" id="regHomeBtn">Criar conta</button></div>
   <div class="home-grid">
-    <button class="tile big" id="tLive" style="--tc:#E8722C"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor" stroke="none"/></svg><div><b>Aula ao vivo</b><br><span>Entra na aula da sala com o PIN do ecrã</span></div></button>
-    <button class="tile" id="tFree" style="--tc:#3DD45C"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9 9h6l3.5 7.5M9 9 12 16.5h-3M14 6h2.5l-1.5 3"/></svg><b>Só pedalar</b><span>Treino livre ao teu ritmo</span></button>
-    <button class="tile" id="tLib" style="--tc:#1FA8F0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h5v14H4zM10 5h4v14h-4zM15.5 6.2l3.8-1 3 13.6-3.8 1z"/></svg><b>Biblioteca</b><span>Treinos guiados para fazeres sozinho</span></button>
     <button class="tile" id="tHist" style="--tc:#A35CFF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/></svg><b>Treinos realizados</b><span id="tHistSub">Gráficos e evolução dos teus treinos</span></button>
     <button class="tile" id="tFicha" style="--tc:#FFD60A"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v3h6V3M9 11h6M9 15h6"/></svg><b>A minha ficha</b><span id="tFichaSub">Idade, FCmáx e saúde para treinares em segurança</span></button>
+  </div>
+  <div class="mood" id="moodCard">
+    <div class="mood-h">Como te sentes hoje?</div>
+    <div class="mood-opts" id="moodOpts">
+      <button type="button" data-m="1" data-u="1f62b" style="--mc:#FF5A5A"><i>😫</i>Exausto</button>
+      <button type="button" data-m="2" data-u="1f615" style="--mc:#FF9F43"><i>😕</i>Em baixo</button>
+      <button type="button" data-m="3" data-u="1f610" style="--mc:#FFD60A"><i>😐</i>Normal</button>
+      <button type="button" data-m="4" data-u="1f642" style="--mc:#3DD45C"><i>🙂</i>Bem</button>
+      <button type="button" data-m="5" data-u="1f929" style="--mc:#1FA8F0"><i>🤩</i>Em grande</button>
+    </div>
+    <div class="mood-r" id="moodResp" aria-live="polite"></div>
+    <button type="button" class="bora-btn" id="boraBtn">Bora pedalar →</button>
+  </div>
+  <!-- escolha do treino: abre com "Bora pedalar" -->
+  <div class="go-sheet" id="goSheet" aria-hidden="true">
+    <div class="go-panel" role="dialog" aria-modal="true" aria-labelledby="goTitle">
+      <div class="go-head"><b id="goTitle">Como queres pedalar hoje?</b><button type="button" class="go-x" id="goClose" aria-label="Fechar">✕</button></div>
+      <div class="go-list">
+    <button class="tile go" id="tLive" style="--tc:#E8722C"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor" stroke="none"/></svg><b>Aula ao vivo</b><span>Entra na aula da sala com o PIN do ecrã</span></button>
+    <button class="tile go" id="tFree" style="--tc:#3DD45C"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9 9h6l3.5 7.5M9 9 12 16.5h-3M14 6h2.5l-1.5 3"/></svg><b>Só pedalar</b><span>Treino livre ao teu ritmo</span></button>
+    <button class="tile go" id="tLib" style="--tc:#1FA8F0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h5v14H4zM10 5h4v14h-4zM15.5 6.2l3.8-1 3 13.6-3.8 1z"/></svg><b>Biblioteca</b><span>Treinos guiados para fazeres sozinho</span></button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -354,6 +691,12 @@ body.solo-livre #progress{display:none;}
       <div class="f-row">
         <label class="f-field">Data de nascimento<input type="date" id="fNasc" max="2020-12-31" min="1920-01-01"></label>
         <div class="f-field">Idade<div class="f-out"><b id="fIdade">—</b><span>anos</span></div></div>
+      </div>
+      <div class="f-field">Sexo
+        <div class="f-chips" id="fSexo">
+          <button type="button" data-v="M">Masculino</button>
+          <button type="button" data-v="F">Feminino</button>
+        </div>
       </div>
       <div class="f-row">
         <label class="f-field">Peso (kg)<input type="number" id="fPeso" inputmode="decimal" min="30" max="250" step="0.5" placeholder="ex: 70"></label>
@@ -438,6 +781,7 @@ body.solo-livre #progress{display:none;}
   <button class="btn-link back-top" id="libBack">← Início</button>
   <h1>Biblioteca</h1>
   <p>Escolhe um treino. A app guia-te bloco a bloco, com as tuas zonas, sem precisares de estar numa aula.</p>
+  <div class="lib-chips" id="libChips"></div>
   <div class="lib-list" id="libList"></div>
 </div>
 
@@ -465,7 +809,8 @@ body.solo-livre #progress{display:none;}
       <label>Palavra-passe<input type="password" id="aLoginPass" autocomplete="current-password" required></label>
       <button type="submit" class="btn-primary">Entrar</button>
       <div class="err" id="aLoginErr"></div>
-      <div class="acct-links"><a href="#" id="aToReg">Criar conta</a><a href="#" id="aForgot">Esqueci-me da palavra-passe</a></div>
+      <div class="acct-links"><span></span><a href="#" id="aForgot">Esqueci-me da palavra-passe</a></div>
+      <div class="reg-cta"><span>Ainda não tens conta?</span><button type="button" class="btn-reg" id="aToReg">✨ Criar conta grátis</button></div>
     </form>
     <form id="aReg" class="form" style="display:none">
       <label>Nome (como aparece no ecrã)<input id="aRegName" maxlength="16" required></label>
@@ -530,7 +875,7 @@ body.solo-livre #progress{display:none;}
       <div><div class="s-name">♥ Cinta de FC</div><div class="s-status" id="hrStatus">opcional</div></div>
       <button id="hrBtn">Ligar</button>
     </div>
-    <button id="showAllBtn" class="btn-link" style="display:none;text-align:left;padding:0">Não aparece? Mostrar todos os dispositivos Bluetooth</button>
+    <button id="showAllBtn" class="bt-all">🔍 Não aparece? Mostrar todos os dispositivos Bluetooth</button>
     <div class="hint" id="bikeHelp">Antes de ligar: pedala um pouco para acordar a consola da bike. Tens de ter o Bluetooth e a Localização do telemóvel ligados.</div>
     <div class="warn" id="btWarn"></div>
   </div>
@@ -543,21 +888,68 @@ body.solo-livre #progress{display:none;}
 </div>
 
 <!-- 3. AULA -->
+<div class="rate-ov" id="rateOv" role="dialog" aria-modal="true" aria-labelledby="rateTitle">
+  <div class="rate-card">
+    <div class="rate-top" id="rateTitle">Treino terminado! 🎉</div>
+    <div class="rate-q">Como foi o treino?</div>
+    <div class="rate-opts" id="rateExp">
+      <button type="button" data-v="1" data-u="1f61e" data-c="😞" style="--mc:#FF5A5A">Mau</button>
+      <button type="button" data-v="2" data-u="1f615" data-c="😕" style="--mc:#FF9F43">Fraco</button>
+      <button type="button" data-v="3" data-u="1f610" data-c="😐" style="--mc:#FFD60A">Razoável</button>
+      <button type="button" data-v="4" data-u="1f600" data-c="😀" style="--mc:#3DD45C">Bom</button>
+      <button type="button" data-v="5" data-u="1f929" data-c="🤩" style="--mc:#1FA8F0">Excelente</button>
+    </div>
+    <div class="rate-q">Como te sentes agora?</div>
+    <div class="rate-opts" id="rateFeel">
+      <button type="button" data-v="1" data-u="1f62b" data-c="😫" style="--mc:#FF5A5A">Exausto</button>
+      <button type="button" data-v="2" data-u="1f62e_200d_1f4a8" data-c="😮‍💨" style="--mc:#FF9F43">Cansado</button>
+      <button type="button" data-v="3" data-u="1f642" data-c="🙂" style="--mc:#FFD60A">Bem</button>
+      <button type="button" data-v="4" data-u="1f4aa" data-c="💪" style="--mc:#3DD45C">Forte</button>
+      <button type="button" data-v="5" data-u="1f525" data-c="🔥" style="--mc:#1FA8F0">Em grande</button>
+    </div>
+    <button type="button" class="rate-ok" id="rateOk" disabled>Guardar</button>
+    <button type="button" class="rate-skip" id="rateSkip">Agora não</button>
+  </div>
+</div>
+<div class="ftp-edit" id="ftpEdit" role="dialog" aria-modal="true" aria-label="Alterar o FTP">
+  <div class="fe-card">
+    <h3 id="ftpEditTitle">O teu FTP</h3>
+    <p id="ftpEditTxt">A tua potência de limiar. As zonas, os alvos em watts e os pontos passam a usar este valor.</p>
+    <div class="fe-row"><input id="ftpEditVal" type="number" inputmode="numeric" min="50" max="600"><span id="ftpEditUnit">W</span></div>
+    <div class="fe-msg" id="ftpEditMsg"></div>
+    <div class="fe-acts"><button class="btn-outline" id="ftpEditCancel">Cancelar</button><button class="btn-primary" id="ftpEditSave">Gravar</button><button class="btn-primary" id="ftpEditOk" style="display:none">OK</button></div>
+  </div>
+</div>
+<div class="nx-burst" id="nxBurst" aria-hidden="true"></div><div class="nx-float" id="nxFloat"></div>
 <div id="liveScreen">
   <div class="progress" id="progress"></div>
+  <button class="hdr-handle" id="hdrHandle" aria-label="Desliza para baixo para abrir o menu" title="Desliza para baixo para abrir o menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
   <div class="topbar">
-    <div class="chips">
-      <span class="chip" id="chipBike"><span class="dot"></span>Bike</span>
-      <span class="chip" id="chipHr"><span class="dot"></span>FC</span>
-      <button class="chip warnchip" id="chipSafety" aria-label="Aviso de segurança">⚠</button>
+    <div class="tb-menu">
+      <button class="mbtn" id="btMenuBtn" aria-expanded="false" aria-controls="btPop" title="Bike e cinta de FC"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg><span class="mdots"><i id="dotBike" title="Bike"></i><i id="dotHr" title="Cinta de FC"></i></span></button>
+      <div class="tb-pop" id="btPop">
+        <span class="chip" id="chipBike"><span class="dot"></span>Bike</span>
+        <span class="chip" id="chipHr"><span class="dot"></span>Cinta de FC</span>
+      </div>
     </div>
+    <div class="tb-menu">
+      <button class="mbtn" id="edMenuBtn" aria-expanded="false" aria-controls="edPop" title="Alterar FTP e FC máxima"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button>
+      <div class="tb-pop" id="edPop">
+        <button class="chip ftpchip" id="chipFtp" title="Alterar o meu FTP"><span class="cl">FTP ✎</span><b id="chipFtpV">—</b></button>
+        <button class="chip ftpchip" id="chipFc" title="Alterar a minha FC máxima"><span class="cl">FCmáx ✎</span><b id="chipFcV">—</b></button>
+      </div>
+    </div>
+    <button class="chip warnchip" id="chipSafety" aria-label="Aviso de segurança">⚠</button>
+    <button class="chip occhip" id="chipOculto" aria-pressed="false" aria-label="Aparecer ou não na projeção" title="Aparecer ou não na projeção"></button>
     <div class="rank" id="rankEl"></div>
-    <div class="solo-ctl"><button class="solo-btn" id="soloPlay">▶ Começar</button><button class="solo-btn ghost" id="soloSkip" title="Saltar para o bloco seguinte">⏭</button></div>
-    <button class="leave-btn" id="leaveBtn">✕ Sair</button>
+    <button class="leave-btn" id="leaveBtn">GRAVAR &amp; SAIR</button>
   </div>
   <div class="safety safety-banner" id="safetyBanner" role="alert"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg><div id="safetyBannerTxt">Sentes <b>desconforto, dor no peito, tonturas ou falta de ar</b>? <b>Pára de pedalar</b> e pede ajuda ao professor da aula.</div><button id="safetyClose" aria-label="Fechar aviso">✕</button></div>
   <div class="body" id="bodyEl">
+    <div class="batt" id="myBatt"><div style="position:relative"><svg viewBox="0 0 44 80" aria-hidden="true"><defs><linearGradient id="btGradA" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1FA84A"/><stop offset="1" stop-color="#7CF0A0"/></linearGradient><clipPath id="btClipA"><rect x="7" y="11" width="30" height="62" rx="4"/></clipPath></defs><rect class="bt-cap" x="15" y="1" width="14" height="7" rx="2"/><rect class="bt-body" x="4" y="8" width="36" height="68" rx="7"/><g clip-path="url(#btClipA)"><rect class="bt-fill" x="7" y="72" width="30" height="0" style="fill:url(#btGradA)"/><rect class="bt-shine" x="7" y="10" width="30" height="6"/></g><path class="bt-bolt" d="M25 20 L14 44 H22 L18 64 L31 36 H23 Z"/></svg><span class="bx"></span></div><span class="bmah">0 mAh</span><span class="bpb">≈ 0% de um powerbank</span></div>
+    <div class="lamp" id="myLamp"><svg viewBox="0 0 64 80" aria-hidden="true"><g class="lrs"><line class="lr" x1="32" y1="-6" x2="32" y2="-14"/><line class="lr" x1="6" y1="6" x2="0" y2="0"/><line class="lr" x1="58" y1="6" x2="64" y2="0"/><line class="lr" x1="-4" y1="28" x2="-12" y2="28"/><line class="lr" x1="68" y1="28" x2="76" y2="28"/></g><path class="lg" d="M32 4a24 24 0 0 1 14 43.5c-2.8 2.1-4.2 4.6-4.2 7.4V57H22.2v-2.1c0-2.8-1.4-5.3-4.2-7.4A24 24 0 0 1 32 4z"/><path class="lf" d="M25 44l3.5-11 3.5 8 3.5-8L39 44"/><rect class="lb" x="22" y="59" width="20" height="5" rx="2"/><rect class="lb" x="23.5" y="66" width="17" height="5" rx="2"/><rect class="lb" x="27" y="73" width="10" height="4" rx="2"/></svg><span class="lwh">0 Wh</span><span class="leur">≈ 0,00 cêntimos</span></div>
     <div class="class-name" id="className"></div>
+    <div class="oc-tag" id="ocTag">🙈 Não apareces na projeção · o treino fica gravado</div>
     <div id="activeBlock" style="width:100%;display:flex;flex-direction:column;align-items:center;">
       <div class="ce-mini" id="ceMini"><svg class="ce-svg" viewBox="0 0 200 130" aria-hidden="true"><g class="ce-g"><path d="M20 58 V96 M20 77 H40"/><path d="M40 52 H58 V40 H134 L148 54 H158 V46 H170 V102 H158 V94 H148 L132 110 H74 L58 96 H40 Z"/><path d="M78 18 H110 M94 18 V40"/></g></svg></div>
       <div class="rl-mini" id="rlMini"><svg class="rl-svg" viewBox="0 0 200 112" aria-hidden="true"><path class="arc" d="M14 100 A86 86 0 0 1 186 100"/><line x1="24.0" y1="100.0" x2="38.0" y2="100.0" class="wt mj"/><line x1="24.9" y1="88.1" x2="32.8" y2="89.4" class="wt"/><line x1="27.7" y1="76.5" x2="35.3" y2="79.0" class="wt"/><line x1="32.3" y1="65.5" x2="39.4" y2="69.1" class="wt"/><line x1="38.5" y1="55.3" x2="45.0" y2="60.0" class="wt"/><line x1="46.3" y1="46.3" x2="56.2" y2="56.2" class="wt mj"/><line x1="55.3" y1="38.5" x2="60.0" y2="45.0" class="wt"/><line x1="65.5" y1="32.3" x2="69.1" y2="39.4" class="wt"/><line x1="76.5" y1="27.7" x2="79.0" y2="35.3" class="wt"/><line x1="88.1" y1="24.9" x2="89.4" y2="32.8" class="wt"/><line x1="100.0" y1="24.0" x2="100.0" y2="38.0" class="wt mj"/><line x1="111.9" y1="24.9" x2="110.6" y2="32.8" class="wt"/><line x1="123.5" y1="27.7" x2="121.0" y2="35.3" class="wt"/><line x1="134.5" y1="32.3" x2="130.9" y2="39.4" class="wt"/><line x1="144.7" y1="38.5" x2="140.0" y2="45.0" class="wt"/><line x1="153.7" y1="46.3" x2="143.8" y2="56.2" class="wt mj"/><line x1="161.5" y1="55.3" x2="155.0" y2="60.0" class="wt"/><line x1="167.7" y1="65.5" x2="160.6" y2="69.1" class="wt"/><line x1="172.3" y1="76.5" x2="164.7" y2="79.0" class="rt"/><line x1="175.1" y1="88.1" x2="167.2" y2="89.4" class="rt"/><line x1="176.0" y1="100.0" x2="162.0" y2="100.0" class="rt mj"/><path class="rz" d="M163.9 76.7 A68 68 0 0 1 168.0 98.8"/><g class="needle"><path d="M100 96.5 L172 100 L100 103.5 Z"/></g><circle class="hub" cx="100" cy="100" r="7"/><circle class="hub2" cx="100" cy="100" r="3"/></svg></div>
@@ -566,6 +958,8 @@ body.solo-livre #progress{display:none;}
       <div class="feel" id="feelEl"></div>
       <div class="timer" id="timerEl">0:00</div>
       <div class="target" id="targetEl"></div>
+      <div class="ftp-result" id="ftpResult" style="display:none"></div>
+      <div class="bg-warn" id="bgWarn" role="alert"></div>
 
       <div class="me" id="meEl">
         <div class="me-w" id="myBig" role="button" tabindex="0" aria-label="Trocar entre valor e percentagem"><span id="myW">0</span><small id="myWUnit">W</small><span class="swap" id="mySwap">toca para ver %FTP</span></div>
@@ -575,10 +969,10 @@ body.solo-livre #progress{display:none;}
         <div class="gauge-scale"><span>0%</span><span>60%</span><span>120%</span><span>180%</span></div>
         <div class="nosensor-msg" id="nosensorMsg">Estás só a acompanhar. Liga a bike (toca em "Bike" lá em cima) para apareceres no ecrã e no ranking.</div>
         <div class="me-grid">
-          <div><div class="v" id="myPct">—</div><div class="l" id="myPctLbl">%FTP</div></div>
+          <div class="tap" id="cellPct" role="button" tabindex="0"><div class="v" id="myPct">—</div><div class="l" id="myPctLbl">%FTP</div></div>
           <div><div class="v" id="myRpm">—</div><div class="l">RPM</div></div>
-          <div><div class="v" id="myHr">—</div><div class="l" id="myHrLbl">FC</div></div>
-          <div><div class="v" id="myKj">0</div><div class="l">kJ</div></div>
+          <div class="tap" id="cellHr" role="button" tabindex="0"><div class="v" id="myHr">—</div><div class="l" id="myHrLbl">FC</div></div>
+          <div><div class="v" id="myKj">0</div><div class="l">kcal</div></div>
           <div><div class="v" id="myPts">0</div><div class="l">pontos</div></div>
           <div><div class="v" id="myZone">0%</div><div class="l" id="myZoneLbl">na zona</div></div>
         </div>
@@ -589,8 +983,10 @@ body.solo-livre #progress{display:none;}
       <div class="blockline"><span class="zone" id="finTitle">Aula concluída</span></div>
       <div class="big" id="totalTimeEl">0:00</div>
       <div class="fin-km" id="finKm"></div>
+      <div class="fin-wh" id="finWh"></div>
+      <div class="fin-ftp" id="finFtp"></div>
       <div class="me-grid">
-        <div><div class="v" id="finKj">0</div><div class="l">kJ</div></div>
+        <div><div class="v" id="finKj">0</div><div class="l">kcal</div></div>
         <div><div class="v" id="finPts">0</div><div class="l">pontos</div></div>
         <div><div class="v" id="finRank">—</div><div class="l">posição</div></div>
         <div><div class="v" id="finAw">0</div><div class="l">W médios</div></div>
@@ -599,12 +995,20 @@ body.solo-livre #progress{display:none;}
       </div>
       <div class="class-name" style="margin-top:8px;">bom trabalho!</div>
       <div class="acct-line" id="savedNote"></div>
+      <button class="btn-strava" id="finStrava" style="display:none">Enviar para o Strava</button>
       <button class="btn-outline" id="finAccountBtn">📈 Ver os meus treinos</button>
       <button class="btn-primary" id="finHomeBtn" style="display:none;margin-top:8px">Voltar ao início</button>
     </div>
 
     <div class="next" id="nextEl"></div>
+    <div class="next nx-seg" id="segNext"></div>
   </div>
+  <div class="solo-bar" id="soloBar">
+    <button class="sb-btn" id="soloBack" aria-label="Bloco anterior" title="Bloco anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="3" height="14" rx="1"/><path d="M20 5v14L9 12z"/></svg></button>
+    <button class="sb-btn play" id="soloPlay" aria-label="Começar" title="Começar"></button>
+    <button class="sb-btn" id="soloSkip" aria-label="Bloco seguinte" title="Bloco seguinte"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="17" y="5" width="3" height="14" rx="1"/><path d="M4 5v14l11-7z"/></svg></button>
+  </div>
+  <button class="sb-handle" id="soloHandle" aria-label="Mostrar os botões"></button>
 </div>
 
 <script>
@@ -667,6 +1071,84 @@ body.solo-livre #progress{display:none;}
     const lo = (modo !== 'fc' && range.min > 0) ? range.min + 1 : range.min;   // igual ao planeamento: 56–75%, 76–90%…
     return (range.open ? '> ' + range.min : lo + '–' + range.max) + '%';
   }
+  // ===== cartão "a seguir" e transição de bloco =====
+  let lastNextHtml = '', lastBlockIdx = -1, nxPhase = '', nxBoomIdx = -1;
+  const NX_SHOW = 15, NX_BOOM = 3;   // segundos antes do fim do bloco
+  function zoneTxtColor(css){ return (css === '--z5' || css === '--z6' || css === '--seg') ? '#fff' : '#0A0D12'; }
+  function hideNx(){ nxRoom(false); const f = $('nxFloat'); if(f) f.innerHTML = ''; const bu = $('nxBurst'); if(bu){ bu.className = 'nx-burst'; bu.innerHTML = ''; } lastNextHtml = ''; nxPhase = ''; }
+  function nxExplode(color){
+    const bu = $('nxBurst'); bu.style.setProperty('--nc', color);
+    let h = '<div class="ring"></div>';
+    for(let k = 0; k < 26; k++){
+      const a = Math.random() * Math.PI * 2, r = 120 + Math.random() * 260, sz = 6 + Math.round(Math.random() * 12);
+      h += '<i style="--x:' + Math.round(Math.cos(a) * r) + 'px;--y:' + Math.round(Math.sin(a) * r) + 'px;--s:' + sz + 'px;--d:' + (Math.random() * .12).toFixed(2) + 's"></i>';
+    }
+    bu.innerHTML = h; bu.className = 'nx-burst'; void bu.offsetWidth; bu.className = 'nx-burst on';
+    clearTimeout(nxExplode.t); nxExplode.t = setTimeout(()=>{ bu.className = 'nx-burst'; bu.innerHTML = ''; }, 3600);
+  }
+  // abre espaço por baixo do cartão: encolhe o ecrã e, se ainda faltar, desliza até ao fim do cartão do aluno
+  function nxRoom(on, card){
+    const body = $('bodyEl'); if(!body) return;
+    if(!on){ if(body.classList.contains('nx-on')){ body.classList.remove('nx-on'); body.scrollTo({top:0, behavior:'smooth'}); } return; }
+    if(nxPhase === 'boom') return;   // a subir/rebentar: não mexe no ecrã
+    body.style.setProperty('--nxh', card.offsetHeight + 'px');
+    body.classList.add('nx-on');
+    if(nxRoom.busy) return;
+    nxRoom.busy = true; setTimeout(()=>{   // espera que o ecrã encolha (0,45 s) e só depois mede
+      nxRoom.busy = false;
+      const me = $('meEl'), c = $('nxFloat').querySelector('.nx'); if(!me || !c || !body.classList.contains('nx-on') || nxPhase === 'boom') return;
+      const over = me.getBoundingClientRect().bottom + 8 - c.getBoundingClientRect().top;
+      if(over > 1) body.scrollTo({top: body.scrollTop + over, behavior:'smooth'});
+    }, 600);
+  }
+  function renderNext(next, remaining){
+    const el = $('nxFloat');
+    const playing = state.status === 'playing' && solo !== 'livre';
+    let phase = '';
+    if(playing && remaining > 0){
+      if(next && remaining <= NX_BOOM) phase = 'boom';
+      else if(remaining <= NX_SHOW) phase = 'show';
+    }
+    if(!phase){ if(el.innerHTML) el.innerHTML = ''; lastNextHtml = ''; nxPhase = ''; nxRoom(false); return; }
+    let html, color = '#fff';
+    if(!next){
+      html = '<div class="nx last" style="--nc:#fff"><div class="nx-top"><span class="nx-lbl">Último bloco</span><span class="nx-in"></span></div><div class="nx-main"><span class="nx-name">Força até ao fim! 💪</span></div></div>';
+    } else {
+      const z = blkZone(next); color = zoneColor(z.css);
+      const zl = next.tipo === 'seg' ? 'Segmento' : (next.tipo === 'cool' ? 'Retorno à calma' : z.name);
+      const meta = next.tipo === 'seg' ? 'transição leve'
+        : (next.teste ? 'o mais forte possível' : (modo === 'zonas' ? '' : '<b>' + pctTxt(next, zoneRange(next.ftp)) + '</b>' + (modo === 'fc' ? ' FCmáx' : ' FTP')));
+      html = '<div class="nx" style="--nc:' + color + '"><div class="nx-top"><span class="nx-lbl">A seguir</span><span class="nx-in"></span></div>' +
+        '<div class="nx-main"><span class="nx-zone" style="color:' + zoneTxtColor(z.css) + '">' + escapeHtml(next.teste ? 'Teste FTP' : zl) + '</span>' + (next.tecnica ? '<span class="nx-tec">' + escapeHtml(next.tecnica) + '</span>' : '') + '</div>' +
+        '<div class="nx-meta">' + (meta ? meta + ' · ' : '') + (next.rpm ? '<b>' + rpmTxt(next) + '</b> rpm · ' : '') + '<b>' + fmtTime(blockDurationSec(next)) + '</b></div></div>';
+    }
+    if(html !== lastNextHtml){ el.innerHTML = html; lastNextHtml = html; nxPhase = ''; }
+    const card = el.querySelector('.nx'); if(!card) return;
+    if(phase !== nxPhase){
+      card.classList.remove('show', 'boom'); void card.offsetWidth; card.classList.add(phase);
+      if(phase === 'boom' && nxBoomIdx !== state.blockIndex){ nxBoomIdx = state.blockIndex; nxExplode(color); }
+      nxPhase = phase;
+    }
+    if(phase === 'show' && remaining <= 8 && !card.classList.contains('shine2')) card.classList.add('shine2');   // repete o brilho aos 8 s
+    const inn = card.querySelector('.nx-in');
+    if(inn) inn.textContent = 'em ' + Math.ceil(remaining);
+    nxRoom(true, card);
+  }
+  function checkBlockChange(b){
+    const idx = state.blockIndex;
+    if(lastBlockIdx === idx) return;
+    const first = lastBlockIdx === -1;
+    lastBlockIdx = idx;
+    if(first || state.status !== 'playing' || solo === 'livre') return;
+    const body = $('bodyEl'); body.classList.remove('blk-in'); void body.offsetWidth; body.classList.add('blk-in');
+  }
+
+  function setTarget(tiles, note, color){
+    const el = $('targetEl');
+    el.style.setProperty('--zc', color || '#3A4353');
+    el.innerHTML = '<div class="tg-row">' + tiles.map(t=> '<div class="tg"><span class="tg-l">' + t.l + '</span><b' + (String(t.v).length > 7 ? ' class="lng"' : '') + '>' + t.v + '</b>' + (t.u ? '<small>' + t.u + '</small>' : '') + '</div>').join('') + '</div>' +
+      (note ? '<div class="tg-note">' + note + '</div>' : '');
+  }
   function zoneRange(pct){
     const Z = zonesNow(), i = zoneIndex(pct), g = gaugeScale();
     const open = i === Z.length - 1;   // última zona (Z7, ou Z5 por FC) não tem teto
@@ -720,7 +1202,7 @@ body.solo-livre #progress{display:none;}
   let renderHandle = null, sampleHandle = null, pushHandle = null;
   let sessionEnded = false, hadState = false;
   let myRank = null;
-  const me = { n:'', ftp:null, kj:0, pts:0, sumW:0, as:0, mw:0, iz:0, ts:0, km:0, spd:0 };  // as = segundos com potência, ts = segundos gravados (potência ou FC)
+  const me = { n:'', ftp:null, kj:0, pts:0, sumW:0, as:0, mw:0, iz:0, ts:0, km:0, spd:0, tw:0, tt:0, ftpIni:null, ftpTest:null, testDone:false };  // as = segundos com potência, ts = segundos gravados (potência ou FC)
   let demo = false;
   me.fc = null;   // FC máxima do aluno
 
@@ -729,8 +1211,16 @@ body.solo-livre #progress{display:none;}
     currentScreen = id;
     ['homeScreen','libScreen','fichaScreen','joinScreen','setupScreen','accountScreen'].forEach(s=> $(s).classList.toggle('active', s===id));
     $('liveScreen').classList.toggle('active', id==='liveScreen');
+    document.documentElement.classList.toggle('in-class', id==='liveScreen');
     window.scrollTo(0,0);
   }
+  // se o aluno tentar recarregar ou fechar a página a meio do treino, o browser pede confirmação
+  window.addEventListener('beforeunload', (e)=>{
+    if(currentScreen !== 'liveScreen' || !(riderRef || solo)) return;
+    if(sessionEnded || (state && state.status === 'finished')) return;
+    try{ saveProgress(); }catch(err){}
+    e.preventDefault(); e.returnValue = '';
+  });
 
   // série do treino para o gráfico: médias de 5 em 5 segundos
   const SERIE_STEP = 5;
@@ -897,7 +1387,6 @@ body.solo-livre #progress{display:none;}
       if(bikeConnected()){ setBikeStatus(S.bikeName + ' ligada', true); return; }
       if(e && e.name === 'NotFoundError'){
         setBikeStatus(showAll === true ? 'nenhum dispositivo escolhido' : 'bike não encontrada: toca em "Não aparece?" em baixo', false);
-        $('showAllBtn').style.display = '';
         return;
       }
       if(e && (e.name === 'SecurityError' || e.name === 'NotAllowedError')){
@@ -905,7 +1394,6 @@ body.solo-livre #progress{display:none;}
         return;
       }
       setBikeStatus(btErr(typeof btStage === 'string' ? btStage : '', e), false);
-      $('showAllBtn').style.display = '';
     }
   }
 
@@ -1070,6 +1558,7 @@ body.solo-livre #progress{display:none;}
   }
 
   function sample(){
+    checkFtpTest();
     const now = performance.now();
     const dt = Math.min(3, (now - lastSampleAt) / 1000);
     lastSampleAt = now;
@@ -1098,6 +1587,7 @@ body.solo-livre #progress{display:none;}
       const fresh = S.bikeSpeed > 0 && now - (S.lastSpeedAt || 0) < 3000;
       me.spd = fresh ? S.bikeSpeed : speedFromPower(dispPower);   // usa a da bike se ela a enviar
       me.km += me.spd * dt / 3600;
+      const cbT = currentBlock(); if(cbT && cbT.teste){ me.tw += w * dt; me.tt += dt; }
       me.kj += w * dt / 1000;
       me.as += dt;
       me.sumW += w * dt;
@@ -1116,9 +1606,16 @@ body.solo-livre #progress{display:none;}
       n: me.n, ftp: me.ftp || null, fc: me.fc || null,
       w: Math.round(dispPower), c: Math.round(S.cadence), hr: Math.round(myHr()) || null,
       kj: Math.round(me.kj * 10) / 10, pts: Math.round(me.pts), km: Math.round(me.km * 100) / 100, v: Math.round(me.spd * 10) / 10,
+      tw: me.tt ? Math.round(me.tw) : null, tt: me.tt ? Math.round(me.tt) : null,
+      bg: document.visibilityState === 'hidden' ? true : null,
+      ftpT: me.ftpTest && me.ftpTest.ok ? me.ftpTest.ftp : null, m20: me.ftpTest ? me.ftpTest.m20 : null, ftpIni: me.ftpIni || null,
       aw: me.as ? Math.round(me.sumW / me.as) : 0, mw: Math.round(me.mw),
       iz: Math.round(me.iz), as: Math.round(modo === 'fc' ? me.ts : me.as),
       dev: hasPowerSource() || (modo === 'fc' && myHr() > 0), demo: demo || null, left: null,
+      pw: hasPowerSource() ? true : false,   // tem bike/potenciómetro ligado (a projeção por zonas mostra %FTP)
+      rx: me.rx || null, fa: me.fa || null,
+      md: moodHoje(),   // emoji do "como te sentes hoje?" (aparece junto ao nome na projeção)
+      oc: ocultoProj ? true : null,   // pediu para não aparecer no ecrã da projeção (continua no relatório do professor)
       t: firebase.database.ServerValue.TIMESTAMP
     }).catch(()=>{});
   }
@@ -1193,17 +1690,17 @@ body.solo-livre #progress{display:none;}
       if(ftp && (!perfil || perfil.ftp !== ftp)) upd.ftp = ftp;
       if(Object.keys(upd).length){ fbDb.ref('alunos/' + user.uid + '/perfil').update(upd).catch(()=>{}); perfil = Object.assign({}, perfil, upd); }
     }
-    resetSerie(); savedThisClass = false; $('savedNote').innerHTML = '';
+    resetSerie(); savedThisClass = false; treinoKey = null; lastBlockIdx = -1; nxBoomIdx = -1; hideNx(); rateDone = false; rateAuto = false; me.rx = null; me.fa = null; $('savedNote').innerHTML = ''; $('ftpResult').style.display = 'none'; $('finFtp').innerHTML = '';
 
     riderRef =fbDb.ref('sessions/' + pin + '/riders/' + riderId);
     // se recarregaste a página a meio, continua de onde ficaste
     try{
       const prev = (await riderRef.once('value')).val();
       if(prev){
-        me.kj = prev.kj || 0; me.pts = prev.pts || 0; me.as = prev.as || 0; me.iz = prev.iz || 0; me.km = prev.km || 0;
+        me.kj = prev.kj || 0; me.pts = prev.pts || 0; me.as = prev.as || 0; me.iz = prev.iz || 0; me.km = prev.km || 0; me.tw = prev.tw || 0; me.tt = prev.tt || 0;
         me.mw = prev.mw || 0; me.sumW = (prev.aw || 0) * (prev.as || 0); me.ts = prev.as || 0;
       } else {
-        me.kj = me.pts = me.as = me.iz = me.mw = me.sumW = me.ts = me.km = me.spd = 0;
+        me.kj = me.pts = me.as = me.iz = me.mw = me.sumW = me.ts = me.km = me.spd = me.tw = me.tt = 0; me.ftpIni = null; me.ftpTest = null; me.testDone = false;
       }
     }catch(e){}
 
@@ -1247,6 +1744,7 @@ body.solo-livre #progress{display:none;}
   }
 
   function endOfSession(){
+    checkFtpTest();
     pushRider();
     saveTreino();
     sessionEnded = true;
@@ -1260,6 +1758,8 @@ body.solo-livre #progress{display:none;}
   }
 
   function leave(){
+    hideNx();   // tira o cartão "a seguir" e o rebentamento, que ficam por cima do ecrã
+    checkFtpTest();
     saveTreino();
     if(riderRef && !sessionEnded){ riderRef.update({left:true, w:0, t:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{}); }
     detachListeners();
@@ -1290,8 +1790,12 @@ body.solo-livre #progress{display:none;}
   }
 
   function render(){
+    updateFtpChip();
+    hdrSync();
+    updMyLamp();
     if(!state) return;
     if(solo === 'guiado') soloAdvance();
+    else if(!solo) aulaAvancaLocal();
     if(solo === 'livre') return renderLivre();
     buildProgress();
 
@@ -1300,15 +1804,18 @@ body.solo-livre #progress{display:none;}
     $('rankEl').innerHTML = hasPowerSource() ? rankTxt : '';
 
     if(finished){
+      if(!rateAuto && !rateDone){ rateAuto = true; setTimeout(()=> askRating(null), 900); }
       $('activeBlock').style.display = 'none';
       $('finishedEl').classList.add('active');
-      $('nextEl').textContent = solo ? '' : (sessionEnded ? 'O instrutor fechou a aula. Podes sair.' : '');
+      $('nextEl').textContent = solo ? '' : (sessionEnded ? 'O instrutor fechou a aula. Podes sair.' : ''); hideNx(); $('segNext').innerHTML = '';
       $('finTitle').textContent = solo ? 'Treino concluído' : 'Aula concluída';
+      $('finStrava').style.display = me.ts >= 60 ? '' : 'none';
       $('totalTimeEl').textContent = solo ? fmtTime(me.ts) : fmtTime(blocos.reduce((s,b)=>s+blockDurationSec(b),0));
       $('finKm').textContent = me.km > 0.01 ? fmtKm(me.km) + ' km · ' + (me.as ? (me.km / me.as * 3600).toFixed(1).replace('.', ',') : '0') + ' km/h média' : '';
+      checkFtpTest(); showFtpResult();
       $('finZoneLbl').textContent = solo === 'livre' ? 'tempo' : 'na zona';
       $('finHomeBtn').style.display = solo ? '' : 'none';
-      $('leaveBtn').textContent = '✕ Sair';
+      $('leaveBtn').textContent = 'GRAVAR & SAIR';
       $('finKj').textContent = me.kj.toFixed(0);
       $('finPts').textContent = Math.round(me.pts);
       $('finRank').textContent = myRank ? myRank.p + 'º/' + myRank.n : '—';
@@ -1339,47 +1846,55 @@ body.solo-livre #progress{display:none;}
     $('rlMini').classList.toggle('on', zi6 === 5);
     $('ceMini').classList.toggle('on', zi6 === 6);
     $('nameEl').textContent = b.nome;
-    const sameName = (b.nome || '').trim() === zone.name;   // não repete o nome da zona
+    const sameName = !(b.nome || '').trim() || (b.nome || '').trim() === zone.name;   // sem nome ou igual à zona: não aparece
     $('nameEl').style.display = sameName ? 'none' : ''; $('nameSep').style.display = sameName ? 'none' : '';
     $('techEl').textContent = b.tecnica || '';
     $('feelEl').textContent = zone.feel || '';
     $('timerEl').textContent = state.status === 'paused' && remaining > 0 ? fmtCountdown(remaining) : fmtCountdown(remaining);
-    $('timerEl').classList.toggle('warn', remaining <= 5 && remaining > 0 && state.status === 'playing');
+    $('timerEl').classList.toggle('t-warn', remaining <= 5 && remaining > 0 && state.status === 'playing');
     $('bodyEl').style.background = 'radial-gradient(circle at 50% 30%, ' + zc + '33, #05070A 70%)';
 
     const range = zoneRange(b.ftp);
+    const pausaN = state.status !== 'playing' ? 'em pausa' : '';
+    const rng = (lo, hi)=> range.open ? '≥ ' + lo : lo + '–' + hi;
+    const rpmT = {l:'RPM', v: rpmTxt(b), u:''};
+    let tiles;
     if(modo === 'fc'){
-      const pausa = state.status !== 'playing' ? ' · em pausa' : '';
-      if(me.fc){
-        const lo = Math.round(me.fc * range.min / 100), hi = Math.round(me.fc * Math.min(range.max, 100) / 100);
-        $('targetEl').innerHTML = 'Alvo <b>' + (range.open ? '≥ ' + lo : lo + '–' + hi) + ' bpm</b> · ' + pctTxt(b, range) + ' FCmáx · <b>' + rpmTxt(b) + '</b> RPM' + pausa;
-      } else {
-        $('targetEl').innerHTML = 'Alvo <b>' + pctTxt(b, range) + ' FCmáx</b> · <b>' + rpmTxt(b) + '</b> RPM' + pausa;
-      }
+      tiles = me.fc
+        ? [{l:'Alvo FC', v: rng(Math.round(me.fc * range.min / 100), Math.round(me.fc * Math.min(range.max, 100) / 100)), u:'bpm'}, {l:'% FCmáx', v: pctTxt(b, range), u:''}, rpmT]
+        : [{l:'Alvo', v: pctTxt(b, range), u:'FCmáx'}, rpmT];
     } else if(modo === 'zonas'){
-      const zl = zone.name.split(' ')[0];
-      const watts = me.ftp ? ' · <b>' + (range.open ? '≥ ' + Math.round(me.ftp * range.min / 100) : Math.round(me.ftp * range.min / 100) + '–' + Math.round(me.ftp * range.max / 100)) + ' W</b>' : ' · ' + (range.open ? '> ' + range.min : range.min + '–' + range.max) + '% FTP';
-      $('targetEl').innerHTML = 'Alvo <b>' + zl + '</b>' + watts + ' · <b>' + rpmTxt(b) + '</b> RPM' + (state.status !== 'playing' ? ' · em pausa' : '');
+      tiles = [{l:'Zona', v: zone.name.split(' ')[0], u:''},
+        me.ftp ? {l:'Alvo', v: rng(Math.round(me.ftp * range.min / 100), Math.round(me.ftp * range.max / 100)), u:'W'} : {l:'% FTP', v: (range.open ? '> ' + range.min : range.min + '–' + range.max), u:'%'}, rpmT];
     } else if(me.ftp){
-      const lo = Math.round(me.ftp * range.min / 100), hi = Math.round(me.ftp * range.max / 100);
-      $('targetEl').innerHTML = 'Alvo <b>' + (range.open ? '≥ ' + lo : lo + '–' + hi) + ' W</b> · ' + pctTxt(b, range) + ' · <b>' + rpmTxt(b) + '</b> RPM' + (state.status !== 'playing' ? ' · em pausa' : '');
+      tiles = [{l:'Alvo', v: rng(Math.round(me.ftp * range.min / 100), Math.round(me.ftp * range.max / 100)), u:'W'}, {l:'% FTP', v: pctTxt(b, range).replace(/%$/,''), u:'%'}, rpmT];
     } else {
-      $('targetEl').innerHTML = 'Alvo <b>' + pctTxt(b, range) + ' FTP</b> · <b>' + rpmTxt(b) + '</b> RPM' + (state.status !== 'playing' ? ' · em pausa' : '');
+      tiles = [{l:'Alvo', v: pctTxt(b, range), u:'FTP'}, rpmT];
     }
+    setTarget(tiles, pausaN, zc);
 
     renderMe(b, range);
+    if(b.teste){   // bloco do teste FTP: sem zona-alvo, conta a média
+      const avg = me.tt > 5 ? me.tw / me.tt : 0;
+      setTarget([{l:'Teste FTP', v:'MÁX', u:''}, {l:'Média', v: avg ? Math.round(avg) : '—', u: avg ? 'W' : ''}, {l:'FTP ≈', v: avg ? Math.round(avg * 0.95) : '—', u: avg ? 'W' : ''}],
+        state.status !== 'playing' ? 'em pausa' : 'o mais forte e constante possível', zc);
+      if(state.status === 'playing' && hasPowerSource() && dispPower > 0 && avg){
+        const r = dispPower / avg;
+        const cue = r < 0.9 ? '↑ Não deixes cair o ritmo' : (r > 1.15 && me.tt < 600 ? '↓ Calma, guarda forças para o fim' : '✓ Ritmo constante, aguenta!');
+        $('cueEl').textContent = cue;
+        $('cueEl').style.color = cue.startsWith('✓') ? '#7FD3A6' : '#FFD27A';
+      }
+    }
     if(solo) soloNoSensorMsg();
 
     const next = blocos[state.blockIndex+1];
-    $('nextEl').innerHTML = next
-      ? (next.tipo === 'seg' ? 'a seguir: <b>' + escapeHtml(next.nome || 'Segmento') + '</b> · transição · ' + fmtTime(blockDurationSec(next))
-        : next.tipo === 'cool' ? 'a seguir: <b>Retorno à calma</b> · ' + fmtTime(blockDurationSec(next)) :
-        'a seguir: <b>' + escapeHtml(next.nome) + '</b> · ' + (modo === 'zonas' ? ((next.nome||'').startsWith(getZone(next.ftp).name.split(' ')[0] + ' ') ? '' : getZone(next.ftp).name.split(' ')[0] + ' · ') : pctTxt(next, zoneRange(next.ftp)) + (modo === 'fc' ? ' FCmáx' : '') + ' · ') + fmtTime(blockDurationSec(next)) + (next.rpm ? ' · ' + rpmTxt(next) + ' rpm' : ''))
-      : 'último bloco';
+    renderNext(next, remaining);
+    checkBlockChange(b);
+    if(b.tipo !== 'seg' && $('segNext').innerHTML) $('segNext').innerHTML = '';
     if(b.tipo === 'seg'){   // no separador de segmento: resumo do segmento que vem a seguir
       const lst = []; for(let k = state.blockIndex + 1; k < blocos.length; k++){ if(blocos[k].tipo === 'seg') break; lst.push(blocos[k]); }
       const tt = lst.reduce((a,x)=> a + blockDurationSec(x), 0);
-      $('nextEl').innerHTML = 'próximo segmento: <b>' + lst.length + (lst.length === 1 ? ' intervalo' : ' intervalos') + ' · ' + fmtTime(tt) + '</b>' + (lst.length ? segChartSvg(lst, 340, 46) : '<br>') +
+      $('segNext').innerHTML = 'próximo segmento: <b>' + lst.length + (lst.length === 1 ? ' intervalo' : ' intervalos') + ' · ' + fmtTime(tt) + '</b>' + (lst.length ? segChartSvg(lst, 340, 46) : '<br>') +
         lst.slice(0, 6).map(x=>{ const z = blkZone(x); return '<span style="color:' + zoneColor(z.css) + '">●</span> ' + escapeHtml(z.name.split(' ')[0]) + ' ' + fmtTime(blockDurationSec(x)); }).join(' &nbsp; ');
     }
 
@@ -1407,6 +1922,19 @@ body.solo-livre #progress{display:none;}
   }
   $('myBig').addEventListener('click', toggleBig);
   $('myBig').addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleBig(); } });
+  // células da grelha: %FTP ↔ W e FC ↔ %FCmáx (toque). Escolha guardada no telemóvel.
+  let cellPctW = lsGet('aavCellPctW') === '1', cellHrPct = lsGet('aavCellHrPct') === '1';
+  function cellTog(k){
+    if(k === 'pct'){ cellPctW = !cellPctW; lsSet('aavCellPctW', cellPctW ? '1' : '0'); }
+    else {
+      if(!me.fc){ toast('Para veres a %FCmáx indica a tua FC máxima (toca em ✎ lá em cima).'); return; }
+      cellHrPct = !cellHrPct; lsSet('aavCellHrPct', cellHrPct ? '1' : '0');
+    }
+    if(lastMeArgs) renderMe(lastMeArgs[0], lastMeArgs[1]);
+  }
+  $('cellPct').addEventListener('click', ()=> cellTog('pct'));
+  $('cellHr').addEventListener('click', ()=> cellTog('hr'));
+  ['cellPct', 'cellHr'].forEach(id=> $(id).addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); cellTog(id === 'cellPct' ? 'pct' : 'hr'); } }));
   function fcZoneOf(p){ return ZONES_FC.find(z=> p <= z.max) || ZONES_FC[ZONES_FC.length-1]; }
 
   function renderMe(b, range){
@@ -1436,9 +1964,10 @@ body.solo-livre #progress{display:none;}
     $('mySd').innerHTML = powered ? (me.spd || 0).toFixed(1).replace('.', ',') + '<small>km/h</small>' + fmtKm(me.km) + '<small>km</small>' : '';
     if(powered) showBig(w, 'W', me.ftp ? dispPower / me.ftp * 100 : null, '%FTP', 'w');
     else if(!hrOnly){ $('myW').textContent = '—'; $('mySwap').textContent = ''; }
-    $('myHrLbl').textContent = 'FC';
     const hr = Math.round(myHr());
-    $('myHr').textContent = hr ? hr : '—';
+    const hrPct = cellHrPct && me.fc && hr;
+    $('myHrLbl').textContent = cellHrPct && me.fc ? '%FCmáx' : 'FC';
+    $('myHr').textContent = hr ? (hrPct ? Math.round(hr / me.fc * 100) + '%' : hr) : '—';
     const cad = Math.round(S.cadence);
     $('myRpm').textContent = powered ? cad : '—';
     $('myRpm').className = 'v' + (powered && cad ? (rpmOk(cad, b) ? ' ok' : ' low') : '');
@@ -1463,7 +1992,8 @@ body.solo-livre #progress{display:none;}
     const myZone = getZone(pct);
     $('myW').style.color = w > 0 ? zoneColor(myZone.css) : '#fff';
     $('myW').style.textShadow = (w > 0 && myZone === ZONES[6]) ? '0 0 18px #FF3B3B, 0 0 2px #FF8A1F' : '';
-    $('myPct').textContent = Math.round(pct) + '%';
+    $('myPct').textContent = cellPctW ? w : Math.round(pct) + '%';
+    $('myPctLbl').textContent = cellPctW ? 'W' : '%FTP';
     $('gDot').style.left = Math.min(100, Math.max(0, pct/gaugeScale().max*100)) + '%';
 
     let cue = '', cls = 'v';
@@ -1569,15 +2099,37 @@ body.solo-livre #progress{display:none;}
     try{ if('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); } }catch(e){}
   }
   function releaseWakeLock(){ try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){} }
+  // app em segundo plano: avisa a TV e, ao voltar, diz ao aluno quanto tempo não contou
+  let hiddenAt = 0;
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'visible' && $('liveScreen').classList.contains('active')) requestWakeLock();
+    const inLive = $('liveScreen').classList.contains('active');
+    if(document.visibilityState === 'hidden'){
+      if(inLive && (riderRef || solo)){ hiddenAt = Date.now(); if(riderRef) riderRef.update({bg:true, t:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{}); }
+      return;
+    }
+    if(inLive) requestWakeLock();
+    if(hiddenAt){
+      const secs = Math.round((Date.now() - hiddenAt) / 1000);
+      hiddenAt = 0;
+      if(riderRef) riderRef.update({bg:null}).catch(()=>{});
+      if(secs >= 15 && state && state.status === 'playing') showBgWarn(secs);
+    }
   });
+  function showBgWarn(secs){
+    const el = $('bgWarn'); if(!el) return;
+    const t = secs >= 90 ? Math.round(secs / 60) + ' min' : secs + ' s';
+    el.innerHTML = '📵 Estiveste <b>' + t + '</b> fora da app: esse tempo não contou para o treino. <b>Mantém a app aberta durante a aula.</b><button aria-label="Fechar">✕</button>';
+    el.classList.add('on');
+    el.querySelector('button').onclick = ()=> el.classList.remove('on');
+    clearTimeout(showBgWarn.h); showBgWarn.h = setTimeout(()=> el.classList.remove('on'), 15000);
+  }
 
   // ---------- eventos ----------
   $('joinBtn').addEventListener('click', ()=> checkPin($('pinInput').value.trim()));
   $('pinInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') checkPin(e.target.value.trim()); });
   $('bikeBtn').addEventListener('click', ()=> connectBike(false));
   $('showAllBtn').addEventListener('click', ()=> connectBike(true));
+  if(!hasBluetooth) $('showAllBtn').style.display = 'none';   // sem Bluetooth na web (iPhone fora do Bluefy) não serve
   $('hrBtn').addEventListener('click', connectHr);
   $('chipBike').addEventListener('click', ()=>{ if(!demo) connectBike(false); });
   $('chipHr').addEventListener('click', connectHr);
@@ -1591,6 +2143,127 @@ body.solo-livre #progress{display:none;}
       if(fn){ const r = fn.call(el); if(r && r.catch) r.catch(()=>{}); }
     }catch(e){}
   }
+  // menus do cabeçalho: ᛒ = bike e cinta · ✎ = FTP e FC máxima
+  // ===== eletricidade gerada (equivalente): kJ ÷ 3,6 = Wh; um gerador real aproveita ~80% =====
+  const GEN_EFF = 0.8, PHONE_WH = 15, EUR_KWH = 0.17;   // preço médio do kWh em Portugal (2026)
+  function whFromKj(kj){ return (kj || 0) / 3.6 * GEN_EFF; }
+  function fmtWh(wh){
+    if(wh >= 1000) return (wh / 1000).toFixed(2).replace('.', ',') + ' kWh';
+    if(wh < 10) return wh.toFixed(1).replace('.', ',') + ' Wh';
+    return Math.round(wh) + ' Wh';
+  }
+  function fmtEur(wh){
+    const eur = wh / 1000 * EUR_KWH, c = eur * 100;
+    if(eur >= 1) return eur.toFixed(2).replace('.', ',') + ' €';
+    if(c >= 10) return Math.round(c) + ' cêntimos';
+    if(c >= 1) return c.toFixed(1).replace('.', ',') + ' cêntimos';
+    return c.toFixed(2).replace('.', ',') + ' cêntimos';
+  }
+  function phonesTxt(wh){
+    const n = wh / PHONE_WH;
+    if(n >= 1.5) return '≈ ' + Math.round(n) + ' cargas de telemóvel';
+    if(n >= 0.95) return '≈ 1 carga de telemóvel';
+    return '≈ ' + Math.max(1, Math.round(n * 100)) + '% de uma carga de telemóvel';
+  }
+  function setLamp(el, wh, goal, active){
+    if(!el) return;
+    const lv = Math.max(wh > 0.05 ? 0.06 : 0, Math.min(1, Math.sqrt(wh / goal)));
+    el.style.setProperty('--lv', lv.toFixed(3));
+    el.classList.toggle('on', !!active && lv > 0);
+    const t = el.querySelector('.lwh'), s = fmtWh(wh);
+    if(t && t.textContent !== s) t.textContent = s;
+    const e = el.querySelector('.leur'), es = '≈ ' + fmtEur(wh).replace('cêntimos', 'cênt.');
+    if(e && e.textContent !== es) e.textContent = es;
+    el.title = s + ' de eletricidade (' + phonesTxt(wh) + ' · ' + es + ')';
+  }
+  // ===== pilha / powerbank: mAh a 3,7 V (bateria de telemóvel ou powerbank), a partir dos Wh gerados =====
+  const PB_MAH = 10000;   // um powerbank "normal"
+  function mahFromWh(wh){ return (wh || 0) / 3.7 * 1000; }
+  function fmtMah(mah){ return Math.round(mah).toLocaleString('pt-PT').replace(/ /g, ' ') + ' mAh'; }
+  function pbTxt(mah){
+    const n = mah / PB_MAH;
+    if(n >= 1.05) return '≈ ' + n.toFixed(1).replace('.', ',') + ' powerbanks';
+    if(n >= 0.95) return '≈ 1 powerbank';
+    return '≈ ' + Math.max(mah > 0 ? 1 : 0, Math.round(n * 100)) + '% de um powerbank';
+  }
+  function setBatt(el, wh, active){
+    if(!el) return;
+    const mah = mahFromWh(wh), cheios = Math.floor(mah / PB_MAH), frac = (mah % PB_MAH) / PB_MAH;
+    const h = mah > 0 ? Math.max(3, 60 * frac) : 0;
+    const f = el.querySelector('.bt-fill');
+    if(f){ f.setAttribute('y', (72 - h).toFixed(1)); f.setAttribute('height', h.toFixed(1)); }
+    el.style.setProperty('--bv', Math.min(1, mah > 0 ? 0.15 + frac * 0.85 : 0).toFixed(3));
+    el.classList.toggle('on', !!active && mah > 0);
+    const x = el.querySelector('.bx'), xs = cheios ? '×' + cheios : '';
+    if(x && x.textContent !== xs) x.textContent = xs;
+    const t = el.querySelector('.bmah'), s = fmtMah(mah);
+    if(t && t.textContent !== s) t.textContent = s;
+    const p = el.querySelector('.bpb'), ps = pbTxt(mah);
+    if(p && p.textContent !== ps) p.textContent = ps;
+    el.title = s + ' (' + ps + ' de ' + PB_MAH.toLocaleString('pt-PT') + ' mAh)';
+  }
+  function updMyLamp(){
+    const wh = whFromKj(me.kj);
+    setLamp($('myLamp'), wh, 100, !!state && state.status === 'playing' && dispPower > 0);
+    setBatt($('myBatt'), wh, !!state && state.status === 'playing' && dispPower > 0);
+    const f = $('finWh');
+    if(f){ const h = wh >= 0.05 ? '⚡ ' + fmtWh(wh) + ' de eletricidade<small>' + phonesTxt(wh) + ' · vale ≈ ' + fmtEur(wh) + '</small><small>🔋 ' + fmtMah(mahFromWh(wh)) + ' · ' + pbTxt(mahFromWh(wh)) + '</small>' : ''; if(f.innerHTML !== h) f.innerHTML = h; }
+  }
+  // ===== cabeçalho escondido durante o treino =====
+  let hdrTimer = 0;
+  function hdrSync(){
+    const ls = $('liveScreen'); if(!ls) return;
+    if(typeof soloBarSync === 'function') soloBarSync();
+    const hide = !!state && state.status === 'playing';   // fora do treino (à espera, pausa, fim) fica sempre à vista
+    if(ls.classList.contains('hdr-hide') !== hide){ ls.classList.toggle('hdr-hide', hide); if(!hide) ls.classList.remove('hdr-open'); }
+    const bikeOff = typeof bikeConnected === 'function' && !demo && hasBluetooth && !bikeConnected() && !hrConnected();
+    $('hdrHandle').classList.toggle('alert', bikeOff);
+  }
+  function hdrOpen(on){
+    const ls = $('liveScreen');
+    ls.classList.toggle('hdr-open', on);
+    clearTimeout(hdrTimer);
+    if(on) hdrArm(); else closeMenus();
+  }
+  function hdrArm(){   // fecha sozinho passados 6 s sem mexer (se nenhum menu estiver aberto)
+    clearTimeout(hdrTimer);
+    hdrTimer = setTimeout(()=>{ if($('btPop').classList.contains('on') || $('edPop').classList.contains('on') || document.querySelector('.modal.on, .ftp-edit.on')) return hdrArm(); hdrOpen(false); }, 6000);
+  }
+  (function(){
+    const h = $('hdrHandle'); let y0 = null;
+    h.addEventListener('pointerdown', e=>{ y0 = e.clientY; try{ h.setPointerCapture(e.pointerId); }catch(_){} });
+    h.addEventListener('pointermove', e=>{ if(y0 !== null && e.clientY - y0 > 18){ y0 = null; hdrOpen(true); } });
+    h.addEventListener('pointerup', ()=>{ y0 = null; });
+    h.addEventListener('pointercancel', ()=>{ y0 = null; });
+    h.addEventListener('click', ()=> hdrOpen(true));   // um toque também abre
+    const tb = document.querySelector('#liveScreen .topbar'); let ty = null;
+    tb.addEventListener('pointerdown', e=>{ ty = e.clientY; hdrArm(); });
+    tb.addEventListener('pointermove', e=>{ if(ty !== null && ty - e.clientY > 24){ ty = null; hdrOpen(false); } });   // deslizar para cima fecha
+    tb.addEventListener('pointerup', ()=>{ ty = null; });
+    document.addEventListener('pointerdown', e=>{   // tocar fora fecha
+      const ls = $('liveScreen'); if(!ls.classList.contains('hdr-open')) return;
+      if(e.target.closest('.topbar, #hdrHandle, .modal, #ftpEdit, .safety-banner')) return;
+      hdrOpen(false);
+    });
+  })();
+  function closeMenus(except){
+    [['btMenuBtn','btPop'],['edMenuBtn','edPop']].forEach(([b,p])=>{ if(p === except) return; $(p).classList.remove('on'); $(b).setAttribute('aria-expanded','false'); });
+  }
+  function toggleMenu(btn, pop){
+    const open = !$(pop).classList.contains('on');
+    closeMenus(pop);
+    $(pop).classList.toggle('on', open); $(btn).setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  $('btMenuBtn').addEventListener('click', (e)=>{ e.stopPropagation(); toggleMenu('btMenuBtn','btPop'); });
+  $('edMenuBtn').addEventListener('click', (e)=>{ e.stopPropagation(); toggleMenu('edMenuBtn','edPop'); });
+  document.addEventListener('click', (e)=>{ if(!e.target.closest('.tb-menu')) closeMenus(); });
+  $('chipFtp').addEventListener('click', ()=>{ closeMenus(); openFtpEdit('ftp'); });
+  $('chipFc').addEventListener('click', ()=>{ closeMenus(); openFcEdit(); });
+  $('ftpEditCancel').addEventListener('click', closeFtpEdit);
+  $('ftpEditOk').addEventListener('click', closeFtpEdit);
+  $('ftpEditSave').addEventListener('click', saveFtpEdit);
+  $('ftpEditVal').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') saveFtpEdit(); });
+  $('ftpEdit').addEventListener('click', (e)=>{ if(e.target.id === 'ftpEdit') closeFtpEdit(); });
   $('enterBtn').addEventListener('click', ()=>{ tryFullscreen(); if(solo) startSolo(); else enterClass(); });
   $('demoBtn').addEventListener('click', ()=>{
     demo = true;
@@ -1600,11 +2273,11 @@ body.solo-livre #progress{display:none;}
   });
   $('leaveBtn').addEventListener('click', ()=>{
     if(solo){
-      if(state && state.status === 'finished'){ leave(); return; }
-      if(me.ts < 5 || confirm('Terminar o treino?')) finishSolo();
+      if(state && state.status === 'finished'){ askRating(leave); return; }
+      if(me.ts < 5 || confirm('Gravar o treino e terminar?')) finishSolo();
       return;
     }
-    if(sessionEnded || state && state.status === 'finished' || confirm('Sair da aula?')) leave();
+    if(sessionEnded || state && state.status === 'finished' || confirm('Gravar o treino e sair da aula?')) askRating(leave);
   });
   window.addEventListener('pagehide', ()=>{ pushRider(); });
 
@@ -1616,12 +2289,283 @@ body.solo-livre #progress{display:none;}
   let treinosCache = [];
   let returnTo = 'homeScreen';
 
-  function saveTreino(){
-    savePending = false;
-    if(savedThisClass || !user || !fbDb || (!pin && !solo) || me.ts < 60) return;
-    savedThisClass = true;
-    if(bucket.n) { serie.w.push(Math.round(bucket.w/bucket.n)); serie.c.push(Math.round(bucket.c/bucket.n)); serie.hr.push(Math.round(bucket.hr/bucket.n)); bucket = {w:0,c:0,hr:0,n:0}; }
-    const hrVals = serie.hr.filter(x=>x>0);
+  // números inválidos (NaN, Infinity) ou indefinidos fazem o Firebase recusar o treino inteiro: passam a null
+  function cleanVals(v){
+    if(Array.isArray(v)) return v.map(x=> (typeof x === 'number' && !isFinite(x)) || x === undefined ? null : cleanVals(x));
+    if(v && typeof v === 'object'){ const o = {}; Object.keys(v).forEach(k=>{ const x = v[k]; if(x === undefined || (typeof x === 'number' && !isFinite(x))) o[k] = null; else o[k] = cleanVals(x); }); return o; }
+    return v;
+  }
+  // treinos que não se conseguiram enviar ficam no telemóvel e seguem quando houver internet / sessão
+  const PEND_KEY = 'prTreinosPendentes';
+  function pendList(){ try{ return JSON.parse(localStorage.getItem(PEND_KEY) || '[]') || []; }catch(e){ return []; } }
+  function pendSave(list){ try{ if(list.length) localStorage.setItem(PEND_KEY, JSON.stringify(list.slice(-20))); else localStorage.removeItem(PEND_KEY); }catch(e){} }
+  async function flushPendentes(){
+    if(!user || !fbDb) return;
+    const list = pendList(); if(!list.length) return;
+    const keep = [];
+    for(const it of list){
+      if(it.uid && it.uid !== user.uid){ keep.push(it); continue; }
+      try{ await fbDb.ref('alunos/' + user.uid + '/treinos/' + it.key).set(cleanVals(it.t)); }catch(e){ keep.push(it); }
+    }
+    pendSave(keep);
+    if(keep.length < list.length && $('savedNote')) $('savedNote').innerHTML = '<b>✓ Treino pendente enviado para a tua conta</b>';
+  }
+  // o treino é guardado aos poucos durante a aula (a cada minuto e quando a app vai para segundo plano),
+  // por isso fica guardado mesmo que o aluno feche a app ou o telemóvel bloqueie antes do fim
+  let treinoKey = null;
+  function getTreinoKey(){
+    if(treinoKey) return treinoKey;
+    const day = new Date().toISOString().slice(0,10);
+    const lk = 'prTreinoKey_' + (pin || '');
+    if(pin){ const old = lsGet(lk); if(old && old.indexOf(day + '_' + pin + '_') === 0){ treinoKey = old; return treinoKey; } }   // voltou a entrar na mesma aula
+    treinoKey = day + '_' + (pin || solo) + '_' + Math.random().toString(36).slice(2,6);
+    if(pin) lsSet(lk, treinoKey);
+    return treinoKey;
+  }
+  // ================= TESTE FTP (20 min, Allen-Coggan) =================
+  // no bloco marcado como teste soma-se a potência; no fim do bloco: FTP = média × 0,95
+  function testBlockSec(){ const t = (blocos || []).find(x=> x && x.teste); return t ? blockDurationSec(t) : 0; }
+  function checkFtpTest(){
+    if(me.testDone || !(me.tt > 0)) return;
+    const cb = currentBlock();
+    const ended = sessionEnded || (state && state.status === 'finished') || !cb || !cb.teste;
+    if(!ended) return;
+    me.testDone = true;
+    const dur = testBlockSec() || 1200;
+    const avg = me.tw / me.tt;
+    const novo = Math.round(avg * 0.95);
+    const ok = me.tt >= dur * 0.9 && novo >= 50 && novo <= 600;
+    me.ftpTest = { m20: Math.round(avg), ftp: novo, antes: me.ftp || null, min: Math.round(me.tt / 60), ok: ok };
+    if(ok){
+      me.ftp = novo;
+      lsSet(LS.ftp, String(novo));
+      if(user && fbDb){ fbDb.ref('alunos/' + user.uid + '/perfil/ftp').set(novo).catch(()=>{}); perfil = Object.assign({}, perfil, {ftp: novo}); }
+      if($('ftpInput')) $('ftpInput').value = novo;
+    }
+    showFtpResult();
+    try{ pushRider(); }catch(e){}
+  }
+  function ftpResultTxt(){
+    const r = me.ftpTest; if(!r) return '';
+    if(!r.ok) return '⏱ Teste FTP incompleto (' + r.min + ' min de ' + Math.round((testBlockSec()||1200)/60) + '): o teu FTP não foi alterado.';
+    return '🎯 Teste FTP concluído! Média 20 min: ' + r.m20 + ' W → <b>novo FTP ' + r.ftp + ' W</b>' + (r.antes ? ' (antes ' + r.antes + ' W)' : '') + '.';
+  }
+  function showFtpResult(){
+    const el = $('ftpResult'); if(el){ el.innerHTML = ftpResultTxt(); el.style.display = me.ftpTest ? '' : 'none'; }
+    const f = $('finFtp'); if(f) f.innerHTML = ftpResultTxt();
+  }
+
+  // ================= ALTERAR O FTP DURANTE A AULA =================
+  let editKind = 'ftp';
+  function openFcEdit(){ openFtpEdit('fc'); }
+  function openFtpEdit(kind){
+    editKind = kind === 'fc' ? 'fc' : 'ftp';
+    const fc = editKind === 'fc';
+    $('ftpEditTitle').textContent = fc ? 'A tua FC máxima' : 'O teu FTP';
+    $('ftpEditTxt').textContent = fc ? 'A frequência cardíaca máxima. As zonas de FC e a %FCmáx passam a usar este valor. Não sabes? 220 − a tua idade.' : 'A tua potência de limiar. As zonas, os alvos em watts e os pontos passam a usar este valor.';
+    $('ftpEditUnit').textContent = fc ? 'bpm' : 'W';
+    $('ftpEditVal').min = fc ? 100 : 50; $('ftpEditVal').max = fc ? 230 : 600;
+    $('ftpEditVal').value = (fc ? me.fc : me.ftp) || '';
+    $('ftpEditMsg').innerHTML = ''; $('ftpEditMsg').className = 'fe-msg';
+    $('ftpEditSave').style.display = ''; $('ftpEditOk').style.display = 'none';
+    $('ftpEdit').classList.add('on');
+    setTimeout(()=>{ try{ $('ftpEditVal').focus(); $('ftpEditVal').select(); }catch(e){} }, 50);
+  }
+  function closeFtpEdit(){ $('ftpEdit').classList.remove('on'); }
+  function saveFtpEdit(){
+    if(editKind === 'fc') return saveFcEdit();
+    const v = Math.round(Number($('ftpEditVal').value) || 0);
+    if(v < 50 || v > 600){ $('ftpEditMsg').textContent = 'O FTP tem de estar entre 50 e 600 W.'; $('ftpEditMsg').className = 'fe-msg err'; return; }
+    const old = me.ftp || 0;
+    if(v === old){ closeFtpEdit(); return; }
+    if(!me.ftpIni) me.ftpIni = old || null;
+    me.ftp = v;
+    lsSet(LS.ftp, String(v));
+    if(user && fbDb){ fbDb.ref('alunos/' + user.uid + '/perfil/ftp').set(v).catch(()=>{}); perfil = Object.assign({}, perfil, {ftp: v}); }
+    if($('ftpInput')) $('ftpInput').value = v;
+    try{ pushRider(); }catch(e){}
+    updateFtpChip();
+    $('ftpEditMsg').className = 'fe-msg ' + (old && v < old ? 'joke' : 'good');
+    $('ftpEditMsg').innerHTML = old && v < old
+      ? '<b>Achas que é assim que vais evoluir? Para trás nem para ganhar balanço!!!!!!! ;P</b><br>FTP gravado: ' + v + ' W (era ' + old + ' W).'
+      : '💪 Boa! FTP atualizado para <b>' + v + ' W</b>' + (old ? ' (era ' + old + ' W)' : '') + '. As tuas zonas já mudaram.';
+    $('ftpEditSave').style.display = 'none'; $('ftpEditOk').style.display = '';
+  }
+  function saveFcEdit(){
+    const v = Math.round(Number($('ftpEditVal').value) || 0);
+    if(v < 100 || v > 230){ $('ftpEditMsg').textContent = 'A FC máxima tem de estar entre 100 e 230 bpm.'; $('ftpEditMsg').className = 'fe-msg err'; return; }
+    const old = me.fc || 0;
+    if(v === old){ closeFtpEdit(); return; }
+    me.fc = v;
+    lsSet('aavFcMax', String(v));
+    if(user && fbDb){ fbDb.ref('alunos/' + user.uid + '/perfil/fcMax').set(v).catch(()=>{}); perfil = Object.assign({}, perfil, {fcMax: v}); }
+    if($('fcInput')) $('fcInput').value = v;
+    try{ pushRider(); }catch(e){}
+    updateFtpChip();
+    $('ftpEditMsg').className = 'fe-msg good';
+    $('ftpEditMsg').innerHTML = '❤ FC máxima atualizada para <b>' + v + ' bpm</b>' + (old ? ' (era ' + old + ' bpm)' : '') + '. As tuas zonas de FC já mudaram.';
+    $('ftpEditSave').style.display = 'none'; $('ftpEditOk').style.display = '';
+  }
+  function syncMenuDots(){
+    $('dotBike').classList.toggle('on', $('chipBike').classList.contains('on'));
+    $('dotHr').classList.toggle('on', $('chipHr').classList.contains('on'));
+  }
+  function updateFtpChip(){
+    syncMenuDots();
+    const c = $('chipFtpV'); if(c) c.textContent = me.ftp ? me.ftp + ' W' : '—';
+    const f = $('chipFcV'); if(f) f.textContent = me.fc ? me.fc : '—';
+  }
+
+  function saveProgress(){ if(riderRef || solo) saveTreino(false); }
+  setInterval(()=>{ if(isPlaying()) saveProgress(); }, 60000);
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden') saveProgress(); });
+  window.addEventListener('pagehide', saveProgress);
+
+  // ===== Strava: ficheiro TCX do treino (tempo, potência, cadência, FC, distância e calorias) =====
+  function xmlEsc(v){ return String(v == null ? '' : v).replace(/[<>&"']/g, c=> ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'})[c]); }
+  function tcxDe(t){
+    const step = t.step || SERIE_STEP, w = arrOf(t.w), c = arrOf(t.c), hr = arrOf(t.hr);
+    const n = Math.max(w.length, c.length, hr.length, Math.ceil((t.dur || 0) / step), 1);
+    const total = n * step, ini = (t.date || Date.now()) - total * 1000;
+    const m = Math.max(0, (t.km || 0) * 1000);
+    // distância: a velocidade cresce com a raiz cúbica da potência; sem potência, reparte por igual
+    const pesos = Array.from({length: n}, (_, i)=> w.length ? Math.cbrt(Math.max(0, w[i] || 0)) : 1);
+    const soma = pesos.reduce((a,b)=> a + b, 0) || 1;
+    const hrs = hr.filter(x=> x > 0), iso = ms=> new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    let d = 0, pts = '';
+    for(let i = 0; i < n; i++){
+      d += m * pesos[i] / soma;
+      pts += '<Trackpoint><Time>' + iso(ini + (i + 1) * step * 1000) + '</Time><DistanceMeters>' + d.toFixed(1) + '</DistanceMeters>' +
+        (hr[i] > 0 ? '<HeartRateBpm><Value>' + Math.round(hr[i]) + '</Value></HeartRateBpm>' : '') +
+        (c[i] > 0 ? '<Cadence>' + Math.min(254, Math.round(c[i])) + '</Cadence>' : '') +
+        (w.length ? '<Extensions><ns3:TPX><ns3:Watts>' + Math.max(0, Math.round(w[i] || 0)) + '</ns3:Watts></ns3:TPX></Extensions>' : '') + '</Trackpoint>';
+    }
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">' +
+      '<Activities><Activity Sport="Biking"><Id>' + iso(ini) + '</Id><Lap StartTime="' + iso(ini) + '"><TotalTimeSeconds>' + total + '</TotalTimeSeconds><DistanceMeters>' + m.toFixed(1) + '</DistanceMeters>' +
+      '<Calories>' + Math.round(t.kj || 0) + '</Calories>' +
+      (hrs.length ? '<AverageHeartRateBpm><Value>' + Math.round(hrs.reduce((a,b)=> a + b, 0) / hrs.length) + '</Value></AverageHeartRateBpm><MaximumHeartRateBpm><Value>' + Math.max(...hrs) + '</Value></MaximumHeartRateBpm>' : '') +
+      '<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>' + pts + '</Track></Lap>' +
+      '<Notes>' + xmlEsc((t.aula || 'Aula de cycling') + ' · PlayRide (Playlife)') + '</Notes></Activity></Activities>' +
+      '<Author xsi:type="Application_t" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Name>PlayRide</Name><Build><Version><VersionMajor>1</VersionMajor><VersionMinor>0</VersionMinor></Version></Build><LangID>pt</LangID><PartNumber>000-00000-00</PartNumber></Author></TrainingCenterDatabase>';
+  }
+  // ===== ficheiro .FIT (formato da Garmin, o que o Strava, Garmin Connect e TrainingPeaks preferem) =====
+  // registo a cada segundo com potência, cadência, FC, velocidade e distância; volta, sessão e atividade de ciclismo indoor
+  function fitDe(t){
+    const step = t.step || SERIE_STEP, w = arrOf(t.w), c = arrOf(t.c), hr = arrOf(t.hr);
+    const n = Math.max(w.length, c.length, hr.length, Math.ceil((t.dur || 0) / step), 1);
+    const total = n * step;                                   // segundos
+    const fimUnix = Math.round((t.date || Date.now()) / 1000), iniUnix = fimUnix - total;
+    const FIT_EPOCH = 631065600, ts0 = iniUnix - FIT_EPOCH;
+    const m = Math.max(0, (t.km || 0) * 1000);
+    const pesos = Array.from({length: n}, (_, i)=> w.length ? Math.cbrt(Math.max(0, w[i] || 0)) : 1);
+    const soma = pesos.reduce((a,b)=> a + b, 0) || 1;
+    const bytes = [];
+    const u8 = v=> bytes.push(v & 0xFF);
+    const u16 = v=>{ u8(v); u8(v >>> 8); };
+    const u32 = v=>{ u8(v); u8(v >>> 8); u8(v >>> 16); u8(v >>> 24); };
+    const TIPOS = { enum:[1,0x00,u8], u8:[1,0x02,u8], u16:[2,0x84,u16], u32:[4,0x86,u32], u32z:[4,0x8C,u32] };
+    const defs = {};
+    function def(local, global, campos){   // campos: [[num, tipo], …]
+      defs[local] = campos;
+      u8(0x40 | local); u8(0); u8(0); u16(global); u8(campos.length);
+      campos.forEach(([num, tp])=>{ u8(num); u8(TIPOS[tp][0]); u8(TIPOS[tp][1]); });
+    }
+    function dat(local, vals){ u8(local); defs[local].forEach(([num, tp], i)=> TIPOS[tp][2](vals[i])); }
+    const i32 = v=> Math.max(0, Math.round(v)) >>> 0;
+    // file_id
+    def(0, 0, [[0,'enum'],[1,'u16'],[2,'u16'],[3,'u32z'],[4,'u32']]);
+    dat(0, [4, 255, 1, 20260101, ts0]);
+    // event: início do cronómetro
+    def(1, 21, [[253,'u32'],[0,'enum'],[1,'enum'],[4,'u8']]);
+    dat(1, [ts0, 0, 0, 0]);
+    // records (1 por segundo)
+    def(2, 20, [[253,'u32'],[3,'u8'],[4,'u8'],[5,'u32'],[6,'u16'],[7,'u16']]);
+    let dist = 0, sumW = 0, maxW = 0, sumHr = 0, nHr = 0, maxHr = 0, sumC = 0, nC = 0;
+    for(let i = 0; i < n; i++){
+      const seg = m * pesos[i] / soma, vel = seg / step;     // m/s neste intervalo
+      const pw = w.length ? Math.max(0, Math.round(w[i] || 0)) : null;
+      const h = hr[i] > 0 ? Math.round(hr[i]) : null, cd = c[i] > 0 ? Math.min(254, Math.round(c[i])) : null;
+      if(pw != null){ sumW += pw * step; maxW = Math.max(maxW, pw); }
+      if(h){ sumHr += h; nHr++; maxHr = Math.max(maxHr, h); }
+      if(cd){ sumC += cd; nC++; }
+      for(let k = 1; k <= step; k++){
+        dist += seg / step;
+        dat(2, [ts0 + i * step + k, h == null ? 0xFF : h, cd == null ? 0xFF : cd, i32(dist * 100), Math.min(0xFFFE, i32(vel * 1000)), pw == null ? 0xFFFF : pw]);
+      }
+    }
+    const tsF = ts0 + total, ms = total * 1000;
+    const avgW = w.length ? Math.round(sumW / total) : 0xFFFF, maxWv = w.length ? maxW : 0xFFFF;
+    const avgHr = nHr ? Math.round(sumHr / nHr) : 0xFF, maxHrv = nHr ? maxHr : 0xFF, avgC = nC ? Math.round(sumC / nC) : 0xFF;
+    const kcal = Math.min(0xFFFE, Math.round(t.kj || 0));
+    // event: fim do cronómetro
+    dat(1, [tsF, 0, 4, 0]);
+    // lap
+    def(3, 19, [[253,'u32'],[2,'u32'],[7,'u32'],[8,'u32'],[9,'u32'],[11,'u16'],[19,'u16'],[20,'u16'],[15,'u8'],[16,'u8'],[17,'u8'],[0,'enum'],[1,'enum'],[25,'enum'],[39,'enum']]);
+    dat(3, [tsF, ts0, ms, ms, i32(m * 100), kcal, avgW, maxWv, avgHr, maxHrv, avgC, 9, 1, 2, 6]);
+    // session
+    def(4, 18, [[253,'u32'],[2,'u32'],[7,'u32'],[8,'u32'],[9,'u32'],[11,'u16'],[20,'u16'],[21,'u16'],[16,'u8'],[17,'u8'],[18,'u8'],[5,'enum'],[6,'enum'],[0,'enum'],[1,'enum'],[25,'u16'],[26,'u16']]);
+    dat(4, [tsF, ts0, ms, ms, i32(m * 100), kcal, avgW, maxWv, avgHr, maxHrv, avgC, 2, 6, 8, 1, 0, 1]);
+    // activity
+    const tz = -new Date().getTimezoneOffset() * 60;
+    def(5, 34, [[253,'u32'],[0,'u32'],[1,'u16'],[2,'enum'],[3,'enum'],[4,'enum'],[5,'u32']]);
+    dat(5, [tsF, ms, 1, 0, 26, 1, tsF + tz]);
+    // cabeçalho (14 bytes) + dados + CRC
+    const TAB = [0x0000,0xCC01,0xD801,0x1400,0xF001,0x3C00,0x2800,0xE401,0xA001,0x6C00,0x7800,0xB401,0x5000,0x9C01,0x8801,0x4400];
+    const crc = (arr, ini)=>{ let c = ini || 0; for(const b of arr){ let tmp = TAB[c & 0xF]; c = (c >> 4) & 0x0FFF; c = c ^ tmp ^ TAB[b & 0xF]; tmp = TAB[c & 0xF]; c = (c >> 4) & 0x0FFF; c = c ^ tmp ^ TAB[(b >> 4) & 0xF]; } return c; };
+    const head = [14, 0x10, 2132 & 0xFF, 2132 >> 8, bytes.length & 0xFF, (bytes.length >>> 8) & 0xFF, (bytes.length >>> 16) & 0xFF, (bytes.length >>> 24) & 0xFF, 0x2E, 0x46, 0x49, 0x54];
+    const hc = crc(head); head.push(hc & 0xFF, hc >> 8);
+    const tudo = head.concat(bytes), fc = crc(tudo);
+    tudo.push(fc & 0xFF, fc >> 8);
+    return new Uint8Array(tudo);
+  }
+  function treinoAgora(){   // o treino que acabou agora (mesmo sem conta)
+    const sw = serie.w.slice(), sc = serie.c.slice(), sh = serie.hr.slice();
+    if(bucket.n){ sw.push(Math.round(bucket.w/bucket.n)); sc.push(Math.round(bucket.c/bucket.n)); sh.push(Math.round(bucket.hr/bucket.n)); }
+    return { date: Date.now(), aula: treinoNome || (solo === 'livre' ? 'Só pedalar' : 'Aula de cycling'), dur: Math.round(me.ts), km: me.km, kj: me.kj, step: SERIE_STEP,
+      w: sw.some(v=> v > 0) ? sw : null, c: sc.some(v=> v > 0) ? sc : null, hr: sh.some(v=> v > 0) ? sh : null };
+  }
+  function descarregar(blob, nome){
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 60000);
+  }
+  async function stravaPartilhar(t){
+    const dt = new Date(t.date || Date.now());
+    const base = 'PlayRide-' + dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0') + '-' +
+      String(t.aula || 'treino').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    const fitBlob = new Blob([fitDe(t)], { type: 'application/vnd.ant.fit' }), nome = base + '.fit';
+    let file = null; try{ file = new File([fitBlob], nome, { type: 'application/octet-stream' }); }catch(e){}
+    const podeShare = file && navigator.canShare && navigator.canShare({ files: [file] });
+    descarregar(fitBlob, nome);
+    let ov = $('stravaOv');
+    if(!ov){ ov = document.createElement('div'); ov.id = 'stravaOv'; ov.className = 'strava-ov'; document.body.appendChild(ov); }
+    ov.innerHTML = '<div class="strava-card"><h3>Enviar para o Strava</h3>' +
+      '<p class="ok">✓ Ficheiro guardado: <b>' + escapeHtml(nome) + '</b><br><small>(está nas Transferências · formato .FIT, também serve para Garmin Connect e TrainingPeaks)</small></p>' +
+      '<ol><li>Abre o Strava no browser com a tua conta (no telemóvel, a app do Strava não deixa carregar ficheiros: usa o browser).</li>' +
+      '<li>Em <b>Carregar atividade → Ficheiro</b>, escolhe o ficheiro <b>.fit</b>.</li>' +
+      '<li>Fica como ciclismo indoor, com a potência, cadência, FC, distância e calorias.</li></ol>' +
+      '<a class="btn-strava" href="https://www.strava.com/upload/select" target="_blank" rel="noopener">Abrir o Strava ↗</a>' +
+      (podeShare ? '<button class="btn-outline" id="stravaShare">Partilhar o ficheiro…</button>' : '') +
+      '<button class="btn-link" id="stravaTcx">⤓ Descarregar também em .tcx</button>' +
+      '<button class="btn-link" id="stravaClose">Fechar</button></div>';
+    ov.classList.add('on');
+    ov.onclick = async e=>{
+      if(e.target === ov || e.target.id === 'stravaClose') ov.classList.remove('on');
+      if(e.target.id === 'stravaTcx'){ descarregar(new Blob([tcxDe(t)], { type: 'application/vnd.garmin.tcx+xml' }), base + '.tcx'); e.target.textContent = '✓ ' + base + '.tcx guardado'; }
+      if(e.target.id === 'stravaShare'){ try{ await navigator.share({ files: [file], title: t.aula || 'Treino PlayRide' }); }catch(err){} }
+    };
+  }
+  $('finStrava').addEventListener('click', ()=> stravaPartilhar(treinoAgora()));
+  function saveTreino(final){
+    final = final !== false;
+    if(final) savePending = false;
+    if(savedThisClass || !fbDb || (!pin && !solo)) return;
+    if(me.ts < 60){ if(final && me.ts > 5) $('savedNote').textContent = 'Treino com menos de 1 minuto a pedalar: não foi guardado.'; return; }
+    if(!user){ if(final) $('savedNote').innerHTML = 'Este treino não fica guardado porque não tens sessão iniciada. <a href="#" id="saveLink">Entra na tua conta</a> para guardares os próximos.'; return; }
+    if(final) savedThisClass = true;
+    const sw = serie.w.slice(), sc = serie.c.slice(), sh = serie.hr.slice();
+    if(bucket.n){ sw.push(Math.round(bucket.w/bucket.n)); sc.push(Math.round(bucket.c/bucket.n)); sh.push(Math.round(bucket.hr/bucket.n)); }
+    const serieW = sw, serieC = sc, serieHr = sh;
+    const hrVals = serieHr.filter(x=>x>0);
     const t = {
       date: Date.now(), aula: treinoNome || 'Aula de cycling', pin: pin || null, tipo: solo || 'aula',
       ftp: me.ftp || null, dur: Math.round(me.ts), as: Math.round(me.as),
@@ -1630,22 +2574,36 @@ body.solo-livre #progress{display:none;}
       iz: Math.round(me.iz), rank: myRank ? myRank.p : null, turma: myRank ? myRank.n : null,
       hrAvg: hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null,
       hrMax: hrVals.length ? Math.max(...hrVals) : null,
-      step: SERIE_STEP, w: serie.w.some(v=>v>0) ? serie.w : null, c: serie.c.some(v=>v>0) ? serie.c : null, hr: hrVals.length ? serie.hr : null,
+      step: SERIE_STEP, w: serieW.some(v=>v>0) ? serieW : null, c: serieC.some(v=>v>0) ? serieC : null, hr: hrVals.length ? serieHr : null,
+      emCurso: final ? null : true,
       blocos: blocos.map(b=>({ftp:b.ftp, rpm:b.rpm||0, d:blockDurationSec(b)})),
       modo: modo,
-      fcMax: me.fc || (perfil && perfil.fcMax) || null
+      fcMax: me.fc || (perfil && perfil.fcMax) || null,
+      ftpIni: me.ftpIni || null,
+      ftpTeste: me.ftpTest || null,
+      avaliacao: (me.rx || me.fa) ? {exp: me.rx || null, sente: me.fa || null} : null,
+      humor: moodHoje()
     };
-    const key = new Date().toISOString().slice(0,10) + '_' + (pin || solo) + '_' + Math.random().toString(36).slice(2,6);
-    fbDb.ref('alunos/' + user.uid + '/treinos/' + key).set(t)
-      .then(()=>{ $('savedNote').innerHTML = '<b>✓ Treino guardado na tua conta</b>'; })
-      .catch(()=>{ savedThisClass = false; $('savedNote').textContent = 'Não consegui guardar o treino (sem internet?).'; });
+    const key = getTreinoKey();
+    const uid = user.uid, clean = cleanVals(t);
+    const falhou = (e)=>{
+      if(!final) return;   // guardar intermédio: tenta outra vez daqui a um minuto
+      const l = pendList(); l.push({uid: uid, key: key, t: clean}); pendSave(l);
+      $('savedNote').innerHTML = 'Não consegui guardar agora' + (e && e.code ? ' (' + escapeHtml(String(e.code)) + ')' : '') + '. O treino ficou neste telemóvel e é enviado sozinho da próxima vez que abrires a app com internet.';
+      console.error('saveTreino', e);
+    };
+    try{
+      fbDb.ref('alunos/' + uid + '/treinos/' + key).set(clean)
+        .then(()=>{ if(final){ $('savedNote').innerHTML = '<b>✓ Treino guardado na tua conta</b>'; flushPendentes(); } })
+        .catch(falhou);
+    }catch(e){ falhou(e); }
   }
 
   function renderAcctLine(){
     const el = $('acctLine');
     if(!el) return;
     if(user){ el.innerHTML = '<b>✓</b> Sessão iniciada como ' + escapeHtml((perfil && perfil.nome) || user.email) + '. O treino fica guardado na tua conta.'; }
-    else { el.innerHTML = 'Queres guardar este treino? <a href="#" id="setupAcctLink">Entra ou cria conta</a> (opcional).'; }
+    else { el.innerHTML = '<div class="reg-box"><b>💾 Guarda este treino na tua conta</b>Com conta grátis, cada treino fica guardado com gráfico e a tua evolução.<div class="reg-row"><button type="button" class="btn-reg" id="setupRegBtn">Criar conta grátis</button><a href="#" id="setupAcctLink">Já tenho conta</a></div></div>'; }
   }
 
   function updateAccountBtn(){
@@ -1657,6 +2615,7 @@ body.solo-livre #progress{display:none;}
     showScreen('accountScreen');
     renderAccount();
   }
+  function openRegister(){ openAccount(); if(!user){ const t = $('aToReg'); if(t) t.click(); setTimeout(()=>{ const n = $('aRegName'); if(n && !n.value) n.focus(); else { const em = $('aRegEmail'); if(em) em.focus(); } }, 60); } }
 
   function aErr(e){
     const c = (e && e.code) || '';
@@ -1693,6 +2652,14 @@ body.solo-livre #progress{display:none;}
     return d.toLocaleDateString('pt-PT', {weekday:'short', day:'2-digit', month:'short'}) + ' · ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
   }
 
+  // emojis do treino guardado: como chegou, como saiu e como achou o treino (emojis normais)
+  const EMO_ANTES = {1:['😫','exausto'], 2:['😕','em baixo'], 3:['😐','normal'], 4:['🙂','bem'], 5:['🤩','em grande']};
+  const EMO_DEPOIS = {1:['😫','exausto'], 2:['😮‍💨','cansado'], 3:['🙂','bem'], 4:['💪','forte'], 5:['🔥','em grande']};
+  const EMO_TREINO = {1:['😞','mau'], 2:['😕','fraco'], 3:['😐','razoável'], 4:['😀','bom'], 5:['🤩','excelente']};
+  function treinoEmos(t){
+    const av = t.avaliacao || {}, a = EMO_ANTES[t.humor], d = EMO_DEPOIS[av.sente], x = EMO_TREINO[av.exp];
+    return { a: a, d: d, x: x, any: !!(a || d || x) };
+  }
   function renderTreinoList(){
     const n = treinosCache.length;
     const now = Date.now(), d30 = 30*24*3600*1000;
@@ -1700,16 +2667,17 @@ body.solo-livre #progress{display:none;}
     $('acctStats').innerHTML =
       '<div><div class="v">' + n + '</div><div class="l">treinos</div></div>' +
       '<div><div class="v">' + last30.length + '</div><div class="l">últimos 30 dias</div></div>' +
-      '<div><div class="v">' + Math.round(treinosCache.reduce((s,t)=>s+(t.kj||0),0)) + '</div><div class="l">kJ no total</div></div>';
+      '<div><div class="v">' + Math.round(treinosCache.reduce((s,t)=>s+(t.kj||0),0)) + '</div><div class="l">kcal no total</div></div>';
     if(!n){ $('treinoList').innerHTML = '<div class="hint" style="text-align:left">Ainda não tens treinos guardados. Entra numa aula com a conta iniciada e a bike ligada: no fim, o treino fica aqui.</div>'; return; }
     $('treinoList').innerHTML = '';
     treinosCache.forEach(t=>{
       const row = document.createElement('div');
       row.className = 'tr-item';
       const onlyHr = !t.w && t.hrAvg;
-      row.innerHTML = '<div><b></b><span></span></div><div class="kj">' + (onlyHr ? t.hrAvg + ' <small>bpm</small>' : Math.round(t.kj||0) + ' <small>kJ</small>') + '</div>';
+      const em = treinoEmos(t);
+      row.innerHTML = '<div><b></b><span></span>' + (em.any ? '<i class="tr-emo">' + (em.a ? em.a[0] : '') + (em.a && em.d ? ' → ' : '') + (em.d ? em.d[0] : '') + (em.x ? ' · treino ' + em.x[0] : '') + '</i>' : '') + '</div><div class="kj">' + (onlyHr ? t.hrAvg + ' <small>bpm</small>' : Math.round(t.kj||0) + ' <small>kcal</small>') + '</div>';
       row.querySelector('b').textContent = t.aula || 'Aula';
-      row.querySelector('span').textContent = fmtDate(t.date) + ' · ' + fmtTime(t.dur||0) + (onlyHr ? ' · só FC' : ' · ' + (t.aw||0) + ' W méd.');
+      row.querySelector('span').textContent = fmtDate(t.date) + ' · ' + fmtTime(t.dur||0) + (onlyHr ? ' · só FC' : ' · ' + (t.aw||0) + ' W méd.') + (t.emCurso ? ' · saiu antes do fim' : '') + (t.ftpTeste && t.ftpTeste.ok ? ' · 🎯 FTP ' + t.ftpTeste.ftp + ' W' : '');
       row.addEventListener('click', ()=> showTreino(t.key));
       $('treinoList').appendChild(row);
     });
@@ -1796,7 +2764,7 @@ body.solo-livre #progress{display:none;}
     const hrMax = hr.length ? Math.max(...hr) : (t.hrMax || null);
     const cell = (v,l)=> '<div><div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
     const stats = hasW
-      ? cell(fmtTime(t.dur||0),'tempo') + (t.km ? cell(fmtKm(t.km),'km') : cell(Math.round(t.kj||0),'kJ')) + cell(t.pts||0,'pontos') +
+      ? cell(fmtTime(t.dur||0),'tempo') + (t.km ? cell(fmtKm(t.km),'km') : cell(Math.round(t.kj||0),'kcal')) + cell(t.pts||0,'pontos') +
         cell(t.aw||0,'W médios') + cell(t.mw||0,'W máx') + cell(pct,'%FTP médio') +
         cell((t.as||t.dur) ? Math.round((t.iz||0)/(t.as||t.dur)*100) + '%' : '—','na zona') +
         cell(t.hrAvg || '—','FC média') + cell(t.rank ? t.rank + 'º/' + t.turma : '—','posição')
@@ -1825,13 +2793,18 @@ body.solo-livre #progress{display:none;}
       '<div class="acct-top" style="max-width:none"><button class="btn-link" id="trBack">← Todos os treinos</button></div>' +
       '<div class="section-t" style="margin-top:4px">' + escapeHtml(t.aula||'Aula') + '</div>' +
       '<div class="hint" style="text-align:left">' + fmtDate(t.date) + (t.ftp && hasW ? ' · FTP ' + t.ftp + ' W' : '') + (hasW ? '' : ' · só frequência cardíaca') + '</div>' +
+      (function(){ const em = treinoEmos(t); if(!em.any) return '';
+        const c = (e, l)=> '<div><i>' + (e ? e[0] : '—') + '</i><b>' + (e ? e[1] : '—') + '</b><span>' + l + '</span></div>';
+        return '<div class="tr-emos">' + c(em.a, 'antes') + c(em.d, 'depois') + c(em.x, 'o treino') + '</div>'; })() +
       charts + hrZonesHtml +
       '<div class="me-grid">' + stats + '</div>' +
+      '<button class="btn-strava" id="trStrava" style="margin-top:14px">Enviar para o Strava</button>' +
       '<button class="btn-link" id="trDelete" style="margin-top:16px;color:#E27070">Apagar este treino</button>';
     $('treinoList').style.display = 'none';
     $('acctStats').style.display = 'none';
     det.style.display = '';
     window.scrollTo(0,0);
+    $('trStrava').addEventListener('click', ()=> stravaPartilhar(t));
     $('trBack').addEventListener('click', ()=>{ det.style.display = 'none'; $('treinoList').style.display = ''; $('acctStats').style.display = ''; });
     $('trDelete').addEventListener('click', ()=>{
       if(!confirm('Apagar este treino?')) return;
@@ -1841,6 +2814,7 @@ body.solo-livre #progress{display:none;}
 
   if(auth){
     auth.onAuthStateChanged(async u=>{
+      if(libError){ libError = false; libPlaylife = null; }   // mudou a conta: volta a tentar ler a Biblioteca Playlife
       user = u; perfil = null;
       if(u){
         try{
@@ -1854,7 +2828,7 @@ body.solo-livre #progress{display:none;}
       updateAccountBtn();
       renderAcctLine();
       renderHome();
-      if(u) loadFichaConta();
+      if(u){ loadFichaConta(); setTimeout(flushPendentes, 1500); }
       if(currentScreen === 'setupScreen' && perfil){
         if(perfil.nome) $('nameInput').value = perfil.nome;
         if(perfil.ftp) $('ftpInput').value = perfil.ftp;
@@ -1873,6 +2847,7 @@ body.solo-livre #progress{display:none;}
   $('finAccountBtn').addEventListener('click', ()=>{ leave(); openAccount(); });
   $('acctBack').addEventListener('click', ()=>{ showScreen(returnTo || 'homeScreen'); if(currentScreen === 'homeScreen') renderHome(); });
   document.addEventListener('click', (e)=>{
+    if(e.target && e.target.id === 'setupRegBtn'){ e.preventDefault(); openRegister(); return; }
     if(e.target && (e.target.id === 'setupAcctLink' || e.target.id === 'saveLink')){
       e.preventDefault();
       if(e.target.id === 'saveLink'){ leave(); }
@@ -1925,13 +2900,25 @@ body.solo-livre #progress{display:none;}
   // MENU INICIAL, SÓ PEDALAR E BIBLIOTECA (treino sozinho, sem aula)
   // =====================================================================
   const PRESETS = [
-    { nome:'Base aeróbia · 30 min', modo:'ftp', autorNome:'PlayRide', blocos:[
+    { nome:'Teste FTP · 20 min (Allen-Coggan)', grupo:'COMPETIÇÃO', modo:'ftp', autorNome:'PlayRide', ftpTest:true, blocos:[
+      {nome:'Aquecimento', min:7, sec:0, ftp:60, rpm:85, rpm2:95, tecnica:'Plano Sentado'},
+      {nome:'Ativação 1', min:1, sec:0, ftp:110, rpm:95, rpm2:105, tecnica:'Plano Sentado'},
+      {nome:'Recupera', min:1, sec:0, ftp:50, rpm:85, tecnica:'Plano Sentado'},
+      {nome:'Ativação 2', min:1, sec:0, ftp:110, rpm:95, rpm2:105, tecnica:'Plano Sentado'},
+      {nome:'Recupera', min:1, sec:0, ftp:50, rpm:85, tecnica:'Plano Sentado'},
+      {nome:'Ativação 3', min:1, sec:0, ftp:110, rpm:95, rpm2:105, tecnica:'Plano Sentado'},
+      {nome:'Recupera', min:1, sec:0, ftp:50, rpm:85, tecnica:'Plano Sentado'},
+      {nome:'Esforço máximo 5 min', min:5, sec:0, ftp:115, rpm:90, rpm2:100, tecnica:'Plano Sentado'},
+      {nome:'Recuperação', min:10, sec:0, ftp:50, rpm:80, rpm2:90, tecnica:'Plano Sentado'},
+      {nome:'TESTE FTP · 20 min', min:20, sec:0, ftp:100, rpm:85, rpm2:95, tecnica:'Plano Sentado', teste:true},
+      {nome:'Retorno à calma', min:10, sec:0, ftp:45, rpm:80, rpm2:85, tecnica:'Plano Sentado', tipo:'cool'} ]},
+    { nome:'Base aeróbia · 30 min', grupo:'BAIXO ENDURANCE', modo:'ftp', autorNome:'PlayRide', blocos:[
       {nome:'Aquecimento', min:5, sec:0, ftp:55, rpm:85, tecnica:'sentado, solta as pernas'},
       {nome:'Ritmo de base', min:10, sec:0, ftp:70, rpm:90, tecnica:'sentado'},
       {nome:'Subida leve', min:5, sec:0, ftp:80, rpm:75, tecnica:'sentado, mais carga'},
       {nome:'Ritmo de base', min:6, sec:0, ftp:70, rpm:90, tecnica:''},
       {nome:'Retorno à calma', min:4, sec:0, ftp:50, rpm:85, tecnica:''} ]},
-    { nome:'Limiar 3 × 6 min · 40 min', modo:'ftp', autorNome:'PlayRide', blocos:[
+    { nome:'Limiar 3 × 6 min · 40 min', grupo:'INTERVALADO EXTENSIVO', modo:'ftp', autorNome:'PlayRide', blocos:[
       {nome:'Aquecimento', min:5, sec:0, ftp:55, rpm:85, tecnica:''},
       {nome:'Ativação', min:3, sec:0, ftp:75, rpm:95, tecnica:''},
       {nome:'Limiar 1', min:6, sec:0, ftp:98, rpm:85, tecnica:'sentado, ritmo constante'},
@@ -1940,7 +2927,7 @@ body.solo-livre #progress{display:none;}
       {nome:'Recupera', min:3, sec:0, ftp:55, rpm:90, tecnica:''},
       {nome:'Limiar 3', min:6, sec:0, ftp:98, rpm:85, tecnica:'em pé no último minuto'},
       {nome:'Retorno à calma', min:8, sec:0, ftp:50, rpm:85, tecnica:''} ]},
-    { nome:'VO2máx 30/30 · 30 min', modo:'ftp', autorNome:'PlayRide', blocos:(function(){
+    { nome:'VO2máx 30/30 · 30 min', grupo:'INTERVALADO INTENSIVO', modo:'ftp', autorNome:'PlayRide', blocos:(function(){
       const b=[{nome:'Aquecimento', min:8, sec:0, ftp:55, rpm:85, tecnica:''},{nome:'Ativação', min:2, sec:0, ftp:80, rpm:95, tecnica:''}];
       for(let s=0;s<2;s++){
         for(let i=0;i<6;i++){ b.push({nome:'Forte', min:0, sec:30, ftp:120, rpm:100, tecnica:'em pé ou sentado, a fundo'}); b.push({nome:'Leve', min:0, sec:30, ftp:50, rpm:90, tecnica:''}); }
@@ -1948,7 +2935,7 @@ body.solo-livre #progress{display:none;}
       }
       b.push({nome:'Retorno à calma', min:4, sec:0, ftp:50, rpm:85, tecnica:''});
       return b; })() },
-    { nome:'Resistência por FC · 35 min', modo:'fc', autorNome:'PlayRide', blocos:[
+    { nome:'Resistência por FC · 35 min', grupo:'ALTO ENDURANCE', modo:'fc', autorNome:'PlayRide', blocos:[
       {nome:'Aquecimento', min:6, sec:0, ftp:58, rpm:85, tecnica:''},
       {nome:'Z2 contínuo', min:12, sec:0, ftp:68, rpm:90, tecnica:'conversa possível'},
       {nome:'Z3 tempo', min:8, sec:0, ftp:77, rpm:85, tecnica:''},
@@ -1959,14 +2946,220 @@ body.solo-livre #progress{display:none;}
 
   function renderHome(){
     const nome = (perfil && perfil.nome) || '';
-    $('homeHello').textContent = user ? 'Olá' + (nome ? ', ' + nome : '') + ' 👋' : '';
+    const hr = new Date().getHours(), sauda = hr < 6 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 20 ? 'Boa tarde' : 'Boa noite';   // 6h–12h dia · 12h–20h tarde · 20h–6h noite
+    const pn = nome ? nome.trim().split(/\s+/)[0] : '';
+    $('homeHello').innerHTML = '<span class="hh-g">' + sauda + ' 👋</span>' + (pn ? '<span class="hh-n">' + escapeHtml(pn) + '</span>' : '');
+    renderMood();
     $('tHistSub').textContent = user ? 'Gráficos e evolução dos teus treinos' : 'Entra na tua conta para guardares os treinos';
+    if($('regHome')) $('regHome').style.display = (auth && !user) ? '' : 'none';
     if(typeof ficha !== 'undefined'){
       const fc = fichaFcMax(ficha), id = ficha ? idadeDe(ficha.nasc) : null;
-      $('tFichaSub').textContent = ficha ? (id ? id + ' anos' : 'Ficha') + (fc ? ' · FCmáx ' + fc + ' bpm' : '') + (fichaAlerta(ficha) ? ' · ⚠ fala com o médico' : '') : 'Por preencher: idade, FCmáx e saúde';
+      $('tFichaSub').textContent = ficha ? (id ? id + ' anos' : 'Ficha') + (fc ? ' · FCmáx ' + fc + ' bpm' : '') + (fichaAlerta(ficha) ? ' · ⚠ fala com o médico' : '') + (!ficha.sexo ? ' · ⚠ falta atualizar' : '') : 'Por preencher: idade, FCmáx e saúde';
+      $('fichaUpd').style.display = ficha && !ficha.sexo ? '' : 'none';
     }
   }
 
+  // ===== frase do dia + "como te sentes hoje?" (fica só neste telemóvel) =====
+  // frases por momento do dia (manhã 6–12h · tarde 12–20h · noite 20–6h); muda todos os dias
+  var FRASES = {
+    manha: [
+      'Um bom dia começa com uma boa pedalada.',
+      'O dia ainda agora começou e tu já estás a cuidar de ti.',
+      'Treinar de manhã é ganhar o dia antes de ele começar.',
+      'Acorda o corpo e a cabeça acompanha.',
+      'Café, água e pedais: o pequeno-almoço dos campeões.',
+      'Hoje é uma página em branco. Escreve-a com energia.',
+      'Quem pedala de manhã chega a tudo com mais força.',
+      'O sol nasce para todos. Tu nasces para mais um treino.',
+      'Começa devagar, aquece bem: o dia é longo e é teu.',
+      'Primeira vitória do dia: estares aqui.',
+      'Manhã bem começada, dia meio ganho.',
+      'Hoje tens uma oportunidade nova de seres melhor do que ontem.'
+    ],
+    tarde: [
+      'Meio do dia, energia inteira.',
+      'A tarde é ótima para descarregar o stress nos pedais.',
+      'Pausa no trabalho, play no treino.',
+      'O dia já vai a meio. A tua força ainda vai no início.',
+      'Uma tarde a pedalar vale mais do que uma tarde a adiar.',
+      'Deixa o cansaço do dia na bike e leva só a boa disposição.',
+      'Cada pedalada da tarde é uma recarga para o resto do dia.',
+      'O treino mais difícil é o que não fazes.',
+      'Consistência vence intensidade. Todos os dias, a qualquer hora.',
+      'A subida custa, mas a vista lá de cima vale a pena.',
+      'És mais forte do que a desculpa desta tarde.',
+      'Celebra o progresso, não a perfeição.'
+    ],
+    noite: [
+      'Acabar o dia a pedalar é acabar o dia por cima.',
+      'O dia foi longo? Deixa-o ficar na bike.',
+      'Treino ao fim do dia: o melhor calmante natural.',
+      'Hoje fizeste muito. Agora é tempo para ti.',
+      'Quem treina à noite dorme melhor e acorda mais forte.',
+      'Fecha o dia com chave de ouro: suor e sorriso.',
+      'Ninguém se arrepende de um treino feito, sobretudo ao fim do dia.',
+      'O cansaço passa. O orgulho fica.',
+      'Pedala para soltar o dia e descansar como mereces.',
+      'Descansar faz parte do treino. Não é desistir.',
+      'Mais um dia, mais um passo. Amanhã há mais.',
+      'Vieste, mesmo depois de um dia cheio. Isso diz muito de ti.'
+    ]
+  };
+  function momentoDia(){ const h = new Date().getHours(); return h < 6 ? 'noite' : h < 12 ? 'manha' : h < 20 ? 'tarde' : 'noite'; }
+  // final da mensagem "como te sentes": varia com a hora do dia e com a resposta (muda todos os dias)
+  var MOOD_FIM = {
+    manha: {
+      1: ['De manhã o corpo demora a acordar: aquece devagar e a cabeça acompanha.',
+          'Se a noite foi curta, hoje não há recordes: pedala só para despertar.',
+          'Um pequeno-almoço, água e um treino leve podem mudar o resto do teu dia.',
+          'Às vezes o melhor treino da manhã é o mais calmo. E está tudo certo.'],
+      2: ['Começa devagar: daqui a dez minutos já te vais sentir diferente.',
+          'Manhãs difíceis também acabam. Dá-lhe uma pedalada e vê como fica.',
+          'Não precisas de estar motivado para começar. A motivação chega a pedalar.',
+          'Respira fundo, aquece com calma e deixa o dia ganhar cor.'],
+      3: ['Uma manhã normal é a melhor base para um bom dia. Bom treino!',
+          'Aquece bem nos primeiros minutos e o corpo responde.',
+          'Começar o dia com treino é meio caminho andado.',
+          'Sem pressas: cumpre o plano e sai daqui com energia para o dia.'],
+      4: ['Começar o dia assim é meio caminho andado. Bom treino!',
+          'Boa disposição logo de manhã? Aproveita e dá o teu melhor.',
+          'Hoje acordaste do lado certo da bike. Bora!',
+          'Esse bom humor vai contigo o dia inteiro. Bom treino!'],
+      5: ['Que manhã! Leva essa energia para os blocos fortes.',
+          'Com esse ânimo, hoje o dia é teu. Só não saltes o aquecimento!',
+          'Manhã em grande, treino em grande. Bebe água e dá tudo.',
+          'Estás a brilhar mais do que o sol. Aproveita cada bloco!']
+    },
+    tarde: {
+      1: ['Uma pedalada leve a meio do dia pode ser o empurrão de que precisas.',
+          'Se o dia já pesa, hoje o importante é mexer, não é sofrer.',
+          'Come qualquer coisa e bebe água antes: o cansaço da tarde também é fome.',
+          'Hoje conta mais teres vindo do que a intensidade. Vai com calma.'],
+      2: ['Às vezes a tarde pede só uma pausa. Pedala para limpar a cabeça.',
+          'Deixa os problemas do dia na porta da sala: aqui é só tu e a bike.',
+          'Uma tarde menos boa melhora quase sempre com movimento.',
+          'Treina ao teu ritmo: hoje o objetivo é saíres melhor do que entraste.'],
+      3: ['Tarde normal, treino certo: cumpre o plano e sai a sentir-te bem.',
+          'O meio do dia é ótimo para recarregar baterias. Bom treino!',
+          'Aquece bem, que o corpo está há horas parado.',
+          'Um treino agora e o resto do dia corre melhor.'],
+      4: ['Aproveita esta energia da tarde: dá tudo nos blocos fortes.',
+          'Boa! Hoje é dia de te desafiares um bocadinho.',
+          'Estás bem? Então desafia-te um bocadinho mais do que o costume.',
+          'Esse bom humor da tarde vai fazer-te voar nos sprints.'],
+      5: ['Tarde em grande! Hoje os blocos fortes são teus.',
+          'Com esta energia, puxa pela turma: o teu ânimo é contagiante.',
+          'Que pica! Só não te esqueças de beber água entre blocos.',
+          'Dia perfeito para bateres o teu recorde. Bora!']
+    },
+    noite: {
+      1: ['Ao fim do dia, ouve o corpo: um treino curto e leve, e depois descansa bem.',
+          'Depois de um dia cheio, hoje basta mexer as pernas sem pressão.',
+          'Se estás mesmo exausto, descansar hoje também é treinar para amanhã.',
+          'Pedala devagar, solta o dia e deita-te cedo.'],
+      2: ['Às vezes o dia pesa. Uma pedalada calma ajuda a desligar.',
+          'Fecha o dia com algo que é só para ti: este treino.',
+          'Não tens de dar tudo hoje. Basta estares aqui.',
+          'Respira, pedala e deixa o dia ficar para trás.'],
+      3: ['Um treino ao fim do dia e o sono agradece. Bom treino!',
+          'Fim do dia, treino feito: o melhor fecho possível.',
+          'Cumpre o plano e depois descansa: amanhã vais sentir a diferença.',
+          'Pedala tranquilo e sai daqui pronto para uma boa noite.'],
+      4: ['Fecha o dia em grande e, depois, dorme bem para recuperar.',
+          'Que bom acabar o dia bem disposto! Aproveita os blocos.',
+          'Estás bem ao fim do dia? Isso merece um treino a sério.',
+          'Termina o dia por cima: dá o teu melhor e depois descansa.'],
+      5: ['Que energia para esta hora! Dá tudo e depois relaxa.',
+          'Noite em grande! Os blocos fortes estão à tua espera.',
+          'Com essa pica, hoje és tu quem dá o ritmo à turma.',
+          'Aproveita cada pedalada e, no fim, um bom duche e cama!']
+    }
+  };
+  var MOODS = {
+    1: { t:'Obrigado pela sinceridade. Hoje o melhor treino é <b>leve</b> e sem pressão. Com dor no peito, tonturas ou falta de ar, não treines.', go:'tFree', gl:'Pedala com calma' },
+    2: { t:'Há dias assim, e está tudo bem. <b>Não tens de provar nada a ninguém.</b>', go:'tLib', gl:'Pedala leve' },
+    3: { t:'Um dia normal é um ótimo dia para treinar: <b>a energia vem com as primeiras pedaladas.</b>', go:'tLive', gl:'Entra no treino' },
+    4: { t:'Boa! <b>Aproveita</b> esse bom momento.', go:'tLive', gl:'Entra no treino' },
+    5: { t:'Que energia! 🔥 Hoje é dia de <b>atacar os blocos fortes</b>.', go:'tLive', gl:'Bora para o treino' }
+  };
+  // ===== emojis animados (Noto, da Google); se não carregarem, fica o emoji normal =====
+  const AE_URL = 'https://fonts.gstatic.com/s/e/notoemoji/latest/';
+  function aeHtml(u, c){ return '<img class="ae" src="' + AE_URL + u + '/512.webp" alt="' + c + '" draggable="false" onerror="this.replaceWith(document.createTextNode(this.alt))">'; }
+  function animarEmojis(root){
+    (root || document).querySelectorAll('button[data-u]').forEach(b=>{
+      if(b.dataset.ae) return; b.dataset.ae = '1';
+      const i = b.querySelector('i'), c = i ? i.textContent : b.dataset.c;
+      if(i) i.innerHTML = aeHtml(b.dataset.u, c);
+      else b.insertAdjacentHTML('afterbegin', '<i>' + aeHtml(b.dataset.u, c) + '</i>');
+    });
+  }
+  // ===== cartão "como foi o treino?" no fim =====
+  let rateDone = false, rateAuto = false, rateThen = null;
+  function rateVal(id){ const b = document.querySelector('#' + id + ' button.on'); return b ? +b.dataset.v : null; }
+  function askRating(then){
+    if(rateDone || me.ts < 60 || $('rateOv').classList.contains('on')){ if(then && !$('rateOv').classList.contains('on')) then(); return; }
+    rateThen = then || null;
+    animarEmojis($('rateOv'));
+    document.querySelectorAll('#rateOv .rate-opts button').forEach(b=> b.classList.remove('on'));
+    $('rateOk').disabled = true;
+    $('rateTitle').textContent = (solo ? 'Treino' : 'Aula') + ' terminad' + (solo ? 'o' : 'a') + '! 🎉';
+    $('rateOv').classList.add('on');
+  }
+  function closeRating(){
+    rateDone = true; $('rateOv').classList.remove('on');
+    const f = rateThen; rateThen = null; if(f) f();
+  }
+  ['rateExp','rateFeel'].forEach(id=> $(id).addEventListener('click', e=>{
+    const b = e.target.closest('button'); if(!b) return;
+    $(id).querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
+    $('rateOk').disabled = !(rateVal('rateExp') || rateVal('rateFeel'));
+  }));
+  $('rateOk').addEventListener('click', ()=>{
+    me.rx = rateVal('rateExp'); me.fa = rateVal('rateFeel');
+    pushRider();
+    // se o treino já estava guardado na conta, junta-lhe a avaliação
+    if(user && fbDb && savedThisClass && treinoKey) fbDb.ref('alunos/' + user.uid + '/treinos/' + treinoKey).update({avaliacao: {exp: me.rx || null, sente: me.fa || null}, humor: moodHoje()}).catch(()=>{});
+    closeRating();
+  });
+  $('rateSkip').addEventListener('click', closeRating);
+  function moodHoje(){ try{ const v = JSON.parse(localStorage.getItem('prMood') || 'null'); return (v && v.d === hojeKey() && v.m >= 1 && v.m <= 5) ? v.m : null; }catch(e){ return null; } }
+  function hojeKey(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function renderMood(){
+    const d = new Date(), dia = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5);
+    const pe = $('moodPhrase'); if(!pe || !FRASES || !MOODS) return;
+    const mom = momentoDia(), lst = FRASES[mom];
+    pe.textContent = lst[dia % lst.length];
+    let m = null; try{ const v = JSON.parse(localStorage.getItem('prMood') || 'null'); if(v && v.d === hojeKey()) m = v.m; }catch(e){}
+    document.querySelectorAll('#moodOpts button').forEach(b=> b.classList.toggle('on', +b.dataset.m === m));
+    const r = $('moodResp');
+    $('moodCard').classList.toggle('done', !!m);
+    const bb = $('boraBtn');
+    if(!m){ r.innerHTML = ''; r.style.removeProperty('--mc'); bb.style.removeProperty('--mc'); bb.textContent = 'Bora pedalar →'; return; }
+    const mo = MOODS[m], btn = document.querySelector('#moodOpts button[data-m="' + m + '"]');
+    const mc = btn ? btn.style.getPropertyValue('--mc') : '#A35CFF';
+    r.style.setProperty('--mc', mc); bb.style.setProperty('--mc', mc); bb.textContent = mo.gl + ' →';
+    const fims = MOOD_FIM[mom][m];
+    r.innerHTML = mo.t + ' ' + fims[(dia + m) % fims.length];
+  }
+  $('moodOpts').addEventListener('click', e=>{
+    const b = e.target.closest('button'); if(!b) return;
+    try{ localStorage.setItem('prMood', JSON.stringify({d: hojeKey(), m: +b.dataset.m})); }catch(err){}
+    renderMood();
+  });
+  // "Bora pedalar": abre a escolha Aula ao vivo / Só pedalar / Biblioteca
+  function openGo(){
+    $('goSheet').classList.add('on'); $('goSheet').setAttribute('aria-hidden', 'false');
+  }
+  function closeGo(){ $('goSheet').classList.remove('on'); $('goSheet').setAttribute('aria-hidden', 'true'); }
+  $('boraBtn').addEventListener('click', openGo);
+  $('goClose').addEventListener('click', closeGo);
+  $('goSheet').addEventListener('click', e=>{ if(e.target === $('goSheet') || e.target.closest('.tile.go')) closeGo(); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeGo(); });
+  renderMood();
+  animarEmojis($('moodOpts'));
+  // a app pode ficar aberta horas: ao voltar a ela, a saudação e a frase acertam-se com a hora
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && currentScreen === 'homeScreen') renderHome(); });
+  setInterval(()=>{ if(!document.hidden && currentScreen === 'homeScreen') renderHome(); }, 60000);
   function treinoDur(t){ return (t.blocos||[]).reduce((s,b)=> s + blockDurationSec(b), 0); }
   function profHtml(t){
     const tot = treinoDur(t) || 1, m = parseModo(t.modo);
@@ -1983,18 +3176,46 @@ body.solo-livre #progress{display:none;}
     const modoTxt = parseModo(t.modo) === 'fc' ? '%FCmáx' : (parseModo(t.modo) === 'zonas' ? 'zonas' : '%FTP');
     el.innerHTML = '<div class="li-top"><b></b><small>' + fmtTime(treinoDur(t)) + ' · ' + modoTxt + '</small></div><div class="lib-prof">' + profHtml(t) + '</div>';
     el.querySelector('b').textContent = t.nome || 'Treino';
+    if(t.autorNome){ const by = document.createElement('span'); by.className = 'li-by'; by.textContent = PRESETS.includes(t) ? 'Treino PlayRide' : 'Biblioteca Playlife · ' + t.autorNome; el.appendChild(by); }
     el.addEventListener('click', ()=> openGuided(t));
     return el;
   }
+  // grupos da biblioteca (os mesmos da app do professor)
+  const LIB_GRUPOS = [
+    {n:'RECUPERAÇÃO', c:'#1FA8F0'}, {n:'BAIXO ENDURANCE', c:'#3DD45C'}, {n:'ALTO ENDURANCE', c:'#5B8DEF'}, {n:'MONTANHA', c:'#FF7A45'},
+    {n:'FARTLEK', c:'#FFD60A'}, {n:'INTERVALADO EXTENSIVO', c:'#2EC4B6'}, {n:'INTERVALADO INTENSIVO', c:'#FF4D6D'}, {n:'COMPETIÇÃO', c:'#A35CFF'}
+  ];
+  const LIB_OUTROS = 'OUTROS TREINOS';
+  let libFiltro = '';
+  function libGrupo(t){ return String(t.grupo || '').trim().toUpperCase() || LIB_OUTROS; }
   function renderLib(){
     const list = $('libList');
     list.innerHTML = '';
-    const sec = (txt)=>{ const d = document.createElement('div'); d.className = 'lib-sec'; d.textContent = txt; list.appendChild(d); };
-    if(libPlaylife && libPlaylife.length){ sec('Biblioteca Playlife'); libPlaylife.forEach(t=> list.appendChild(libItem(t))); }
-    sec('Treinos PlayRide');
-    PRESETS.forEach(t=> list.appendChild(libItem(t)));
+    // junta a Biblioteca Playlife com os treinos PlayRide e arruma tudo por grupo
+    const todos = (libPlaylife || []).concat(PRESETS);
+    const por = {}; todos.forEach(t=>{ const g = libGrupo(t); (por[g] = por[g] || []).push(t); });
+    const base = LIB_GRUPOS.map(g=> g.n);
+    const ordem = base.concat(Object.keys(por).filter(g=> !base.includes(g) && g !== LIB_OUTROS).sort()).concat([LIB_OUTROS]).filter(g=> por[g]);
+    const cor = g=> (LIB_GRUPOS.find(x=> x.n === g) || {c: g === LIB_OUTROS ? '#8A93A3' : '#B07CFF'}).c;
+    if(libFiltro && !por[libFiltro]) libFiltro = '';
+    $('libChips').innerHTML = ordem.length > 1 ? '<button data-f="" class="' + (!libFiltro ? 'on' : '') + '">Todos</button>' +
+      ordem.map(g=> '<button data-f="' + escapeHtml(g) + '" class="' + (libFiltro === g ? 'on' : '') + '" style="--gc:' + cor(g) + '"><i></i>' + escapeHtml(g) + '</button>').join('') : '';
+    ordem.forEach(g=>{
+      if(libFiltro && libFiltro !== g) return;
+      const d = document.createElement('div'); d.className = 'lib-sec g'; d.style.setProperty('--gc', cor(g));
+      d.innerHTML = '<i></i>' + escapeHtml(g) + ' <small>' + por[g].length + '</small>';
+      list.appendChild(d);
+      por[g].forEach(t=> list.appendChild(libItem(t)));
+    });
     if(libPlaylife === null && !libError){ const h = document.createElement('div'); h.className = 'hint'; h.textContent = 'A carregar a Biblioteca Playlife…'; list.insertBefore(h, list.firstChild); }
+    if(libError && !user){   // a Biblioteca Playlife só se vê com conta
+      const h = document.createElement('div'); h.className = 'hint';
+      h.innerHTML = 'Entra na tua conta para veres também os treinos da <b>Biblioteca Playlife</b>. <a href="#" id="libLogin">Entrar ou criar conta</a>';
+      list.insertBefore(h, list.firstChild);
+      h.querySelector('#libLogin').addEventListener('click', (e)=>{ e.preventDefault(); openAccount(); });
+    }
   }
+  $('libChips').addEventListener('click', e=>{ const b = e.target.closest('button'); if(!b) return; libFiltro = b.dataset.f || ''; renderLib(); });
   async function openLib(){
     showScreen('libScreen');
     renderLib();
@@ -2034,7 +3255,7 @@ body.solo-livre #progress{display:none;}
   }
   function openGuided(t){
     solo = 'guiado'; pin = null; modo = parseModo(t.modo); treinoNome = t.nome || 'Treino guiado';
-    blocos = (t.blocos||[]).map(b=>({ nome:b.nome||'', min:b.min||0, sec:b.sec||0, ftp:b.ftp||0, rpm:b.rpm||0, rpm2:b.rpm2||0, tipo:b.tipo||null, tecnica:b.tecnica||'' }))
+    blocos = (t.blocos||[]).map(b=>({ nome:b.nome||'', min:b.min||0, sec:b.sec||0, ftp:b.ftp||0, rpm:b.rpm||0, rpm2:b.rpm2||0, tipo:b.tipo||null, tecnica:b.tecnica||'', teste: b.teste ? true : null, alvo: b.alvo === undefined ? null : b.alvo }))
       .filter(b=> blockDurationSec(b) > 0);
     configureSetup(treinoNome, 'guiado');
   }
@@ -2068,8 +3289,8 @@ body.solo-livre #progress{display:none;}
       if(Object.keys(upd).length){ fbDb.ref('alunos/' + user.uid + '/perfil').update(upd).catch(()=>{}); perfil = Object.assign({}, perfil, upd); }
     }
     if(solo === 'livre') modo = (!hasPowerSource() && hrConnected()) ? 'fc' : 'ftp';   // só cinta: o número grande é a FC
-    resetSerie(); savedThisClass = false; $('savedNote').innerHTML = '';
-    me.kj = me.pts = me.as = me.iz = me.mw = me.sumW = me.ts = me.km = me.spd = 0;
+    resetSerie(); savedThisClass = false; treinoKey = null; lastBlockIdx = -1; nxBoomIdx = -1; hideNx(); rateDone = false; rateAuto = false; me.rx = null; me.fa = null; $('savedNote').innerHTML = ''; $('ftpResult').style.display = 'none'; $('finFtp').innerHTML = '';
+    me.kj = me.pts = me.as = me.iz = me.mw = me.sumW = me.ts = me.km = me.spd = me.tw = me.tt = 0; me.ftpIni = null; me.ftpTest = null; me.testDone = false;
     serverOffset = 0; sessionEnded = false; myRank = null; riderRef = null;
     soloClock.acc = 0; soloClock.since = 0;
     if(solo === 'livre') state = { status:'paused', blockIndex:0 };
@@ -2082,8 +3303,8 @@ body.solo-livre #progress{display:none;}
     $('className').textContent = treinoNome;
     $('progress').dataset.built = '';
     updateModeLabels();
-    $('leaveBtn').textContent = '✕ Terminar';
-    $('soloPlay').textContent = '▶ Começar';
+    $('leaveBtn').textContent = 'GRAVAR & SAIR';
+    sbPlayIcon(false); sbForce = false; soloBarSync();
     showScreen('liveScreen');
     $('chipBike').classList.toggle('on', bikeConnected() || demo);
     lastSampleAt = performance.now();
@@ -2097,17 +3318,84 @@ body.solo-livre #progress{display:none;}
     if(state.status === 'playing'){
       if(solo === 'livre'){ soloClock.acc = soloElapsed(); soloClock.since = 0; state = { status:'paused', blockIndex:0 }; }
       else state = Object.assign({}, state, { status:'paused', remainingAtStart: computeRemaining(state) });
-      $('soloPlay').textContent = '▶ Continuar';
+      sbPlayIcon(false);
     } else {
       if(solo === 'livre'){ soloClock.since = Date.now(); state = { status:'playing', blockIndex:0 }; }
       else state = Object.assign({}, state, { status:'playing', startedAt: Date.now() });
-      $('soloPlay').textContent = '❚❚ Pausa';
+      sbPlayIcon(true);
     }
+    render();
+  }
+  // ---- barra de baixo do treino da biblioteca / só pedalar: ⏮ ▶ ⏭ ----
+  // à vista enquanto está parado; durante o treino esconde-se e aparece com o rato no fundo do ecrã ou com um toque em baixo
+  var sbTimer = 0, sbForce = false;
+  var SB_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>';
+  var SB_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4.2" height="15" rx="1.2"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2"/></svg>';
+  function sbPlayIcon(aTocar){
+    const b = $('soloPlay'); b.innerHTML = aTocar ? SB_PAUSE : SB_PLAY;
+    const t = aTocar ? 'Pausa' : (state && state.status === 'paused' && (state.startedAt || soloClock.acc) ? 'Continuar' : 'Começar');
+    b.setAttribute('aria-label', t); b.title = t;
+  }
+  function soloBarSync(){
+    const bar = $('soloBar'); if(!bar) return;
+    const ativo = !!solo && !!state && state.status !== 'finished';
+    const esc = ativo && state.status === 'playing' && !sbForce;
+    bar.classList.toggle('on', ativo);
+    bar.classList.toggle('esc', esc);
+    $('soloHandle').classList.toggle('on', ativo && esc);
+    document.body.classList.toggle('sb-on', ativo && !esc);
+    const g = solo === 'guiado';
+    $('soloBack').style.display = g ? '' : 'none'; $('soloSkip').style.display = g ? '' : 'none';
+  }
+  var sbRato = matchMedia('(hover:hover)').matches;
+  function sbMostra(ms){
+    sbForce = true; clearTimeout(sbTimer);
+    if(ms) sbTimer = setTimeout(sbEsconde, ms);
+    soloBarSync();
+  }
+  function sbEsconde(){
+    if(sbRato && $('soloBar').matches(':hover')) return;
+    sbForce = false; soloBarSync();
+  }
+  (function(){
+    const ls = $('liveScreen'), bar = $('soloBar'), ZONA = 110;
+    let tRato = 0;
+    ls.addEventListener('mousemove', e=>{
+      if(!solo) return;
+      ls.classList.remove('sb-auto'); clearTimeout(tRato);
+      if(state && state.status === 'playing') tRato = setTimeout(()=> ls.classList.add('sb-auto'), 2500);
+      if(window.innerHeight - e.clientY <= ZONA) sbMostra(0);
+      else if(sbForce && !bar.matches(':hover')){ clearTimeout(sbTimer); sbTimer = setTimeout(sbEsconde, 500); }
+    });
+    ls.addEventListener('mouseleave', ()=>{ if(sbForce){ clearTimeout(sbTimer); sbTimer = setTimeout(sbEsconde, 500); } });
+    ls.addEventListener('touchstart', e=>{
+      const t = e.touches[0]; if(!solo || !t) return;
+      if(window.innerHeight - t.clientY <= ZONA * 1.6 || bar.contains(e.target)) sbMostra(4000);
+    }, {passive:true});
+    $('soloHandle').addEventListener('click', ()=> sbMostra(4000));
+    bar.addEventListener('click', ()=>{ if(!sbRato) sbMostra(4000); });
+  })();
+  function soloVoltar(){   // recomeça o bloco se já passaram mais de 3 s; senão volta ao anterior
+    if(!state || state.status === 'finished' || solo !== 'guiado') return;
+    const dur = blockDurationSec(blocos[state.blockIndex]), rem = computeRemaining(state);
+    if(dur - rem > 3 || state.blockIndex === 0) state = Object.assign({}, state, { remainingAtStart: dur, startedAt: Date.now() });
+    else soloGoTo(state.blockIndex - 1);
     render();
   }
   function soloGoTo(idx){
     if(idx >= blocos.length){ finishSolo(); return; }
     state = { blockIndex: idx, status: state.status, remainingAtStart: blockDurationSec(blocos[idx]), startedAt: Date.now() };
+  }
+  // aula ao vivo: se a internet falhar (aqui ou no professor), o telemóvel continua a passar de bloco sozinho
+  // pelo relógio; quando a ligação voltar, o estado do professor volta a mandar
+  function aulaAvancaLocal(){
+    if(!state || state.status !== 'playing' || !blocos.length) return;
+    for(let n = 0; n < 500; n++){
+      const passou = (Date.now() + serverOffset - (state.startedAt || 0)) / 1000 - (state.remainingAtStart || 0);
+      const ni = state.blockIndex + 1;
+      if(passou < 0 || ni >= blocos.length) return;
+      state = Object.assign({}, state, { blockIndex: ni, remainingAtStart: blockDurationSec(blocos[ni]), startedAt: Date.now() + serverOffset - passou * 1000 });
+    }
   }
   function soloAdvance(){
     if(!state || state.status !== 'playing') return;
@@ -2130,14 +3418,16 @@ body.solo-livre #progress{display:none;}
   }
   function renderLivre(){
     if(state.status === 'finished'){
+      if(!rateAuto && !rateDone){ rateAuto = true; setTimeout(()=> askRating(null), 900); }
       blocos = [];
       const tmp = solo; // reaproveita o ecrã de fim
       $('activeBlock').style.display = 'none';
       $('finishedEl').classList.add('active');
-      $('nextEl').textContent = '';
+      $('nextEl').textContent = ''; hideNx();
       $('finTitle').textContent = 'Treino concluído';
       $('totalTimeEl').textContent = fmtTime(soloElapsed());
       $('finKm').textContent = me.km > 0.01 ? fmtKm(me.km) + ' km · ' + (me.as ? (me.km / me.as * 3600).toFixed(1).replace('.', ',') : '0') + ' km/h média' : '';
+      checkFtpTest(); showFtpResult();
       $('finKj').textContent = me.kj.toFixed(0);
       $('finPts').textContent = Math.round(me.pts);
       $('finRank').textContent = '—';
@@ -2146,7 +3436,7 @@ body.solo-livre #progress{display:none;}
       $('finZoneLbl').textContent = 'a gravar';
       $('finZone').textContent = fmtTime(me.ts);
       $('finHomeBtn').style.display = '';
-      $('leaveBtn').textContent = '✕ Sair';
+      $('leaveBtn').textContent = 'GRAVAR & SAIR';
       $('bodyEl').style.background = '#05070A';
       if(!savedThisClass){
         if(user && !savePending){ savePending = true; setTimeout(saveTreino, 300); }
@@ -2176,7 +3466,7 @@ body.solo-livre #progress{display:none;}
     $('techEl').textContent = '';
     $('feelEl').textContent = zone ? zone.feel : '';
     $('timerEl').textContent = fmtTime(soloElapsed());
-    $('timerEl').classList.remove('warn');
+    $('timerEl').classList.remove('t-warn');
     $('targetEl').innerHTML = state.status === 'playing' ? 'Pedala ao teu ritmo' : 'Em pausa · toca em <b>▶</b> para continuar';
     $('bodyEl').style.background = 'radial-gradient(circle at 50% 30%, ' + zc + '33, #05070A 70%)';
     const range = zone ? zoneRange(pct) : {min:0, max:0};
@@ -2188,7 +3478,7 @@ body.solo-livre #progress{display:none;}
     $('myZoneLbl').textContent = 'W médios';
     $('myZone').textContent = me.as ? Math.round(me.sumW/me.as) : 0;
     soloNoSensorMsg();
-    $('nextEl').innerHTML = 'Toca em ✕ Terminar quando acabares';
+    $('nextEl').innerHTML = 'Toca em <b>GRAVAR &amp; SAIR</b> quando acabares'; hideNx();
   }
 
 
@@ -2213,7 +3503,7 @@ body.solo-livre #progress{display:none;}
 
   function chipVal(id){ const b = $(id).querySelector('button.on'); return b ? b.dataset.v : null; }
   function setChip(id, v){ $(id).querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.v === v)); }
-  ['fNivel','fFreq','fObj'].forEach(id=> $(id).addEventListener('click', e=>{ const b = e.target.closest('button'); if(b){ setChip(id, b.dataset.v); fichaPreview(); } }));
+  ['fSexo','fNivel','fFreq','fObj'].forEach(id=> $(id).addEventListener('click', e=>{ const b = e.target.closest('button'); if(b){ setChip(id, b.dataset.v); fichaPreview(); } }));
   $('fParq').addEventListener('click', e=>{
     const b = e.target.closest('button'); if(!b) return;
     b.parentNode.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
@@ -2225,7 +3515,7 @@ body.solo-livre #progress{display:none;}
     $('fParq').querySelectorAll('.f-yn').forEach(g=>{ const on = g.querySelector('button.on'); if(on) parq[g.dataset.q] = Number(on.dataset.v); });
     const num = (id)=>{ const v = Number($(id).value); return v > 0 ? v : null; };
     return {
-      nasc: $('fNasc').value || null, peso: num('fPeso'), altura: num('fAltura'),
+      nasc: $('fNasc').value || null, sexo: chipVal('fSexo'), peso: num('fPeso'), altura: num('fAltura'),
       nivel: chipVal('fNivel'), freq: chipVal('fFreq'), objetivo: chipVal('fObj'),
       fcRep: num('fFcRep'), fcMed: num('fFcMed'), ftp: num('fFtp'), parq: parq,
       decl: $('fDecl').checked, rgpd: $('fRgpd').checked
@@ -2261,7 +3551,7 @@ body.solo-livre #progress{display:none;}
   function fillFichaForm(f){
     f = f || {};
     $('fNasc').value = f.nasc || ''; $('fPeso').value = f.peso || ''; $('fAltura').value = f.altura || '';
-    setChip('fNivel', f.nivel || null); setChip('fFreq', f.freq || null); setChip('fObj', f.objetivo || null);
+    setChip('fSexo', f.sexo || null); setChip('fNivel', f.nivel || null); setChip('fFreq', f.freq || null); setChip('fObj', f.objetivo || null);
     $('fFcRep').value = f.fcRep || ''; $('fFcMed').value = f.fcMed || '';
     $('fFtp').value = f.ftp || (perfil && perfil.ftp) || lsGet(LS.ftp) || '';
     $('fParq').querySelectorAll('.f-yn').forEach(g=>{ const v = f.parq ? f.parq[g.dataset.q] : undefined; g.querySelectorAll('button').forEach(b=> b.classList.toggle('on', v !== undefined && Number(b.dataset.v) === Number(v))); });
@@ -2272,12 +3562,19 @@ body.solo-livre #progress{display:none;}
     fichaPreview();
   }
 
+  function toast(txt){
+    let t = $('prToast');
+    if(!t){ t = document.createElement('div'); t.id = 'prToast'; t.className = 'pr-toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    t.textContent = txt; t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
+    clearTimeout(toast.h); toast.h = setTimeout(()=> t.classList.remove('on'), txt.length > 60 ? 4500 : 2600);
+  }
   function openFicha(){ fillFichaForm(ficha); showScreen('fichaScreen'); }
 
   async function saveFicha(){
     const f = readFichaForm();
     $('fErr').textContent = '';
     if(!f.nasc || !idadeDe(f.nasc)){ $('fErr').textContent = 'Indica a tua data de nascimento.'; $('fNasc').focus(); return; }
+    if(!f.sexo){ $('fErr').textContent = 'Indica o teu sexo (Masculino ou Feminino).'; $('fSexo').scrollIntoView({block:'center'}); return; }
     if(Object.keys(f.parq).length < $('fParq').querySelectorAll('.f-yn').length){ $('fErr').textContent = 'Responde a todas as perguntas do questionário de saúde.'; return; }
     if(!f.decl || !f.rgpd){ $('fErr').textContent = 'Para guardar, confirma as duas caixas no fim.'; return; }
     f.atualizado = Date.now();
@@ -2297,9 +3594,14 @@ body.solo-livre #progress{display:none;}
       }catch(e){ $('fErr').textContent = 'Guardado neste telemóvel, mas não na conta (sem internet?).'; renderHome(); return; }
     }
     $('fSave').textContent = 'Ficha guardada ✓';
-    setTimeout(()=>{ $('fSave').textContent = 'Guardar a minha ficha'; }, 1800);
     $('fDelete').style.display = '';
     renderHome();
+    // mostra a confirmação e volta ao menu inicial
+    setTimeout(()=>{
+      $('fSave').textContent = 'Guardar a minha ficha';
+      showScreen('homeScreen'); renderHome(); window.scrollTo(0, 0);
+      toast('✓ Ficha guardada' + (user ? ' na tua conta' : ' neste telemóvel'));
+    }, 700);
   }
   async function deleteFicha(){
     if(!confirm('Apagar a tua ficha? (os treinos guardados mantêm-se)')) return;
@@ -2331,13 +3633,33 @@ body.solo-livre #progress{display:none;}
       $('fichaLine').innerHTML = 'Ainda não tens ficha. <a href="#" id="fichaLink">Preenche a tua ficha</a> (2 minutos) para treinares com as tuas zonas e em segurança.';
     } else if(fichaAlerta(ficha)){
       $('fichaLine').innerHTML = '<span style="color:#FF8A8A">⚠ Na tua ficha indicaste um problema de saúde: pedala com intensidade leve e avisa o professor.</span>';
+    } else if(!ficha.sexo){
+      $('fichaLine').innerHTML = '<span style="color:#FFD27A">📋 Atualiza a tua ficha: falta indicar o sexo.</span> <a href="#" id="fichaLink">Atualizar agora</a>';
     } else $('fichaLine').innerHTML = '';
     $('setupSafetyTxt').innerHTML = solo
       ? 'Estás a treinar sozinho. Se sentires <b>dor no peito, tonturas, falta de ar ou qualquer desconforto</b>, pára de pedalar e pede ajuda. Em emergência liga <b>112</b>.'
       : 'Se sentires <b>dor no peito, tonturas, falta de ar ou qualquer desconforto</b>, pára de pedalar e pede ajuda ao professor da aula.';
   }
 
-  // aviso durante a aula: aparece ao entrar e sempre que tocas em ⚠
+  // ---- não aparecer na projeção: o treino continua a ser gravado e entra no relatório do professor ----
+  var ocultoProj = false;
+  try{ ocultoProj = localStorage.getItem('prOcultoProj') === '1'; }catch(e){}
+  function ocultoSync(){
+    const b = $('chipOculto'); if(!b) return;
+    b.textContent = ocultoProj ? '🙈' : '👁';
+    b.classList.toggle('on', ocultoProj); b.setAttribute('aria-pressed', ocultoProj ? 'true' : 'false');
+    b.title = ocultoProj ? 'Estás oculto na projeção (toca para voltares a aparecer)' : 'Estás visível na projeção (toca para não apareceres)';
+    document.body.classList.toggle('oculto', ocultoProj);
+  }
+  $('chipOculto').addEventListener('click', ()=>{
+    ocultoProj = !ocultoProj;
+    try{ localStorage.setItem('prOcultoProj', ocultoProj ? '1' : '0'); }catch(e){}
+    ocultoSync(); pushRider();
+    toast(ocultoProj ? '🙈 Já não apareces na projeção. O treino continua a ser gravado e fica no relatório do professor.' : '👁 Voltaste a aparecer na projeção.');
+  });
+  ocultoSync();
+
+  // aviso de segurança: começa minimizado (só o ⚠ em cima, a pulsar uns segundos); abre ao tocar em ⚠
   let safetyTimer = null;
   function showSafety(ms){
     $('safetyBannerTxt').innerHTML = solo
@@ -2354,7 +3676,7 @@ body.solo-livre #progress{display:none;}
     const was = currentScreen;
     _showScreen(id);
     if(id === 'setupScreen') setupFichaInfo();
-    if(id === 'liveScreen' && was !== 'liveScreen') showSafety(12000);
+    if(id === 'liveScreen' && was !== 'liveScreen'){ const c = $('chipSafety'); c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse'); }
     if(id !== 'liveScreen'){ clearTimeout(safetyTimer); $('safetyBanner').classList.remove('on'); }
   };
 
@@ -2363,14 +3685,17 @@ body.solo-livre #progress{display:none;}
   $('fSave').addEventListener('click', saveFicha);
   $('fDelete').addEventListener('click', deleteFicha);
   document.addEventListener('click', (e)=>{ if(e.target && e.target.id === 'fichaLink'){ e.preventDefault(); openFicha(); } });
+  $('fichaUpd').addEventListener('click', openFicha);
 
   $('tLive').addEventListener('click', ()=>{ showScreen('joinScreen'); setTimeout(()=> $('pinInput').focus(), 50); });
   $('tFree').addEventListener('click', openLivre);
   $('tLib').addEventListener('click', openLib);
   $('tHist').addEventListener('click', openAccount);
+  $('regHomeBtn').addEventListener('click', openRegister);
   $('joinBack').addEventListener('click', ()=>{ showScreen('homeScreen'); renderHome(); });
   $('libBack').addEventListener('click', ()=>{ showScreen('homeScreen'); renderHome(); });
   $('soloPlay').addEventListener('click', soloPlayToggle);
+  $('soloBack').addEventListener('click', soloVoltar);
   $('soloSkip').addEventListener('click', ()=>{ if(state && state.status !== 'finished') soloGoTo(state.blockIndex + 1); render(); });
   $('finHomeBtn').addEventListener('click', ()=> leave());
   $('setupBack').addEventListener('click', ()=>{
@@ -2414,6 +3739,38 @@ window.PR_INSTALL_CFG = { key:'aluno', name:'PlayRide', icon:'icon-192.png', acc
       x.addEventListener('click', function(){ window.PlayRideInstall(); });
       home.appendChild(x);
     } };
+</script>
+<script>
+// olho na palavra-passe: toca para ver ou esconder o que escreveste
+(function(){
+  var EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  var st = document.createElement('style');
+  st.textContent = '.pw-wrap{position:relative;display:block;width:100%;}' +
+    '.pw-wrap input{width:100%;box-sizing:border-box;padding-right:48px !important;}' +
+    'button.pw-eye{position:absolute;top:0;right:0;bottom:0;width:46px !important;min-width:0;padding:0 !important;margin:0;background:none !important;border:none !important;box-shadow:none !important;color:#8A93A3;display:flex;align-items:center;justify-content:center;cursor:pointer;}' +
+    'button.pw-eye:hover,button.pw-eye.on{color:#fff;}' +
+    'button.pw-eye svg{width:22px;height:22px;}';
+  document.head.appendChild(st);
+  document.querySelectorAll('input[type=password]').forEach(function(inp){
+    var w = document.createElement('span'); w.className = 'pw-wrap';
+    inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'pw-eye'; b.tabIndex = -1;
+    b.setAttribute('aria-label', 'Mostrar palavra-passe'); b.innerHTML = EYE;
+    w.appendChild(b);
+    b.addEventListener('mousedown', function(e){ e.preventDefault(); });   // não tira o foco do campo
+    b.addEventListener('click', function(e){
+      e.preventDefault();
+      var ver = inp.type === 'password';
+      inp.type = ver ? 'text' : 'password';
+      b.innerHTML = ver ? EYE_OFF : EYE; b.classList.toggle('on', ver);
+      b.setAttribute('aria-label', ver ? 'Esconder palavra-passe' : 'Mostrar palavra-passe');
+      try{ var n = inp.value.length; inp.focus(); inp.setSelectionRange(n, n); }catch(err){}
+    });
+    // ao enviar o formulário volta a esconder (para o browser oferecer guardar a palavra-passe)
+    if(inp.form) inp.form.addEventListener('submit', function(){ if(inp.type === 'text'){ inp.type = 'password'; b.innerHTML = EYE; b.classList.remove('on'); } }, true);
+  });
+})();
 </script>
 <script src="instalar.js"></script>
 <div class="legal">© 2026 Mário Teixeira · todos os direitos reservados</div>
