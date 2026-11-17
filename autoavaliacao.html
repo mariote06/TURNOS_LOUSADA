@@ -97,6 +97,7 @@ details summary{cursor:pointer;font-weight:600;color:var(--accent)}
 }
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -164,8 +165,11 @@ details summary{cursor:pointer;font-weight:600;color:var(--accent)}
     <div class="bar"><i id="barfill"></i></div>
     <div class="prog" id="prog">0 de 15 critérios respondidos</div>
     <div class="btns">
-      <button class="btn" id="copy" type="button">Copiar resumo</button>
-      <a class="btn alt" id="wa" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true">Enviar por WhatsApp</a>
+      <button class="btn" id="pdf" type="button" aria-disabled="true">Enviar PDF</button>
+    </div>
+    <div class="btns">
+      <a class="btn alt" id="wa" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true">WhatsApp (texto)</a>
+      <button class="btn alt" id="copy" type="button" aria-disabled="true">Copiar resumo</button>
     </div>
     <div class="msg" id="msg" role="status"></div>
     <details>
@@ -295,8 +299,9 @@ function update(){
   wa.setAttribute('aria-disabled',ok?'false':'true');
   wa.href=ok?('https://wa.me/?text='+encodeURIComponent(txt)):'#';
   $('copy').setAttribute('aria-disabled',ok?'false':'true');
+  $('pdf').setAttribute('aria-disabled',ok?'false':'true');
   if(!ok){ setMsg(st.done<N?'Responde a todos os critérios para poderes enviar.':'Escreve o teu nome para poderes enviar.',false); }
-  else setMsg('Tudo preenchido. Copia o resumo ou envia por WhatsApp para o teu coordenador.',true);
+  else setMsg('Tudo preenchido. Carrega em Enviar PDF e escolhe o WhatsApp do teu coordenador.',true);
 }
 function setMsg(t,ok){ var m=$('msg'); m.textContent=t; m.className='msg'+(ok?' ok':''); }
 
@@ -333,6 +338,97 @@ $('copy').addEventListener('click',function(){
   });
 });
 $('wa').addEventListener('click',function(e){ if(this.getAttribute('aria-disabled')==='true'){ e.preventDefault(); update(); } });
+
+
+function slug(t){return (t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');}
+function buildPdf(){
+  var J=window.jspdf; if(!J||!J.jsPDF) throw new Error('jspdf');
+  var st=stats(), doc=new J.jsPDF({unit:'mm',format:'a4'});
+  var W=210, M=16, CW=W-2*M, y=0, G=[11,122,90], INK=[22,32,28], MU=[91,104,98], LN=[217,224,220];
+  function need(h){ if(y+h>282){ doc.addPage(); y=18; } }
+  function txt(t,x,size,bold,col,w){
+    doc.setFont('helvetica',bold?'bold':'normal'); doc.setFontSize(size); doc.setTextColor(col[0],col[1],col[2]);
+    var lines=doc.splitTextToSize(t,w||CW), lh=size*0.3528*1.35;
+    for(var i=0;i<lines.length;i++){ need(lh); doc.text(lines[i],x,y+size*0.3528); y+=lh; }
+  }
+  // cabeçalho
+  doc.setFillColor(G[0],G[1],G[2]); doc.rect(0,0,W,30,'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('PLAYLIFE FITNESS CENTER · SALA DE EXERCÍCIO',M,11);
+  doc.setFontSize(20); doc.text('Autoavaliação do Técnico de Exercício',M,22);
+  y=38;
+  var dt=state.data?state.data.split('-').reverse().join('/'):'–';
+  txt('Nome: '+state.nome.trim(),M,12,true,INK);
+  txt('Unidade: '+(state.unidade||'–')+'      Data: '+dt,M,11,false,MU);
+  y+=3;
+  // total
+  var pct=Math.round(st.total/MAX*100);
+  doc.setDrawColor(LN[0],LN[1],LN[2]); doc.setFillColor(245,248,246); doc.roundedRect(M,y,CW,22,2,2,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(G[0],G[1],G[2]);
+  doc.text(st.total+' / '+MAX,M+5,y+10.5);
+  doc.setFontSize(11); doc.setTextColor(INK[0],INK[1],INK[2]);
+  doc.text(classify(st.total)+' ('+pct+'%)',M+5,y+17.5);
+  doc.setFillColor(LN[0],LN[1],LN[2]); doc.rect(M+70,y+9,CW-77,3.2,'F');
+  doc.setFillColor(G[0],G[1],G[2]); doc.rect(M+70,y+9,(CW-77)*st.total/MAX,3.2,'F');
+  y+=30;
+  // parâmetros
+  st.per.forEach(function(r){
+    need(30);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(INK[0],INK[1],INK[2]);
+    doc.text(r.p.nome,M,y+4.5);
+    doc.setFontSize(11); doc.setTextColor(G[0],G[1],G[2]);
+    doc.text('Média '+(r.avg===null?'–':fmt(r.avg)),W-M,y+4.5,{align:'right'});
+    y+=7; doc.setDrawColor(G[0],G[1],G[2]); doc.setLineWidth(0.5); doc.line(M,y,W-M,y); y+=3;
+    r.p.crit.forEach(function(c,ci){
+      need(9);
+      var v=state.s[r.p.id+'_'+ci]||0;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(INK[0],INK[1],INK[2]);
+      doc.text(c[0],M+1,y+4);
+      for(var k=1;k<=5;k++){
+        var bx=W-M-5*7+(k-1)*7;
+        if(k<=v){ doc.setFillColor(G[0],G[1],G[2]); doc.roundedRect(bx,y+0.8,5.5,4,0.8,0.8,'F'); }
+        else { doc.setFillColor(LN[0],LN[1],LN[2]); doc.roundedRect(bx,y+0.8,5.5,4,0.8,0.8,'F'); }
+      }
+      doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(INK[0],INK[1],INK[2]);
+      doc.text(String(v),W-M-5*7-3,y+4,{align:'right'});
+      y+=7;
+    });
+    var cm=(state.c[r.p.id]||'').trim();
+    if(cm){ y+=1; txt('Comentário: '+cm,M+1,9.5,false,MU,CW-2); }
+    y+=5;
+  });
+  // fecho
+  var blocks=[['Os meus pontos fortes',state.fortes],['O que quero melhorar',state.melhorar],['Plano de melhoria',state.plano],['Apoio de que preciso',state.apoio]];
+  blocks.forEach(function(b){
+    var t=(b[1]||'').trim(); if(!t) return;
+    need(16); txt(b[0],M,11.5,true,G); y+=1; txt(t,M,10.5,false,INK); y+=4;
+  });
+  // rodapé
+  var n=doc.getNumberOfPages();
+  for(var i=1;i<=n;i++){ doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(MU[0],MU[1],MU[2]);
+    doc.text('Escala: 1 preciso de melhorar muito · 3 cumpro o essencial · 5 excelente',M,292);
+    doc.text(i+'/'+n,W-M,292,{align:'right'}); }
+  var name='Autoavaliacao_TEF_'+slug(state.nome)+'_'+(state.data||'')+'.pdf';
+  return {blob:doc.output('blob'),name:name};
+}
+$('pdf').addEventListener('click',function(){
+  var st=stats();
+  if(!ready(st)){ update(); return; }
+  var out;
+  try{ out=buildPdf(); }catch(e){ setMsg('Não consegui gerar o PDF. Verifica a ligação à internet e tenta outra vez, ou usa o botão WhatsApp (texto).',false); return; }
+  var file=new File([out.blob],out.name,{type:'application/pdf'});
+  var data={files:[file],title:'Autoavaliação TEF – '+state.nome.trim(),text:'Autoavaliação TEF – '+state.nome.trim()};
+  if(navigator.canShare && navigator.canShare(data)){
+    navigator.share(data).then(function(){ setMsg('PDF partilhado. Obrigado!',true); },
+      function(err){ if(err&&err.name==='AbortError'){ setMsg('Envio cancelado. Carrega em Enviar PDF para tentar outra vez.',false);} else { baixar(out); } });
+  } else { baixar(out); }
+});
+function baixar(out){
+  var u=URL.createObjectURL(out.blob), a=document.createElement('a');
+  a.href=u; a.download=out.name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){URL.revokeObjectURL(u);},10000);
+  setMsg('O PDF foi guardado no telemóvel ('+out.name+'). Anexa-o numa mensagem ao teu coordenador.',true);
+}
 
 build(); load();
 if(!state.data){ var d=new Date(); state.data=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
