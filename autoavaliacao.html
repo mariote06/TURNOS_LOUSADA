@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autoavaliação TEF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: coluna única de leitura (máx. 760px), cartões por parâmetro, resultado fixo no fundo em mobile */
+:root{
+  --bg:#f3f5f4;
+  --surface:#ffffff;
+  --ink:#16201c;
+  --muted:#5b6862;
+  --line:#d9e0dc;
+  --accent:#0b7a5a;
+  --accent-ink:#ffffff;
+  --accent-soft:#dff2ea;
+  --warn:#b4540a;
+  --f-display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --f-body:'Barlow',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101614; --surface:#18211e; --ink:#e8efeb; --muted:#9aa8a1; --line:#2a3631;
+    --accent:#3cc99b; --accent-ink:#08231a; --accent-soft:#17352b; --warn:#f0a35e;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#18211e; --ink:#e8efeb; --muted:#9aa8a1; --line:#2a3631;
+  --accent:#3cc99b; --accent-ink:#08231a; --accent-soft:#17352b; --warn:#f0a35e;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--f-body)}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+header{padding:8px 0 4px}
+.eyebrow{font:600 13px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 40px/1.05 var(--f-display);margin:8px 0 6px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px}
+h2{font:700 24px/1.1 var(--f-display);margin:0;text-wrap:balance}
+.legend{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;font-size:13px;color:var(--muted)}
+.legend div{border:1px solid var(--line);border-radius:8px;padding:6px 4px;text-align:center;line-height:1.2}
+.legend b{display:block;font:700 18px/1 var(--f-display);color:var(--ink);margin-bottom:2px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+input[type=text],input[type=date],select,textarea{
+  font:400 16px/1.4 var(--f-body);color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+textarea{min-height:84px;resize:vertical}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.param-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.avg{font:600 14px/1 var(--f-body);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.avg b{font:700 22px/1 var(--f-display);color:var(--accent)}
+.crit{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+.crit:first-of-type{border-top:0;padding-top:0}
+.crit-name{font-weight:600}
+.crit-desc{color:var(--muted);font-size:14px;margin-top:-4px}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.scale input{position:absolute;opacity:0;pointer-events:none}
+.scale label{
+  display:flex;align-items:center;justify-content:center;min-height:46px;
+  border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer;
+  font:700 20px/1 var(--f-display);user-select:none}
+.scale label:hover{border-color:var(--accent)}
+.scale input:checked+label{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.scale input:focus-visible+label{outline:3px solid var(--accent);outline-offset:2px}
+.note{font-size:14px;color:var(--muted);margin:0}
+.result{position:sticky;bottom:8px;z-index:5;box-shadow:0 6px 24px rgba(0,0,0,.18);gap:10px}
+.res-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.score{font:700 34px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.score small{font:600 16px/1 var(--f-body);color:var(--muted)}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:14px}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+.prog{font-size:14px;color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 16px/1 var(--f-body);padding:13px 16px;border-radius:10px;border:1px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:46px;flex:1 1 150px}
+.btn.alt{background:transparent;color:var(--accent)}
+.btn[aria-disabled=true]{opacity:.45;cursor:not-allowed}
+.msg{font-size:14px;min-height:20px;color:var(--warn)}
+.msg.ok{color:var(--accent)}
+details summary{cursor:pointer;font-weight:600;color:var(--accent)}
+#summary{font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;min-height:180px;margin-top:8px}
+@media (max-width:480px){
+  h1{font-size:34px}
+  .fields{grid-template-columns:1fr}
+  .legend{font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Playlife Fitness Center · Sala de Exercício</div>
+    <h1>Autoavaliação do Técnico de Exercício</h1>
+    <p>Avalia o teu desempenho em cada critério, de 1 a 5, como se estivesses a ver o teu último mês de turnos. Responde com sinceridade: serve para definirmos juntos onde te posso ajudar, não para te penalizar.</p>
+  </header>
+
+  <section class="card" aria-labelledby="h-id">
+    <h2 id="h-id">Identificação</h2>
+    <div class="fields">
+      <label class="f full" for="nome">Nome
+        <input type="text" id="nome" autocomplete="name" placeholder="Nome e apelido">
+      </label>
+      <label class="f" for="unidade">Unidade
+        <select id="unidade">
+          <option value="">Escolher…</option>
+          <option>Lousada</option>
+          <option>Penafiel</option>
+        </select>
+      </label>
+      <label class="f" for="data">Data
+        <input type="date" id="data">
+      </label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-esc">
+    <h2 id="h-esc">Como pontuar</h2>
+    <div class="legend">
+      <div><b>1</b>Preciso de melhorar muito</div>
+      <div><b>2</b>Abaixo do esperado</div>
+      <div><b>3</b>Cumpro o essencial</div>
+      <div><b>4</b>Faço bem</div>
+      <div><b>5</b>Excelente, constante</div>
+    </div>
+    <p class="note">Pensa em exemplos reais com clientes. Podes escrever um exemplo ou comentário no fim de cada grupo.</p>
+  </section>
+
+  <div id="params" style="display:contents"></div>
+
+  <section class="card" aria-labelledby="h-fin">
+    <h2 id="h-fin">Para fechar</h2>
+    <label class="f" for="fortes">Os meus pontos fortes
+      <textarea id="fortes" placeholder="O que faço melhor no dia a dia"></textarea>
+    </label>
+    <label class="f" for="melhorar">O que quero melhorar
+      <textarea id="melhorar" placeholder="Onde sinto mais dificuldade"></textarea>
+    </label>
+    <label class="f" for="plano">Plano de melhoria: o que vou fazer
+      <textarea id="plano" placeholder="Ações concretas para as próximas semanas"></textarea>
+    </label>
+    <label class="f" for="apoio">Apoio de que preciso
+      <textarea id="apoio" placeholder="Formação, acompanhamento em turno, materiais…"></textarea>
+    </label>
+  </section>
+
+  <section class="card result" aria-live="polite" aria-labelledby="h-res">
+    <h2 id="h-res" style="position:absolute;left:-9999px">Resultado</h2>
+    <div class="res-top">
+      <div class="score"><span id="total">0</span><small> / 75</small></div>
+      <span class="badge" id="classif">Por preencher</span>
+    </div>
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="prog" id="prog">0 de 15 critérios respondidos</div>
+    <div class="btns">
+      <button class="btn" id="copy" type="button">Copiar resumo</button>
+      <a class="btn alt" id="wa" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true">Enviar por WhatsApp</a>
+    </div>
+    <div class="msg" id="msg" role="status"></div>
+    <details>
+      <summary>Ver o resumo a enviar</summary>
+      <textarea id="summary" readonly></textarea>
+    </details>
+  </section>
+</div>
+
+<script>
+var PARAMS=[
+ {id:'perfil',nome:'Perfil de cliente / prescrição',crit:[
+  ['Histórico do cliente','Compreendo e uso o histórico do cliente: lesões, objetivos, experiências anteriores.'],
+  ['Origem da prescrição do treino','Identifico a origem da prescrição (TEF, PT, Play 30, Standard, Aulas de Grupo, externa ou sem prescrição) e adapto o meu acompanhamento.']]},
+ {id:'variaveis',nome:'Variáveis do treino',crit:[
+  ['Variáveis do treino','Controlo a carga, o volume, a intensidade, a frequência e o descanso.'],
+  ['Metodologias de treino','Domino diferentes metodologias e apresento-as aos clientes: superséries, circuito, drop set, tri set, etc.'],
+  ['Progressões','Ajusto continuamente os exercícios à evolução do treino.']]},
+ {id:'comunicacao',nome:'Comunicação',crit:[
+  ['Empatia','Compreendo as necessidades emocionais do cliente.'],
+  ['Energia e motivação','Motivo e envolvo os clientes.'],
+  ['Clareza na explicação','Comunico de forma clara e adaptada às necessidades do cliente.'],
+  ['Criação de relação e confiança','Construo vínculo e confiança com o cliente.']]},
+ {id:'foco',nome:'Foco / Missão',crit:[
+  ['Estar presente','Mantenho atenção, concentração e disponibilidade durante todo o turno.'],
+  ['Compromisso com os objetivos do cliente','Alinho constantemente o treino com os objetivos do cliente.'],
+  ['Observação e ajuste contínuo','Monitorizo e faço ajustes frequentes durante os treinos.'],
+  ['Feedback e acompanhamento do progresso','Giro bem os horários, planeio os treinos a médio e longo prazo e dou feedback sobre o progresso.']]},
+ {id:'higiene',nome:'Higiene e Segurança',crit:[
+  ['Manutenção do espaço e segurança','Garanto a limpeza, a organização dos equipamentos e a segurança durante os treinos.'],
+  ['Aparência','Uso sempre o uniforme e o equipamento adequados.']]}
+];
+var MAX=75, N=15;
+var BANDS=[ // percentagem do máximo
+  {min:90,t:'Excelente'},{min:75,t:'Muito bom'},{min:50,t:'Regular'},{min:30,t:'Insatisfatório'},{min:0,t:'Não satisfaz os requisitos'}];
+var STORE='tef_autoavaliacao_rascunho_v1';
+var state={nome:'',unidade:'',data:'',fortes:'',melhorar:'',plano:'',apoio:'',s:{},c:{}};
+function $(i){return document.getElementById(i)}
+
+function build(){
+  var host=$('params'), k=0, html='';
+  PARAMS.forEach(function(p,pi){
+    html+='<section class="card" aria-labelledby="h-'+p.id+'"><div class="param-head"><h2 id="h-'+p.id+'">'+p.nome+'</h2>'+
+      '<div class="avg">Média <b id="avg-'+p.id+'">–</b></div></div>';
+    p.crit.forEach(function(c,ci){
+      var key=p.id+'_'+ci;
+      html+='<div class="crit" role="radiogroup" aria-labelledby="n-'+key+'">'+
+        '<div class="crit-name" id="n-'+key+'">'+c[0]+'</div><div class="crit-desc">'+c[1]+'</div><div class="scale">';
+      for(var v=1;v<=5;v++){
+        html+='<input type="radio" name="'+key+'" id="'+key+'_'+v+'" value="'+v+'"><label for="'+key+'_'+v+'" aria-label="'+c[0]+': '+v+'">'+v+'</label>';
+      }
+      html+='</div></div>';
+      k++;
+    });
+    html+='<label class="f" for="c-'+p.id+'">Exemplo ou comentário (opcional)<textarea id="c-'+p.id+'" data-c="'+p.id+'" placeholder="Uma situação real que justifique a tua pontuação"></textarea></label></section>';
+  });
+  host.innerHTML=html;
+}
+
+function load(){
+  try{var r=localStorage.getItem(STORE); if(r){var o=JSON.parse(r); if(o&&typeof o==='object'){ for(var k in state){ if(k in o) state[k]=o[k]; } }}}catch(e){}
+}
+function save(){ try{localStorage.setItem(STORE,JSON.stringify(state));}catch(e){} }
+
+function paint(){
+  ['nome','unidade','data','fortes','melhorar','plano','apoio'].forEach(function(id){ $(id).value=state[id]||''; });
+  PARAMS.forEach(function(p){
+    $('c-'+p.id).value=state.c[p.id]||'';
+    p.crit.forEach(function(c,ci){
+      var key=p.id+'_'+ci, v=state.s[key];
+      if(v){ var el=$(key+'_'+v); if(el) el.checked=true; }
+    });
+  });
+}
+
+function classify(total){
+  var pct=total/MAX*100;
+  for(var i=0;i<BANDS.length;i++){ if(pct>=BANDS[i].min) return BANDS[i].t; }
+  return BANDS[BANDS.length-1].t;
+}
+function fmt(n){return (Math.round(n*10)/10).toFixed(1).replace('.',',');}
+
+function stats(){
+  var total=0, done=0, per=[];
+  PARAMS.forEach(function(p){
+    var sum=0, cnt=0;
+    p.crit.forEach(function(c,ci){ var v=state.s[p.id+'_'+ci]; if(v){sum+=v;cnt++;} });
+    total+=sum; done+=cnt;
+    per.push({p:p,sum:sum,cnt:cnt,avg:cnt?sum/cnt:null});
+  });
+  return {total:total,done:done,per:per};
+}
+
+function summaryText(st){
+  var L=[];
+  L.push('AUTOAVALIAÇÃO TEF – Playlife');
+  L.push('Nome: '+(state.nome||'–'));
+  L.push('Unidade: '+(state.unidade||'–')+'   Data: '+(state.data?state.data.split('-').reverse().join('/'):'–'));
+  L.push('');
+  L.push('Total: '+st.total+'/'+MAX+' ('+Math.round(st.total/MAX*100)+'%) – '+classify(st.total));
+  L.push('');
+  st.per.forEach(function(r){
+    L.push(r.p.nome+': média '+(r.avg===null?'–':fmt(r.avg)));
+    r.p.crit.forEach(function(c,ci){ L.push('  • '+c[0]+': '+(state.s[r.p.id+'_'+ci]||'–')); });
+    if(state.c[r.p.id]) L.push('  Comentário: '+state.c[r.p.id].trim());
+  });
+  L.push('');
+  if(state.fortes) L.push('Pontos fortes: '+state.fortes.trim());
+  if(state.melhorar) L.push('A melhorar: '+state.melhorar.trim());
+  if(state.plano) L.push('Plano de melhoria: '+state.plano.trim());
+  if(state.apoio) L.push('Apoio de que preciso: '+state.apoio.trim());
+  return L.join('\n');
+}
+
+function ready(st){ return st.done===N && state.nome.trim().length>1; }
+
+function update(){
+  var st=stats();
+  $('total').textContent=st.total;
+  $('barfill').style.width=(st.total/MAX*100)+'%';
+  $('classif').textContent=st.done===N?classify(st.total):'Por preencher';
+  $('prog').textContent=st.done+' de '+N+' critérios respondidos';
+  st.per.forEach(function(r){ $('avg-'+r.p.id).textContent=r.avg===null?'–':fmt(r.avg); });
+  var txt=summaryText(st);
+  $('summary').value=txt;
+  var ok=ready(st), wa=$('wa');
+  wa.setAttribute('aria-disabled',ok?'false':'true');
+  wa.href=ok?('https://wa.me/?text='+encodeURIComponent(txt)):'#';
+  $('copy').setAttribute('aria-disabled',ok?'false':'true');
+  if(!ok){ setMsg(st.done<N?'Responde a todos os critérios para poderes enviar.':'Escreve o teu nome para poderes enviar.',false); }
+  else setMsg('Tudo preenchido. Copia o resumo ou envia por WhatsApp para o teu coordenador.',true);
+}
+function setMsg(t,ok){ var m=$('msg'); m.textContent=t; m.className='msg'+(ok?' ok':''); }
+
+function copyText(txt){
+  function fallback(){
+    var ta=$('summary'); ta.value=txt; ta.focus(); ta.select();
+    try{ return document.execCommand('copy'); }catch(e){ return false; }
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(txt).then(function(){return true;},function(){return fallback();});
+  }
+  return Promise.resolve(fallback());
+}
+
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.type==='radio'){ state.s[t.name]=parseInt(t.value,10); }
+  else if(t.dataset && t.dataset.c){ state.c[t.dataset.c]=t.value; }
+  else if(t.id && t.id in state){ state[t.id]=t.value; }
+  save(); update();
+});
+document.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.dataset && t.dataset.c){ state.c[t.dataset.c]=t.value; }
+  else if(t.id && ['nome','fortes','melhorar','plano','apoio'].indexOf(t.id)>-1){ state[t.id]=t.value; }
+  else return;
+  save(); update();
+});
+$('copy').addEventListener('click',function(){
+  var st=stats();
+  if(!ready(st)){ update(); return; }
+  copyText(summaryText(st)).then(function(ok){
+    setMsg(ok?'Resumo copiado. Cola-o numa mensagem para o coordenador.':'Não consegui copiar. Abre "Ver o resumo a enviar" e copia o texto manualmente.',ok);
+  });
+});
+$('wa').addEventListener('click',function(e){ if(this.getAttribute('aria-disabled')==='true'){ e.preventDefault(); update(); } });
+
+build(); load();
+if(!state.data){ var d=new Date(); state.data=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+paint(); update();
+</script>
+</body>
+</html>
